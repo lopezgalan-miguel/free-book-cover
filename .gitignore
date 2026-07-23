@@ -1,0 +1,25 @@
+mockups/
+
+# dependencias
+node_modules/
+
+# builds
+dist/
+dist-ssr/
+*.local
+
+# capacitor (plataformas nativas generadas)
+android/
+ios/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store

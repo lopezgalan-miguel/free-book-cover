@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+/*
+ * TOKENS DE DISEÑO (fuente única de verdad visual)
+ * ------------------------------------------------
+ * Extraídos de los mockups. Se usan como clases de Tailwind (bg-panel,
+ * text-ink, border-line, text-accent…) para que TODOS los componentes
+ * compartan la misma paleta y sea trivial cambiar el tema en un solo sitio.
+ * Mobile First: los tamaños base son los de móvil; se escalan con utilidades
+ * responsive (sm:, md:, lg:).
+ */
+@theme {
+  /* Paleta — tonos cálidos "papel / tinta / dorado" del editor */
+  --color-stage: #26231d; /* fondo del escenario (detrás del lienzo) */
+  --color-canvas: #efece5; /* fondo de la app en escritorio */
+  --color-panel: #faf8f4; /* paneles y hojas */
+  --color-line: #e7e2d8; /* bordes suaves */
+  --color-line-soft: #eee7db; /* separadores internos */
+  --color-ink: #2b2824; /* texto principal */
+  --color-ink-soft: #5c554a; /* texto secundario */
+  --color-muted: #a49b8c; /* texto atenuado / metadatos */
+  --color-accent: #a98a5f; /* dorado de marca */
+  --color-accent-strong: #8c6f47; /* dorado en hover / activo */
+  --color-accent-tint: #f4ecdd; /* fondo de estado activo */
+  --color-danger: #b4453a; /* acciones destructivas */
+
+  /* Tipografías de interfaz. Las fuentes de CONTENIDO (portadas) se cargan
+     dinámicamente desde el panel de fuentes, no aquí. */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  /* Respeta las áreas seguras en móvil (notch, isla dinámica). */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
