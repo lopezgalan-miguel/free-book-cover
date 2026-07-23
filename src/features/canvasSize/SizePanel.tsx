@@ -13,6 +13,6 @@
  *    con clamp para no permitir valores absurdos.
  */
 
-export function SizePanel() {
+export const SizePanel = () => {
   return <section data-panel="size" />;
-}
+};

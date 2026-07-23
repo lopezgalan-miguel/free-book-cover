@@ -14,6 +14,6 @@
  *    cual, sin rasterizar.
  */
 
-export function FontPanel() {
+export const FontPanel = () => {
   return <section data-panel="fonts" />;
-}
+};

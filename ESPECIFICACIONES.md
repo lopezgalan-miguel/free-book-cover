@@ -40,6 +40,7 @@ el tamaño del lienzo y exporta el resultado a resolución completa.
 | **Lienzo** | Redimensionar libremente. Accesos directos a formatos (16:9, 4:3, 1:1, KDP…) y **ancho/alto en píxeles por teclado**. |
 | **Imagen** | Subir imagen de fondo; encaje *cover*/*contain*; reposicionar arrastrando. |
 | **Export** | Elegir formato de salida (**PNG/JPEG/WebP/PDF**) **sin perder calidad** respecto al original. |
+| **Idiomas** | Interfaz **bilingüe castellano/catalán**, con selector CA/ES y preferencia recordada entre sesiones. Textos externalizados en un catálogo (nunca literales en los componentes). |
 
 ---
 
@@ -48,7 +49,10 @@ el tamaño del lienzo y exporta el resultado a resolución completa.
 - **React 19 + Vite 6 + TypeScript** (estricto).
 - **Tailwind CSS v4** (vía `@tailwindcss/vite`) con **tokens de diseño** en
   `src/index.css` (`@theme`). Responsive y Mobile First.
-- **Zustand** para el estado global tipado del editor.
+- **Zustand** para el estado global tipado del editor y para la preferencia de
+  idioma (persistida en `localStorage`).
+- **i18n propio y ligero** (sin dependencias externas): catálogo de mensajes
+  tipado (`es`/`ca`) + hook `useT()`; castellano por defecto.
 - **vite-plugin-pwa** para la PWA instalable (offline + manifest).
 - **Capacitor** para empaquetar a Android/iOS (capa `platform/`).
 - **Canvas + SVG** para el render: preview en DOM/SVG, exportación rasterizada a
@@ -74,7 +78,7 @@ src/
 ├─ main.tsx  ·  App.tsx          # arranque y composición de vistas
 ├─ types/
 │  └─ editor.ts                  # modelo de dominio — fuente única de verdad
-├─ views/Home/Home.tsx           # pantalla de entrada
+├─ views/Home/Home.tsx · useMediaQuery.ts   # composición de la pantalla del editor
 ├─ features/
 │  ├─ canvas/    Stage.tsx · TextBlock.tsx · useDrag.ts   # preview en tiempo real
 │  ├─ text/      TextPanel.tsx                            # contenido y estilo
@@ -82,6 +86,7 @@ src/
 │  ├─ color/     ColorPanel.tsx                           # picker · hex · paleta
 │  ├─ canvasSize/ SizePanel.tsx · presets.ts             # tamaño y presets
 │  └─ export/    ExportDialog.tsx                         # formato y descarga
+├─ i18n/  config.ts · messages.ts · useI18n.ts · LanguageSwitcher.tsx  # bilingüe ES/CA
 ├─ store/editorStore.ts          # estado global (Zustand, tipado)
 ├─ core/  renderToCanvas.ts · curvedText.ts · exporters.ts  # render y export
 ├─ sharedComponents/  Slider.tsx · Toggle.tsx · Sheet.tsx   # primitivas reutilizables
@@ -129,6 +134,13 @@ Definido en [`src/types/editor.ts`](src/types/editor.ts). Piezas clave:
 
 - **TypeScript estricto**; sin `any`. Interfaces para las *props* de cada
   componente.
+- **Arrow functions en todo el proyecto**: toda función, incluyendo componentes
+  React, se define como `const Foo = (...) => ...`. Esto unifica el estilo y
+  evita inconsistencias entre utilidades, hooks, lógica de `core` y componentes.
+- **Parámetros con nombre descriptivo**: en lugar de `_props`, `_input`, `_options`,
+  etc., se usa el nombre del componente o función como prefijo seguido de `Props`,
+  `Input`, `Options`, etc. Ejemplos: `toggleProps`, `sliderProps`, `textBlockProps`,
+  `dragOptions`, `curvedTextInput`, `renderInput`, `canvas`, `format`.
 - **Nombres legibles**: verbo + objeto en acciones (`addBlock`, `setImage`),
   sustantivos claros en datos.
 - **Imports absolutos** con alias `@/` (configurado en Vite y tsconfig).
@@ -136,6 +148,9 @@ Definido en [`src/types/editor.ts`](src/types/editor.ts). Piezas clave:
   store, `core` y `utils`.
 - **Estilos con tokens** de Tailwind (`bg-panel`, `text-ink`, `text-accent`…),
   nunca colores "mágicos" repartidos por los componentes.
+- **Textos vía i18n**: ningún literal visible en los componentes; todo texto de
+  UI se pide con `t('clave')` y vive en `i18n/messages.ts` con su versión
+  castellana y catalana (el catálogo obliga a traducir ambas o no compila).
 - Un fichero, una responsabilidad; primitivas reutilizables en
   `sharedComponents`.
 
@@ -162,7 +177,11 @@ Definido en [`src/types/editor.ts`](src/types/editor.ts). Piezas clave:
 - [x] **Tokens de diseño** y estilos base (Mobile First).
 - [x] Modelo de dominio (`types/editor.ts`) y **store** inicial (Zustand).
 - [x] Utilidades puras (`clamp`, `hex`, `download`) y `presets`.
-- [x] **Home "hola mundo"** para validar arranque y estilos.
+- [x] **Home** según mockups: shell responsive del editor (cabecera + Stage;
+  paneles fijos en escritorio, barra de pestañas + hoja inferior `Sheet` en
+  móvil), bilingüe ES/CA. Los paneles y el Stage se montan como stubs.
+- [x] **i18n bilingüe ES/CA**: catálogo tipado, store persistido, `useT()` y
+  selector CA/ES (castellano por defecto). Los paneles nacerán ya traducidos.
 
 ### Fase 2 — Preview y edición de texto
 
@@ -205,6 +224,11 @@ npm run build && npx cap add android && npm run cap:sync
 
 ## 10. Estado actual
 
-Cimientos completos y **Home "hola mundo"** operativa. Todos los componentes de
-features, `core` y `sharedComponents` existen como *stubs* con su **contrato**
-documentado, listos para implementarse fase a fase.
+Cimientos completos. La **Home** ya compone el editor según los mockups:
+cabecera con marca, dimensiones del lienzo, selector ES/CA y botón Exportar;
+Stage al centro; en escritorio (≥ lg) paneles laterales fijos (`SizePanel` a la
+izquierda; `TextPanel`, `FontPanel` y `ColorPanel` a la derecha) y en móvil
+barra inferior de pestañas con hoja inferior (`Sheet`) que aloja el panel
+activo. Todo el texto sale del catálogo i18n. Los paneles, el `Stage` y el
+`ExportDialog` siguen como *stubs* con su **contrato** documentado, listos para
+implementarse fase a fase.

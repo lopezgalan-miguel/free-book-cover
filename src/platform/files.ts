@@ -14,8 +14,6 @@
 
 import { downloadBlob } from '@/utils/download';
 
-export async function saveFile(blob: Blob, fileName: string): Promise<void> {
-  // TODO(equipo): en Capacitor, derivar a Filesystem/Share según plataforma.
-  // Por ahora, la vía web cubre el desarrollo y la PWA.
+export const saveFile = async (blob: Blob, fileName: string): Promise<void> => {
   downloadBlob(blob, fileName);
-}
+};

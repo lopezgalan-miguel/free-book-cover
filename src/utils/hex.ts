@@ -14,8 +14,7 @@ import type { HexColor } from '@/types/editor';
 
 const HEX_PATTERN = /^([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
-/** Quita el `#`, valida y expande el formato corto (#abc → #AABBCC). */
-export function normalizeHex(input: string): HexColor | null {
+const normalizeHex = (input: string): HexColor | null => {
   const raw = input.trim().replace(/^#/, '');
   if (!HEX_PATTERN.test(raw)) return null;
 
@@ -28,8 +27,10 @@ export function normalizeHex(input: string): HexColor | null {
       : raw;
 
   return `#${full.toUpperCase()}` as HexColor;
-}
+};
 
-export function isValidHex(input: string): boolean {
+const isValidHex = (input: string): boolean => {
   return normalizeHex(input) !== null;
-}
+};
+
+export { normalizeHex, isValidHex };

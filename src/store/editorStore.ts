@@ -27,31 +27,28 @@ import type {
   ExportFormat,
 } from '@/types/editor';
 
-/** Crea un bloque de texto nuevo con valores por defecto sensatos. */
-function createDefaultBlock(id: string): TextBlock {
-  return {
-    id,
-    text: 'Texto nuevo',
-    x: 50,
-    y: 50,
-    fontFamily: 'Playfair Display',
-    fontWeight: 700,
-    fontSizePct: 10,
-    italic: false,
-    underline: false,
-    uppercase: false,
-    align: 'center',
-    lineHeight: 1.1,
-    letterSpacing: 0,
-    color: '#F4EFE6',
-    shadow: false,
-    shadowIntensity: 40,
-    outline: false,
-    outlineWidth: 3,
-    outlineColor: '#1A1712',
-    curve: 0,
-  };
-}
+const createDefaultBlock = (id: string): TextBlock => ({
+  id,
+  text: 'Texto nuevo',
+  x: 50,
+  y: 50,
+  fontFamily: 'Playfair Display',
+  fontWeight: 700,
+  fontSizePct: 10,
+  italic: false,
+  underline: false,
+  uppercase: false,
+  align: 'center',
+  lineHeight: 1.1,
+  letterSpacing: 0,
+  color: '#F4EFE6',
+  shadow: false,
+  shadowIntensity: 40,
+  outline: false,
+  outlineWidth: 3,
+  outlineColor: '#1A1712',
+  curve: 0,
+});
 
 /** Estado inicial: lienzo Kindle por defecto, sin imagen, un bloque de ejemplo. */
 const initialState: EditorState = {

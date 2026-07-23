@@ -14,6 +14,7 @@ export interface ToggleProps {
   onChange: (checked: boolean) => void;
 }
 
-export function Toggle(_props: ToggleProps) {
+export const Toggle = (toggleProps: ToggleProps) => {
+  void toggleProps; // stub: la firma ya es definitiva, el cuerpo llega en la Fase 2
   return null;
-}
+};

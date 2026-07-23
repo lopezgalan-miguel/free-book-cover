@@ -12,6 +12,6 @@
  *  - Si no hay selección, muestra un estado vacío invitando a añadir una capa.
  */
 
-export function TextPanel() {
+export const TextPanel = () => {
   return <section data-panel="text" />;
-}
+};

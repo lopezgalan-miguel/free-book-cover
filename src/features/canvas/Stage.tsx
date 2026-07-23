@@ -17,6 +17,6 @@
  * la rasterización final es de core/renderToCanvas, no de aquí.
  */
 
-export function Stage() {
+export const Stage = () => {
   return <div data-stage className="relative flex-1" />;
-}
+};

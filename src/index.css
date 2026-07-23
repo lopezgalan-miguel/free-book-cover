@@ -25,9 +25,11 @@
   --color-danger: #b4453a; /* acciones destructivas */
 
   /* Tipografías de interfaz. Las fuentes de CONTENIDO (portadas) se cargan
-     dinámicamente desde el panel de fuentes, no aquí. */
+     dinámicamente desde el panel de fuentes, no aquí. La excepción es la
+     fuente de MARCA (font-display), reservada al logotipo de la cabecera. */
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-display: 'Playfair Display', Georgia, serif;
 }
 
 *,

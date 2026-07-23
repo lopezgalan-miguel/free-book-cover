@@ -18,10 +18,11 @@
 
 import type { ExportFormat } from '@/types/editor';
 
-export async function exportCanvas(
-  _canvas: HTMLCanvasElement,
-  _format: ExportFormat,
-): Promise<Blob> {
-  // TODO(equipo): serializar según el formato manteniendo la calidad.
+export const exportCanvas = async (
+  canvas: HTMLCanvasElement,
+  format: ExportFormat,
+): Promise<Blob> => {
+  void canvas; // stub: la firma ya es definitiva, el cuerpo llega en la Fase 4
+  void format;
   throw new Error('exportCanvas: pendiente de implementar');
-}
+};

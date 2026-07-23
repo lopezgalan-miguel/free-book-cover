@@ -11,6 +11,6 @@
  *    de modo que en el modelo solo entran colores válidos `#RRGGBB`.
  */
 
-export function ColorPanel() {
+export const ColorPanel = () => {
   return <section data-panel="color" />;
-}
+};

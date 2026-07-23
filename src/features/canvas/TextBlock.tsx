@@ -24,6 +24,7 @@ export interface TextBlockProps {
   selected: boolean;
 }
 
-export function TextBlock(_props: TextBlockProps) {
+export const TextBlock = (textBlockProps: TextBlockProps) => {
+  void textBlockProps; // stub: la firma ya es definitiva, el cuerpo llega en la Fase 2
   return null;
-}
+};

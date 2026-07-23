@@ -12,6 +12,6 @@
  *    entrega el Blob vía platform/files (web: download; nativo: Capacitor).
  */
 
-export function ExportDialog() {
+export const ExportDialog = () => {
   return <section data-panel="export" />;
-}
+};

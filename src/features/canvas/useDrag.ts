@@ -24,10 +24,10 @@ export interface UseDragResult {
   onPointerDown: (event: React.PointerEvent) => void;
 }
 
-export function useDrag(_options: UseDragOptions): UseDragResult {
-  // TODO(equipo): implementar el ciclo pointerdown/move/up con clamp a [0,100].
+export const useDrag = (dragOptions: UseDragOptions): UseDragResult => {
+  void dragOptions; // stub: la firma ya es definitiva, el cuerpo llega en la Fase 2
   return {
     isDragging: false,
     onPointerDown: () => {},
   };
-}
+};
