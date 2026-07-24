@@ -8,6 +8,8 @@
 
 import { Home } from '@/views/Home/Home';
 
-export default function App() {
+const App = () => {
   return <Home />;
-}
+};
+
+export default App;

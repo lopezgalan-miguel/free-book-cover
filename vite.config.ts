@@ -15,6 +15,11 @@ export default defineConfig({
       // La app es instalable en Android/iOS como PWA y, más adelante,
       // empaquetable como app nativa con Capacitor (ver /platform).
       includeAssets: ['favicon.svg'],
+      workbox: {
+        // Precaché también de las fuentes autoalojadas: la tipografía de la
+        // interfaz (woff2) debe funcionar offline, sin depender de ningún CDN.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      },
       manifest: {
         name: 'Editor de portadas',
         short_name: 'Portadas',

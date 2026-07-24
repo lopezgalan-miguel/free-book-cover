@@ -21,6 +21,7 @@ export interface SliderProps {
   onChange: (value: number) => void;
 }
 
-export function Slider(_props: SliderProps) {
+export const Slider = (sliderProps: SliderProps) => {
+  void sliderProps; // stub: la firma ya es definitiva, el cuerpo llega en la Fase 2
   return null;
-}
+};

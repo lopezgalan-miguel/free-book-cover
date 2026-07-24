@@ -1,3 +1,19 @@
+/*
+ * FUENTES DE UI AUTOALOJADAS (sin CDN)
+ * ------------------------------------
+ * Las tipografías de interfaz se empaquetan con la app (@fontsource, subconjunto
+ * latin: cubre castellano y catalán) para que la tipografía sea siempre la misma:
+ * sin depender de la red, con la PWA offline y sin bloqueadores de terceros.
+ */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-sans/700.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/playfair-display/400.css';
+@import '@fontsource/playfair-display/600.css';
+@import '@fontsource/playfair-display/700.css';
 @import 'tailwindcss';
 
 /*
@@ -25,9 +41,11 @@
   --color-danger: #b4453a; /* acciones destructivas */
 
   /* Tipografías de interfaz. Las fuentes de CONTENIDO (portadas) se cargan
-     dinámicamente desde el panel de fuentes, no aquí. */
+     dinámicamente desde el panel de fuentes, no aquí. La excepción es la
+     fuente de MARCA (font-display), reservada al logotipo de la cabecera. */
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-display: 'Playfair Display', Georgia, serif;
 }
 
 *,

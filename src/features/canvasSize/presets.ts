@@ -11,9 +11,9 @@ import type { CanvasPreset } from '@/types/editor';
 
 export const CANVAS_PRESETS: CanvasPreset[] = [
   // Amazon KDP
-  { id: 'kindle', group: 'Amazon KDP', label: 'Kindle', sub: '1600×2560', width: 1600, height: 2560 },
-  { id: 'pb69', group: 'Amazon KDP', label: 'Tapa blanda', sub: '1800×2700', width: 1800, height: 2700 },
-  { id: 'audio', group: 'Amazon KDP', label: 'Audiolibro', sub: '2400²', width: 2400, height: 2400 },
+  { id: 'kindle', group: 'Amazon KDP', label: 'Kindle', sub: '1600 x 2560', width: 1600, height: 2560 },
+  { id: 'pb69', group: 'Amazon KDP', label: 'Tapa blanda', sub: '1800 x 2700', width: 1800, height: 2700 },
+  { id: 'audio', group: 'Amazon KDP', label: 'Audiolibro', sub: '2400 x 2400', width: 2400, height: 2400 },
 
   // Proporciones comunes
   { id: 'r23', group: 'Proporción', label: '2:3', width: 1600, height: 2400 },

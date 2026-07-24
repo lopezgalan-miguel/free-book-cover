@@ -28,7 +28,7 @@ export interface RenderInput {
   size: EditorState['size'];
 }
 
-export async function renderToCanvas(_input: RenderInput): Promise<HTMLCanvasElement> {
-  // TODO(equipo): implementar el pintado a resolución real.
+export const renderToCanvas = async (renderInput: RenderInput): Promise<HTMLCanvasElement> => {
+  void renderInput; // stub: la firma ya es definitiva, el cuerpo llega en la Fase 4
   throw new Error('renderToCanvas: pendiente de implementar');
-}
+};

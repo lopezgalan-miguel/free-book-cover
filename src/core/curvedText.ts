@@ -26,7 +26,7 @@ export interface CurvedTextGeometry {
   pathD: string;
 }
 
-export function computeCurvedText(_input: CurvedTextInput): CurvedTextGeometry {
-  // TODO(equipo): calcular la geometría del arco.
+export const computeCurvedText = (curvedTextInput: CurvedTextInput): CurvedTextGeometry => {
+  void curvedTextInput; // stub: la firma ya es definitiva, el cuerpo llega en la Fase 4
   throw new Error('computeCurvedText: pendiente de implementar');
-}
+};
