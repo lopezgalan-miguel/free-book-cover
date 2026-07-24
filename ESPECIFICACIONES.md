@@ -49,6 +49,9 @@ el tamaño del lienzo y exporta el resultado a resolución completa.
 - **React 19 + Vite 6 + TypeScript** (estricto).
 - **Tailwind CSS v4** (vía `@tailwindcss/vite`) con **tokens de diseño** en
   `src/index.css` (`@theme`). Responsive y Mobile First.
+- **Fuentes de UI autoalojadas** (`@fontsource`, subconjunto latin — cubre ES/CA)
+  importadas en `src/index.css`: sin CDN de terceros, la tipografía es idéntica
+  online y offline, y va incluida en el precaché de la PWA.
 - **Zustand** para el estado global tipado del editor y para la preferencia de
   idioma (persistida en `localStorage`).
 - **i18n propio y ligero** (sin dependencias externas): catálogo de mensajes
@@ -164,7 +167,8 @@ Definido en [`src/types/editor.ts`](src/types/editor.ts). Piezas clave:
   *object URLs* se revocan tras su uso.
 - **Sin dependencias innecesarias**: menos superficie de ataque y builds
   ligeros.
-- **PWA offline**: la app funciona sin red una vez instalada.
+- **PWA offline**: la app funciona sin red una vez instalada (incluidas las
+  fuentes de la interfaz, autoalojadas en el build).
 
 ---
 

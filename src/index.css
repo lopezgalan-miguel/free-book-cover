@@ -1,3 +1,19 @@
+/*
+ * FUENTES DE UI AUTOALOJADAS (sin CDN)
+ * ------------------------------------
+ * Las tipografías de interfaz se empaquetan con la app (@fontsource, subconjunto
+ * latin: cubre castellano y catalán) para que la tipografía sea siempre la misma:
+ * sin depender de la red, con la PWA offline y sin bloqueadores de terceros.
+ */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-sans/700.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/playfair-display/400.css';
+@import '@fontsource/playfair-display/600.css';
+@import '@fontsource/playfair-display/700.css';
 @import 'tailwindcss';
 
 /*

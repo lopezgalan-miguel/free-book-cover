@@ -35,10 +35,23 @@ export interface TextBlock {
   // --- Contenido ---
   /** Texto crudo; los saltos de línea (`\n`) se respetan en el render. */
   text: string;
+  /**
+   * Clave del catálogo i18n si `text` sigue siendo el texto de partida sin
+   * editar (título/subtítulo/autor/"texto nuevo"); `null` en cuanto el usuario
+   * lo modifica. Permite retraducir los bloques aún no editados al cambiar de
+   * idioma sin tocar los que ya contienen texto propio del usuario.
+   */
+  placeholderKey: string | null;
 
   // --- Posición (en % del lienzo, 0–100). El origen es el CENTRO del bloque. ---
   x: number;
   y: number;
+
+  // --- Marco (recuadro de selección, independiente del tamaño del texto). ---
+  /** Ancho del marco en % del lienzo, o null para auto-ajustar al texto. */
+  boxWidthPct: number | null;
+  /** Alto del marco en % del lienzo, o null para auto-ajustar al texto. */
+  boxHeightPct: number | null;
 
   // --- Tipografía ---
   /** Nombre legible de la familia, p.ej. "Playfair Display". */
