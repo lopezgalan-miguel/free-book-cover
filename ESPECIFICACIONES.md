@@ -49,9 +49,14 @@ el tamaño del lienzo y exporta el resultado a resolución completa.
 - **React 19 + Vite 6 + TypeScript** (estricto).
 - **Tailwind CSS v4** (vía `@tailwindcss/vite`) con **tokens de diseño** en
   `src/index.css` (`@theme`). Responsive y Mobile First.
-- **Fuentes de UI autoalojadas** (`@fontsource`, subconjunto latin — cubre ES/CA)
+- **Fuentes autoalojadas** (`@fontsource`, subconjunto latin — cubre ES/CA)
   importadas en `src/index.css`: sin CDN de terceros, la tipografía es idéntica
-  online y offline, y va incluida en el precaché de la PWA.
+  online y offline, y va incluida en el precaché de la PWA. Aplica tanto a las
+  fuentes de **interfaz** (IBM Plex Sans/Mono) como al **catálogo de portadas**
+  (Playfair Display, Cormorant Garamond, Montserrat…): de cada familia del
+  catálogo se importan los pesos 400 y 700, suficientes para las muestras del
+  panel y para los estilos habituales de una portada. Las fuentes que sube el
+  usuario se registran en caliente con `FontFace` (ver `useFontLoader`).
 - **Zustand** para el estado global tipado del editor y para la preferencia de
   idioma (persistida en `localStorage`).
 - **i18n propio y ligero** (sin dependencias externas): catálogo de mensajes
@@ -187,23 +192,78 @@ Definido en [`src/types/editor.ts`](src/types/editor.ts). Piezas clave:
 - [x] **i18n bilingüe ES/CA**: catálogo tipado, store persistido, `useT()` y
   selector CA/ES (castellano por defecto). Los paneles nacerán ya traducidos.
 
-### Fase 2 — Preview y edición de texto
+### ✅ Fase 1.5 — Paneles maquetados (hecha)
 
-- [ ] `Stage` + `TextBlock`: render fiel del proyecto y selección.
-- [ ] `useDrag`: arrastrar bloques e imagen de fondo.
-- [ ] `TextPanel`: textarea con preview en tiempo real y controles de estilo.
-- [ ] `Sheet`, `Slider`, `Toggle` operativos.
+- [x] `SizePanel`, `TextPanel`, `FontPanel` y `ColorPanel` con su **layout
+  visual** según los mockups y todo el texto vía i18n. Siguen SIN cablear al
+  store (valores fijos, controles no controlados): eso es la Fase 2A.
+- [x] `Stage` + `TextBlock` + `useDrag`: preview real, selección, arrastre de
+  bloques, edición inline con doble clic y redimensionado del marco con asas
+  (esto último va más allá del mockup y se conserva).
+
+### Fase 2A — Cablear los paneles al store
+
+Los paneles ya están maquetados: aquí se les da vida sin tocar su layout.
+
+- [ ] `Slider` y `Toggle` operativos, y los paneles pasan a usarlos en lugar de
+  repetir su markup en línea.
+- [ ] `presets.ts` alineado con los mockups (añadir `wrap` 3828×2775; `r169` a
+  2560×1440) y con **claves i18n** en vez de etiquetas en castellano fijas.
+- [ ] `SizePanel`: consumir `presets.ts` (fin de la lista duplicada en local),
+  marcar el preset activo con `activePresetId`, inputs de ancho/alto controlados
+  (`clamp(100, 10000)` → `setSize(..., 'custom')`) y subida de imagen real con
+  validación de tipo y revocado de la *object URL* anterior.
+- [ ] `TextPanel`: la selección sale de `selectedBlockId`; todos los controles
+  escriben con `patchSelected`.
+- [ ] `ColorPanel`: picker, hex (a través de `normalizeHex`) y paleta escribiendo
+  en el bloque seleccionado.
+- [ ] `Stage`: arrastre de la imagen de fondo (reusando `useDrag` sobre
+  `offsetX/offsetY`) y publicar su escala para que la cabecera muestre el `%` de
+  zoom como en el mockup.
+- [ ] Acciones nuevas de store: `setImageFit`, `setImageOffset`, `centerImage`.
+- [ ] Panel de imagen completo: botones **Rellenar / Ajustar / Centrar** y la
+  pista de arrastre, visibles solo cuando hay imagen.
+- [ ] Efectos completos: slider de intensidad de sombra y slider de grosor de
+  contorno + su color, ambos condicionados a su toggle.
+
+### Fase 2B — Reestructurar los paneles según los mockups
+
+- [ ] Partir `SizePanel` en `ImagePanel` (imagen y encaje) y `SizePanel`
+  (presets y píxeles).
+- [ ] Extraer `LayerList` (capas reales del store: seleccionar y eliminar) con
+  dos presentaciones: lista vertical en escritorio y chips con scroll
+  horizontal en móvil.
+- [ ] Partir `TextPanel` en `TextPanel` (solo el contenido) y `StylePanel`
+  (peso, B/I/U/AA, alineación, sliders y efectos).
+- [ ] `Home` escritorio: panel derecho en el orden del mockup —
+  **Texto → Fuente → Estilo → Color → Efectos** — y estado vacío
+  ("Selecciona una capa…") que cubre el panel entero, no solo un bloque.
+- [ ] `Home` móvil: **cinco** pestañas (Texto, Fuente, Color, Estilo, Lienzo).
+  Texto = `LayerList` + `TextPanel` + "Eliminar capa"; Lienzo = `ImagePanel` +
+  `SizePanel`. El selector ES/CA sigue en la cabecera.
+- [ ] Ampliar el catálogo i18n con las claves nuevas (efectos, encaje de imagen,
+  exportación, toast, pesos tipográficos, pestaña Estilo).
 
 ### Fase 3 — Fuentes y color
 
-- [ ] `FontPanel` + `useFontLoader`: catálogo y **carga de fuentes externas**.
-- [ ] `ColorPanel`: picker + hex + paleta.
+- [ ] Autoalojar el catálogo de portadas con `@fontsource` (pesos 400 y 700 de
+  las 10 familias que faltan) y unificarlo en un único `FONT_CATALOG` — hoy la
+  lista vive duplicada dentro de `FontPanel`.
+- [ ] `FontPanel`: selección real contra el bloque activo y grupo
+  "Personalizada".
+- [ ] `useFontLoader.loadCustomFont`: registro con `FontFace`, validación de
+  extensión/tipo y acción `addCustomFont` en el store.
 
-### Fase 4 — Lienzo y exportación
+### Fase 4 — Curvatura y exportación
 
-- [ ] `SizePanel`: presets y ancho/alto por teclado.
-- [ ] `renderToCanvas` + `curvedText` + `exporters`: **export sin pérdida**.
-- [ ] `ExportDialog`: elegir formato y descargar.
+- [ ] `computeCurvedText` + rama `curve !== 0` en `TextBlock` (SVG `<textPath>`):
+  hoy el slider de curvatura no tendría efecto.
+- [ ] `renderToCanvas` a resolución real + `exportCanvas`
+  (PNG/JPEG/WebP/PDF): **export sin pérdida**.
+- [ ] `ExportDialog` en sus dos formas: modal centrado en escritorio (rejilla
+  2×2 de formatos, slider de calidad para JPEG/WebP, nota de imprenta,
+  Cancelar/Descargar) y contenido de hoja en móvil.
+- [ ] `Toast` compartido para confirmar la exportación.
 
 ### Fase 5 — Empaquetado nativo
 
@@ -228,11 +288,19 @@ npm run build && npx cap add android && npm run cap:sync
 
 ## 10. Estado actual
 
-Cimientos completos. La **Home** ya compone el editor según los mockups:
-cabecera con marca, dimensiones del lienzo, selector ES/CA y botón Exportar;
-Stage al centro; en escritorio (≥ lg) paneles laterales fijos (`SizePanel` a la
-izquierda; `TextPanel`, `FontPanel` y `ColorPanel` a la derecha) y en móvil
-barra inferior de pestañas con hoja inferior (`Sheet`) que aloja el panel
-activo. Todo el texto sale del catálogo i18n. Los paneles, el `Stage` y el
-`ExportDialog` siguen como *stubs* con su **contrato** documentado, listos para
-implementarse fase a fase.
+Cimientos completos y **piel del editor terminada**. La **Home** compone el
+editor según los mockups: cabecera con marca, dimensiones del lienzo, selector
+ES/CA y botón Exportar; Stage al centro; en escritorio (≥ lg) paneles laterales
+fijos y en móvil barra inferior de pestañas con hoja inferior (`Sheet`). Todo el
+texto sale del catálogo i18n.
+
+**Ya vivo:** el modelo de dominio, el store, el i18n bilingüe con preferencia
+persistida, y el `Stage` con `TextBlock` (preview fiel, selección, arrastre,
+edición inline y redimensionado del marco).
+
+**Pendiente de cablear:** los cuatro paneles están maquetados pero con valores
+fijos y controles no controlados; `ExportDialog`, `Slider` y `Toggle` son
+*stubs*; `renderToCanvas`, `exporters`, `curvedText` y `loadCustomFont` lanzan
+error a propósito. El catálogo de fuentes lista 15 familias pero solo hay 3
+instaladas, así que las muestras se ven con fuente de sustitución hasta la
+Fase 3. Cada pieza mantiene su **contrato** documentado en cabecera.

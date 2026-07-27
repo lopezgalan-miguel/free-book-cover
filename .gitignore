@@ -1,5 +1,8 @@
 mockups/
 
+# planes de trabajo locales (la fuente de verdad es ESPECIFICACIONES.md)
+PLAN-MOVIL.md
+
 # dependencias
 node_modules/
 
