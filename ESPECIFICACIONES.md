@@ -205,44 +205,46 @@ Definido en [`src/types/editor.ts`](src/types/editor.ts). Piezas clave:
 
 Los paneles ya están maquetados: aquí se les da vida sin tocar su layout.
 
-- [ ] `Slider` y `Toggle` operativos, y los paneles pasan a usarlos en lugar de
+- [x] `Slider` y `Toggle` operativos, y los paneles pasan a usarlos en lugar de
   repetir su markup en línea.
-- [ ] `presets.ts` alineado con los mockups (añadir `wrap` 3828×2775; `r169` a
+- [x] `presets.ts` alineado con los mockups (añadir `wrap` 3828×2775; `r169` a
   2560×1440) y con **claves i18n** en vez de etiquetas en castellano fijas.
-- [ ] `SizePanel`: consumir `presets.ts` (fin de la lista duplicada en local),
+- [x] `SizePanel`: consumir `presets.ts` (fin de la lista duplicada en local),
   marcar el preset activo con `activePresetId`, inputs de ancho/alto controlados
   (`clamp(100, 10000)` → `setSize(..., 'custom')`) y subida de imagen real con
   validación de tipo y revocado de la *object URL* anterior.
-- [ ] `TextPanel`: la selección sale de `selectedBlockId`; todos los controles
+- [x] `TextPanel`: la selección sale de `selectedBlockId`; todos los controles
   escriben con `patchSelected`.
 - [ ] `ColorPanel`: picker, hex (a través de `normalizeHex`) y paleta escribiendo
   en el bloque seleccionado.
 - [ ] `Stage`: arrastre de la imagen de fondo (reusando `useDrag` sobre
   `offsetX/offsetY`) y publicar su escala para que la cabecera muestre el `%` de
   zoom como en el mockup.
-- [ ] Acciones nuevas de store: `setImageFit`, `setImageOffset`, `centerImage`.
-- [ ] Panel de imagen completo: botones **Rellenar / Ajustar / Centrar** y la
+- [x] Acciones nuevas de store: `setImageFit`, `setImageOffset`, `centerImage`.
+- [x] Panel de imagen completo: botones **Rellenar / Ajustar / Centrar** y la
   pista de arrastre, visibles solo cuando hay imagen.
-- [ ] Efectos completos: slider de intensidad de sombra y slider de grosor de
+- [x] Efectos completos: slider de intensidad de sombra y slider de grosor de
   contorno + su color, ambos condicionados a su toggle.
 
-### Fase 2B — Reestructurar los paneles según los mockups
+### ✅ Fase 2B — Reestructurar los paneles según los mockups (hecha)
 
-- [ ] Partir `SizePanel` en `ImagePanel` (imagen y encaje) y `SizePanel`
+- [x] Partir `SizePanel` en `ImagePanel` (imagen y encaje) y `SizePanel`
   (presets y píxeles).
-- [ ] Extraer `LayerList` (capas reales del store: seleccionar y eliminar) con
+- [x] Extraer `LayerList` (capas reales del store: seleccionar y eliminar) con
   dos presentaciones: lista vertical en escritorio y chips con scroll
   horizontal en móvil.
-- [ ] Partir `TextPanel` en `TextPanel` (solo el contenido) y `StylePanel`
+- [x] Partir `TextPanel` en `TextPanel` (solo el contenido) y `StylePanel`
   (peso, B/I/U/AA, alineación, sliders y efectos).
-- [ ] `Home` escritorio: panel derecho en el orden del mockup —
+- [x] `Home` escritorio: panel derecho en el orden del mockup —
   **Texto → Fuente → Estilo → Color → Efectos** — y estado vacío
   ("Selecciona una capa…") que cubre el panel entero, no solo un bloque.
-- [ ] `Home` móvil: **cinco** pestañas (Texto, Fuente, Color, Estilo, Lienzo).
+- [x] `Home` móvil: **cinco** pestañas (Texto, Fuente, Color, Estilo, Lienzo).
   Texto = `LayerList` + `TextPanel` + "Eliminar capa"; Lienzo = `ImagePanel` +
   `SizePanel`. El selector ES/CA sigue en la cabecera.
-- [ ] Ampliar el catálogo i18n con las claves nuevas (efectos, encaje de imagen,
-  exportación, toast, pesos tipográficos, pestaña Estilo).
+- [x] Ampliar el catálogo i18n con las claves nuevas de esta fase (`panel.image.*`,
+  `panel.layers.remove`, `panel.style.*` y `home.tab.style`). Las de exportación
+  y toast son de la Fase 4; los nombres de peso ("Regular 400") no se traducen:
+  son valores CSS, como el nombre de la familia.
 
 ### Fase 3 — Fuentes y color
 
