@@ -33,6 +33,7 @@ import { ColorPanel } from '@/features/color/ColorPanel';
 import { ExportDialog } from '@/features/export/ExportDialog';
 import { FontPanel } from '@/features/fonts/FontPanel';
 import { ImagePanel } from '@/features/image/ImagePanel';
+import { LayerList } from '@/features/layers/LayerList';
 import { TextPanel } from '@/features/text/TextPanel';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 import type { MessageKey } from '@/i18n/messages';
@@ -104,6 +105,7 @@ export const Home = () => {
           <aside className="w-[264px] flex-none overflow-y-auto border-r border-line bg-panel">
             <ImagePanel />
             <SizePanel />
+            <LayerList layout="column" />
           </aside>
           <main className="flex min-w-0 flex-1 flex-col bg-stage">
             <Stage />
