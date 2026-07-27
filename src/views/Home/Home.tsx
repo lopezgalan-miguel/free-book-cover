@@ -7,11 +7,15 @@
  * Qué hace:
  *  - Cabecera con la marca, las dimensiones del lienzo, el selector de idioma
  *    (ES/CA) y el botón Exportar.
- *  - Escritorio (≥ lg): SizePanel fijo a la izquierda (imagen y lienzo);
- *    TextPanel, FontPanel y ColorPanel fijos a la derecha; Stage al centro.
- *  - Móvil: Stage a pantalla completa, barra inferior de pestañas y hoja
+ *  - Escritorio (≥ lg): a la izquierda ImagePanel, SizePanel y LayerList; a la
+ *    derecha TextPanel, FontPanel, StylePanel y ColorPanel; Stage al centro.
+ *    Sin capa seleccionada, el panel derecho ENTERO se sustituye por el aviso
+ *    de "selecciona una capa": los paneles de estilo no tendrían sobre qué
+ *    actuar, así que no se pintan a medias.
+ *  - Móvil: Stage a pantalla completa, barra inferior de cinco pestañas y hoja
  *    inferior (Sheet) que aloja el panel activo; Exportar abre la hoja con
- *    ExportDialog.
+ *    ExportDialog. La pestaña Texto lleva además la tira de capas y el borrado
+ *    de la capa actual, que en escritorio viven en la columna izquierda.
  *
  * Cómo lo hace:
  *  - useMediaQuery monta UNA sola variante del layout (nada de duplicar
@@ -34,7 +38,9 @@ import { ExportDialog } from '@/features/export/ExportDialog';
 import { FontPanel } from '@/features/fonts/FontPanel';
 import { ImagePanel } from '@/features/image/ImagePanel';
 import { LayerList } from '@/features/layers/LayerList';
+import { StylePanel } from '@/features/text/StylePanel';
 import { TextPanel } from '@/features/text/TextPanel';
+import { useSelectedBlock } from '@/features/text/useSelectedBlock';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 import type { MessageKey } from '@/i18n/messages';
 import { useT } from '@/i18n/useI18n';
@@ -44,7 +50,7 @@ import { useEditorStore } from '@/store/editorStore';
 import { useMediaQuery } from './useMediaQuery';
 
 /** Pestañas de edición de la barra inferior móvil. */
-type HomeTab = 'text' | 'font' | 'color' | 'canvas';
+type HomeTab = 'text' | 'font' | 'style' | 'color' | 'canvas';
 
 /** Contenido que puede alojar la hoja inferior: una pestaña o la exportación. */
 type SheetContent = HomeTab | 'export';
@@ -55,6 +61,7 @@ const DESKTOP_MEDIA_QUERY = '(min-width: 64rem)';
 const HOME_TABS: { key: HomeTab; icon: string; labelKey: MessageKey }[] = [
   { key: 'text', icon: 'T', labelKey: 'home.tab.text' },
   { key: 'font', icon: '✦', labelKey: 'home.tab.font' },
+  { key: 'style', icon: '◈', labelKey: 'home.tab.style' },
   { key: 'color', icon: '◐', labelKey: 'home.tab.color' },
   { key: 'canvas', icon: '▢', labelKey: 'home.tab.canvas' },
 ];
@@ -62,6 +69,7 @@ const HOME_TABS: { key: HomeTab; icon: string; labelKey: MessageKey }[] = [
 const SHEET_TITLE_KEYS: Record<SheetContent, MessageKey> = {
   text: 'home.tab.text',
   font: 'home.tab.font',
+  style: 'home.tab.style',
   color: 'home.tab.color',
   canvas: 'home.tab.canvas',
   export: 'home.export',
@@ -71,6 +79,8 @@ export const Home = () => {
   const t = useT();
   const isDesktop = useMediaQuery(DESKTOP_MEDIA_QUERY);
   const size = useEditorStore((state) => state.size);
+  const selectedBlock = useSelectedBlock();
+  const removeBlock = useEditorStore((state) => state.removeBlock);
   const [sheetContent, setSheetContent] = useState<SheetContent | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -111,9 +121,18 @@ export const Home = () => {
             <Stage />
           </main>
           <aside className="flex w-[300px] flex-none flex-col divide-y divide-line-soft overflow-y-auto border-l border-line bg-panel">
-            <TextPanel />
-            <FontPanel />
-            <ColorPanel />
+            {selectedBlock ? (
+              <>
+                <TextPanel />
+                <FontPanel />
+                <StylePanel />
+                <ColorPanel />
+              </>
+            ) : (
+              <p className="p-10 text-center text-sm leading-relaxed text-muted">
+                {t('panel.text.noSelection')}
+              </p>
+            )}
           </aside>
         </div>
 
@@ -174,8 +193,26 @@ export const Home = () => {
         title={sheetContent ? t(SHEET_TITLE_KEYS[sheetContent]) : ''}
         onClose={() => setSheetContent(null)}
       >
-        {sheetContent === 'text' && <TextPanel />}
+        {sheetContent === 'text' && (
+          <>
+            <LayerList layout="row" />
+            <TextPanel />
+            {selectedBlock && (
+              <div className="px-4 pb-2">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => removeBlock(selectedBlock.id)}
+                  className="text-sm"
+                >
+                  {t('panel.layers.remove')}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
         {sheetContent === 'font' && <FontPanel />}
+        {sheetContent === 'style' && <StylePanel />}
         {sheetContent === 'color' && <ColorPanel />}
         {sheetContent === 'canvas' && (
           <>
