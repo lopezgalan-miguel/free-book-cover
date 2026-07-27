@@ -5,6 +5,7 @@
  * espaciado) y efectos (sombra, contorno, curvatura).
  */
 
+import { Button } from '@/sharedComponents/Button';
 import { useT } from '@/i18n/useI18n';
 
 const hasSelection = true;
@@ -56,28 +57,28 @@ export const TextPanel = () => {
         </select>
 
         <div className="mb-3 flex gap-1.5">
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-accent bg-accent-tint text-sm font-bold text-accent-strong">
+          <Button size="icon" isActive className="text-sm font-bold text-accent-strong">
             B
-          </button>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-white text-sm italic text-ink-soft">
+          </Button>
+          <Button size="icon" className="text-sm italic text-ink-soft">
             I
-          </button>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-white text-sm text-ink-soft">
+          </Button>
+          <Button size="icon" className="text-sm text-ink-soft">
             U
-          </button>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-white text-[11px] tracking-wide text-ink-soft">
+          </Button>
+          <Button size="icon" className="text-[11px] tracking-wide text-ink-soft">
             AA
-          </button>
+          </Button>
           <div className="flex-1" />
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-white text-sm text-ink-soft">
+          <Button size="icon" className="text-sm text-ink-soft">
             ⇤
-          </button>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-accent bg-accent-tint text-sm text-accent-strong">
+          </Button>
+          <Button size="icon" isActive className="text-sm text-accent-strong">
             ⇔
-          </button>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-white text-sm text-ink-soft">
+          </Button>
+          <Button size="icon" className="text-sm text-ink-soft">
             ⇥
-          </button>
+          </Button>
         </div>
 
         <div className="mb-3">

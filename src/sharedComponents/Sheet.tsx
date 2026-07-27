@@ -14,6 +14,7 @@
 
 import type { ReactNode } from 'react';
 import { useT } from '@/i18n/useI18n';
+import { Button } from './Button';
 
 export interface SheetProps {
   open: boolean;
@@ -46,13 +47,9 @@ export const Sheet = (sheetProps: SheetProps) => {
           />
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-ink">{sheetProps.title}</h2>
-            <button
-              type="button"
-              onClick={sheetProps.onClose}
-              className="text-sm font-semibold text-accent-strong"
-            >
+            <Button variant="ghost" size="none" onClick={sheetProps.onClose}>
               {t('sheet.done')}
-            </button>
+            </Button>
           </div>
         </header>
         <div className="min-h-0 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">

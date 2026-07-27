@@ -36,6 +36,7 @@ import { TextPanel } from '@/features/text/TextPanel';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 import type { MessageKey } from '@/i18n/messages';
 import { useT } from '@/i18n/useI18n';
+import { Button } from '@/sharedComponents/Button';
 import { Sheet } from '@/sharedComponents/Sheet';
 import { useEditorStore } from '@/store/editorStore';
 import { useMediaQuery } from './useMediaQuery';
@@ -92,13 +93,9 @@ export const Home = () => {
           <div className="flex items-center gap-4">
             <span className="font-mono text-xs text-muted">{dimsLabel}</span>
             <LanguageSwitcher />
-            <button
-              type="button"
-              onClick={() => setExportOpen(true)}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-panel transition-colors hover:bg-accent-strong"
-            >
+            <Button variant="primary" onClick={() => setExportOpen(true)}>
               {t('home.export')}
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -132,13 +129,9 @@ export const Home = () => {
           </div>
           <div className="font-mono text-[10px] text-muted">{dimsLabel}</div>
         </div>
-        <button
-          type="button"
-          onClick={() => setSheetContent('export')}
-          className="text-sm font-semibold text-accent-strong"
-        >
+        <Button variant="ghost" size="none" onClick={() => setSheetContent('export')}>
           {t('home.export')}
-        </button>
+        </Button>
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col">
