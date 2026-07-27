@@ -104,17 +104,13 @@ export interface CanvasSize {
 /** Formatos de exportación soportados. */
 export type ExportFormat = 'PNG' | 'JPEG' | 'WebP' | 'PDF';
 
-/** Preset de tamaño de lienzo (KDP, proporciones, redes…). */
-export interface CanvasPreset {
-  id: string;
-  /** Grupo para agrupar en la UI, p.ej. "Amazon KDP". */
-  group: string;
-  label: string;
-  /** Subtítulo opcional, p.ej. "1600×2560". */
-  sub?: string;
-  width: number;
-  height: number;
-}
+/**
+ * Los presets de lienzo (`CanvasPreset`) viven en
+ * `features/canvasSize/presets.ts`: son un catálogo de la interfaz, no parte
+ * del proyecto serializable (de un preset solo se guardan aquí el `size`
+ * resultante y su `activePresetId`), y necesitan claves i18n que este modelo
+ * no importa.
+ */
 
 /** Una fuente cargada por el usuario (.ttf/.otf/.woff) ya registrada. */
 export interface CustomFont {
