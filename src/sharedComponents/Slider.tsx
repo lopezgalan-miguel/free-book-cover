@@ -5,9 +5,11 @@
  * (tamaño, interlineado, espaciado, curvatura, intensidad de sombra…).
  * Muestra una etiqueta a la izquierda y el valor actual formateado a la derecha.
  *
- * Cómo lo hará:
+ * Cómo lo hace:
  *  - Es controlado: recibe `value` y notifica cambios con `onChange`.
  *  - Sin estado propio ni lógica de dominio; sirve para cualquier rango.
+ *  - No lleva margen exterior: la separación entre controles la pone quien
+ *    los coloca, no el control.
  */
 
 export interface SliderProps {
@@ -21,7 +23,29 @@ export interface SliderProps {
   onChange: (value: number) => void;
 }
 
-export const Slider = (sliderProps: SliderProps) => {
-  void sliderProps; // stub: la firma ya es definitiva, el cuerpo llega en la Fase 2
-  return null;
-};
+export const Slider = ({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  valueLabel,
+  onChange,
+}: SliderProps) => (
+  <div>
+    <div className="mb-1.5 flex justify-between text-xs text-ink-soft">
+      <span>{label}</span>
+      <span className="font-mono text-[11px] text-muted">{valueLabel ?? value}</span>
+    </div>
+    <input
+      type="range"
+      aria-label={label}
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(event) => onChange(Number(event.target.value))}
+      className="h-2 w-full cursor-pointer rounded-lg bg-line accent-accent"
+    />
+  </div>
+);
