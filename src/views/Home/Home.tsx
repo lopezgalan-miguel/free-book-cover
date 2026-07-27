@@ -32,6 +32,7 @@ import { SizePanel } from '@/features/canvasSize/SizePanel';
 import { ColorPanel } from '@/features/color/ColorPanel';
 import { ExportDialog } from '@/features/export/ExportDialog';
 import { FontPanel } from '@/features/fonts/FontPanel';
+import { ImagePanel } from '@/features/image/ImagePanel';
 import { TextPanel } from '@/features/text/TextPanel';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 import type { MessageKey } from '@/i18n/messages';
@@ -101,6 +102,7 @@ export const Home = () => {
 
         <div className="flex min-h-0 flex-1">
           <aside className="w-[264px] flex-none overflow-y-auto border-r border-line bg-panel">
+            <ImagePanel />
             <SizePanel />
           </aside>
           <main className="flex min-w-0 flex-1 flex-col bg-stage">
@@ -173,7 +175,12 @@ export const Home = () => {
         {sheetContent === 'text' && <TextPanel />}
         {sheetContent === 'font' && <FontPanel />}
         {sheetContent === 'color' && <ColorPanel />}
-        {sheetContent === 'canvas' && <SizePanel />}
+        {sheetContent === 'canvas' && (
+          <>
+            <ImagePanel />
+            <SizePanel />
+          </>
+        )}
         {sheetContent === 'export' && <ExportDialog />}
       </Sheet>
     </div>

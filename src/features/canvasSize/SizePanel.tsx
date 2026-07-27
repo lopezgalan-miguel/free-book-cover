@@ -25,20 +25,6 @@ export const SizePanel = () => {
     <section data-panel="size" className="flex flex-col gap-0">
       <div className="border-b border-line-soft p-4">
         <p className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
-          {t('panel.size.backgroundImage')}
-        </p>
-        <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-panel px-3 py-2.5 hover:border-accent-strong hover:bg-white">
-          <div className="h-[52px] w-[38px] flex-none rounded bg-stage-dark" />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-ink">{t('panel.size.uploadImage')}</p>
-            <p className="text-[10.5px] text-muted">{t('panel.size.formats')}</p>
-          </div>
-          <input type="file" accept="image/*" className="hidden" />
-        </label>
-      </div>
-
-      <div className="border-b border-line-soft p-4">
-        <p className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
           {t('panel.size.canvas')}
         </p>
 
