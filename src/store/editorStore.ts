@@ -30,9 +30,11 @@ import type {
   CanvasImage,
   CanvasSize,
   ExportFormat,
+  ImageFit,
 } from '@/types/editor';
 import { messages, type MessageKey } from '@/i18n/messages';
 import { DEFAULT_LANG, type Lang } from '@/i18n/config';
+import { clamp } from '@/utils/clamp';
 
 const createDefaultBlock = (id: string): TextBlock => ({
   id,
@@ -165,6 +167,12 @@ interface EditorActions {
   /** Retraduce al idioma dado el texto de los bloques aún no editados. */
   retranslateBlocks: (lang: Lang) => void;
   setImage: (image: CanvasImage | null) => void;
+  /** Cambia el encaje del fondo. No hace nada si no hay imagen. */
+  setImageFit: (fit: ImageFit) => void;
+  /** Coloca el fondo. Ambos valores en % (0–100). No-op sin imagen. */
+  setImageOffset: (offsetX: number, offsetY: number) => void;
+  /** Devuelve el fondo al centro (50/50). No-op sin imagen. */
+  centerImage: () => void;
   setSize: (size: CanvasSize, presetId?: string) => void;
   setExportFormat: (format: ExportFormat) => void;
 }
@@ -220,6 +228,25 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     })),
 
   setImage: (image) => set({ image }),
+
+  setImageFit: (fit) =>
+    set((state) => (state.image ? { image: { ...state.image, fit } } : {})),
+
+  setImageOffset: (offsetX, offsetY) =>
+    set((state) =>
+      state.image
+        ? {
+            image: {
+              ...state.image,
+              offsetX: clamp(offsetX, 0, 100),
+              offsetY: clamp(offsetY, 0, 100),
+            },
+          }
+        : {},
+    ),
+
+  centerImage: () =>
+    set((state) => (state.image ? { image: { ...state.image, offsetX: 50, offsetY: 50 } } : {})),
 
   setSize: (size, presetId = 'custom') => set({ size, activePresetId: presetId }),
 
