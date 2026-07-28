@@ -5,8 +5,12 @@
  * partir de las piezas de features, siguiendo los mockups (desktop y móvil).
  *
  * Qué hace:
- *  - Cabecera con la marca, las dimensiones del lienzo, el selector de idioma
- *    (ES/CA) y el botón Exportar.
+ *  - Cabecera con la marca, el selector de idioma (ES/CA), las dimensiones del
+ *    lienzo y el botón Exportar. El orden lo fija el mockup: en escritorio el
+ *    ES/CA abre el grupo derecho (idioma → dims → Exportar) y en móvil ocupa el
+ *    extremo izquierdo de la barra, con el título centrado y Exportar a la
+ *    derecha. En escritorio, junto a las dimensiones va el % de zoom que
+ *    publica el Stage; en móvil el mockup deja solo las dims.
  *  - Escritorio (≥ lg): a la izquierda ImagePanel, SizePanel y LayerList; a la
  *    derecha TextPanel, FontPanel, StylePanel y ColorPanel; Stage al centro.
  *    Sin capa seleccionada, el panel derecho ENTERO se sustituye por el aviso
@@ -24,10 +28,9 @@
  *    el estado de dominio se lee del editorStore con selectores.
  *  - Ningún literal visible: todo texto sale del catálogo i18n con useT().
  *
- * Los paneles, el Stage y el ExportDialog ya se montan en su sitio, pero su
- * interior se implementa en las fases 2–4 (ver sus contratos). Cuando Stage
- * publique su escala (Fase 2), la cabecera mostrará también el % de zoom, y
- * en la Fase 4 el diálogo de exportación definirá su presentación y cierre.
+ * El ExportDialog se monta en sus dos formas (modal en escritorio, contenido de
+ * la hoja en móvil) y avisa hacia aquí al terminar: el Toast lo pinta esta
+ * vista porque el diálogo se cierra en cuanto la exportación sale bien.
  */
 
 import { useState } from 'react';
@@ -46,6 +49,7 @@ import type { MessageKey } from '@/i18n/messages';
 import { useT } from '@/i18n/useI18n';
 import { Button } from '@/sharedComponents/Button';
 import { Sheet } from '@/sharedComponents/Sheet';
+import { Toast } from '@/sharedComponents/Toast';
 import { useEditorStore } from '@/store/editorStore';
 import { useMediaQuery } from './useMediaQuery';
 
@@ -83,8 +87,16 @@ export const Home = () => {
   const removeBlock = useEditorStore((state) => state.removeBlock);
   const [sheetContent, setSheetContent] = useState<SheetContent | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  /** Zoom del preview, que lo mide el Stage al ajustar el lienzo al hueco. */
+  const [zoomPct, setZoomPct] = useState(0);
+  /**
+   * Acuse de la exportación. Vive aquí y no en el ExportDialog porque este se
+   * cierra justo al exportar: si el aviso fuese suyo, se iría con él.
+   */
+  const [toast, setToast] = useState<string | null>(null);
 
   const dimsLabel = `${size.width}×${size.height}`;
+  const canvasLabel = zoomPct > 0 ? `${dimsLabel} · ${zoomPct}%` : dimsLabel;
 
   if (isDesktop) {
     return (
@@ -103,8 +115,8 @@ export const Home = () => {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="font-mono text-xs text-muted">{dimsLabel}</span>
             <LanguageSwitcher />
+            <span className="font-mono text-xs text-muted">{canvasLabel}</span>
             <Button variant="primary" onClick={() => setExportOpen(true)}>
               {t('home.export')}
             </Button>
@@ -118,7 +130,7 @@ export const Home = () => {
             <LayerList layout="column" />
           </aside>
           <main className="flex min-w-0 flex-1 flex-col bg-stage">
-            <Stage />
+            <Stage onZoomChange={setZoomPct} />
           </main>
           <aside className="flex w-[300px] flex-none flex-col divide-y divide-line-soft overflow-y-auto border-l border-line bg-panel">
             {selectedBlock ? (
@@ -136,8 +148,14 @@ export const Home = () => {
           </aside>
         </div>
 
-        {/* Fase 4: ExportDialog definirá su presentación (modal) y su cierre. */}
-        {exportOpen && <ExportDialog />}
+        {exportOpen && (
+          <ExportDialog
+            presentation="modal"
+            onClose={() => setExportOpen(false)}
+            onExported={setToast}
+          />
+        )}
+        <Toast message={toast} onHide={() => setToast(null)} />
       </div>
     );
   }
@@ -220,8 +238,16 @@ export const Home = () => {
             <SizePanel />
           </>
         )}
-        {sheetContent === 'export' && <ExportDialog />}
+        {sheetContent === 'export' && (
+          <ExportDialog
+            presentation="sheet"
+            onClose={() => setSheetContent(null)}
+            onExported={setToast}
+          />
+        )}
       </Sheet>
+
+      <Toast message={toast} onHide={() => setToast(null)} />
     </div>
   );
 };

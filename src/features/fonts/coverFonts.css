@@ -1,0 +1,249 @@
+/*
+ * FUENTES DE PORTADA (contenido del lienzo)
+ * -----------------------------------------
+ * Las 13 familias que ofrece `FONT_CATALOG`. Se empaquetan con la app: una
+ * portada tiene que verse igual sin red y exportarse igual en cualquier
+ * máquina.
+ *
+ * Por qué se declara aquí el @font-face en vez de importar el CSS del paquete:
+ *
+ *  1. SUBCONJUNTO. Los paquetes @fontsource-variable no publican entrada
+ *     `latin-*`: su único CSS trae cirílico, griego, vietnamita y símbolos.
+ *     Importarlo deshace la regla de `index.css`. Apuntando al fichero latin
+ *     directamente, se empaqueta solo lo que se usa.
+ *
+ *  2. NOMBRE DE FAMILIA. Ese CSS declara 'Lora Variable', no 'Lora'. Los
+ *     bloques guardan el nombre de la familia en `fontFamily` como dato del
+ *     proyecto: si cambia, los proyectos ya guardados dejan de encontrar su
+ *     tipografía. Aquí se declara el nombre real.
+ *
+ * Peso variable donde existe (un fichero cubre todo el rango y pesa menos que
+ * dos estáticos); estático en las tres familias que no tienen versión variable.
+ * Redonda arriba, cursiva al final del fichero.
+ *
+ * Al añadir una familia: instalar el paquete, declararla aquí Y darla de alta
+ * en `catalog.ts` (incluido `hasItalic`). Las dos cosas, o el panel ofrece algo
+ * que no carga.
+ */
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('@fontsource-variable/playfair-display/files/playfair-display-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url('@fontsource-variable/cormorant-garamond/files/cormorant-garamond-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 800;
+  src: url('@fontsource-variable/eb-garamond/files/eb-garamond-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url('@fontsource-variable/libre-baskerville/files/libre-baskerville-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url('@fontsource-variable/lora/files/lora-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/montserrat/files/montserrat-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Josefin Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url('@fontsource-variable/josefin-sans/files/josefin-sans-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/archivo/files/archivo-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Oswald';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 700;
+  src: url('@fontsource-variable/oswald/files/oswald-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('@fontsource-variable/cinzel/files/cinzel-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/spectral/files/spectral-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/spectral/files/spectral-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Marcellus';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/marcellus/files/marcellus-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Bebas Neue';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff2') format('woff2');
+}
+
+/*
+ * CURSIVAS REALES
+ * ---------------
+ * Cortes itálicos de verdad, no la oblicua sintética que el navegador fabrica
+ * inclinando la redonda. En una portada se nota: una itálica dibujada cambia
+ * la forma de las letras, no solo su ángulo.
+ *
+ * Solo 9 de las 13 familias tienen corte itálico. Oswald, Cinzel, Marcellus y
+ * Bebas Neue no lo publican: en esas cuatro el navegador sigue sintetizándola.
+ * `catalog.ts` lo declara en `hasItalic` para que se pueda avisar en la UI.
+ */
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('@fontsource-variable/playfair-display/files/playfair-display-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url('@fontsource-variable/cormorant-garamond/files/cormorant-garamond-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400 800;
+  src: url('@fontsource-variable/eb-garamond/files/eb-garamond-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url('@fontsource-variable/libre-baskerville/files/libre-baskerville-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url('@fontsource-variable/lora/files/lora-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/montserrat/files/montserrat-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Josefin Sans';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url('@fontsource-variable/josefin-sans/files/josefin-sans-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Archivo';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/archivo/files/archivo-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/spectral/files/spectral-latin-400-italic.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/spectral/files/spectral-latin-700-italic.woff2') format('woff2');
+}

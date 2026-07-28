@@ -1,19 +1,34 @@
 /*
  * FUENTES DE UI AUTOALOJADAS (sin CDN)
  * ------------------------------------
- * Las tipografías de interfaz se empaquetan con la app (@fontsource, subconjunto
- * latin: cubre castellano y catalán) para que la tipografía sea siempre la misma:
- * sin depender de la red, con la PWA offline y sin bloqueadores de terceros.
+ * Las tipografías de interfaz se empaquetan con la app (@fontsource) para que
+ * la tipografía sea siempre la misma: sin depender de la red, con la PWA
+ * offline y sin bloqueadores de terceros.
+ *
+ * SIEMPRE `latin-<peso>.css`, NUNCA `<peso>.css`: la segunda forma empaqueta
+ * todos los subconjuntos del alfabeto (cirílico, griego, vietnamita,
+ * latin-ext…), y como el service worker precachea el bundle entero, eso es
+ * descarga obligatoria en la primera visita. Solo con estas tres familias la
+ * diferencia era 1,3 MB frente a 412 KB. El subconjunto `latin` (U+0000–00FF y
+ * complementos) cubre castellano y catalán, incluido el punto volado de
+ * "l·l" — que es lo único que aquí se escribe.
+ *
+ * Al añadir las fuentes de portada (Fase 3) se multiplica por familia y peso:
+ * mantener la regla o el bundle se dispara.
  */
-@import '@fontsource/ibm-plex-sans/400.css';
-@import '@fontsource/ibm-plex-sans/500.css';
-@import '@fontsource/ibm-plex-sans/600.css';
-@import '@fontsource/ibm-plex-sans/700.css';
-@import '@fontsource/ibm-plex-mono/400.css';
-@import '@fontsource/ibm-plex-mono/500.css';
-@import '@fontsource/playfair-display/400.css';
-@import '@fontsource/playfair-display/600.css';
-@import '@fontsource/playfair-display/700.css';
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/ibm-plex-sans/latin-700.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+
+/*
+ * Las tipografías de PORTADA (las que el usuario aplica a los bloques) se
+ * declaran aparte, en el catálogo de la feature. Playfair Display sale de ahí:
+ * es a la vez fuente de marca y familia del catálogo, y se declara una sola vez.
+ */
+@import './features/fonts/coverFonts.css';
 @import 'tailwindcss';
 
 /*
@@ -40,9 +55,12 @@
   --color-accent-tint: #f4ecdd; /* fondo de estado activo */
   --color-danger: #b4453a; /* acciones destructivas */
 
-  /* Tipografías de interfaz. Las fuentes de CONTENIDO (portadas) se cargan
-     dinámicamente desde el panel de fuentes, no aquí. La excepción es la
-     fuente de MARCA (font-display), reservada al logotipo de la cabecera. */
+  /* Tipografías de interfaz. Las de CONTENIDO (las que el usuario aplica a los
+     bloques) se declaran en `features/fonts/coverFonts.css` y se listan en
+     `catalog.ts`: no se ponen aquí ni se usan como clase de Tailwind, se
+     aplican por `style` desde el bloque. `font-display` es la fuente de MARCA,
+     reservada al logotipo de la cabecera; comparte fichero con la familia
+     homónima del catálogo. */
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --font-display: 'Playfair Display', Georgia, serif;

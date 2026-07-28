@@ -3,13 +3,13 @@
  * -----------------------------------------
  * Todo lo que no es el texto en sí del bloque seleccionado: peso, negrita,
  * cursiva, subrayado, mayúsculas, alineación, tamaño, interlineado, espaciado
- * y efectos (sombra, contorno, curvatura).
+ * y efectos (sombra, contorno, textura, curvatura).
  *
  * Cómo lo hace:
  *  - Cada control es controlado y escribe en el store con `patchSelected`: no
  *    hay estado intermedio, el `Stage` refleja el cambio al instante.
- *  - Los ajustes finos de un efecto (intensidad de sombra, grosor y color del
- *    contorno) solo aparecen cuando el efecto está activo.
+ *  - Los ajustes finos de un efecto (intensidad y color de la sombra, grosor y
+ *    color del contorno) solo aparecen cuando el efecto está activo.
  *  - Los nombres de peso ("Regular", "Bold"…) NO se traducen: son los valores
  *    CSS del grosor, terminología tipográfica, igual que el nombre de la
  *    familia. Lo traducible es la etiqueta del control, no el valor.
@@ -17,6 +17,7 @@
  */
 
 import { useT } from '@/i18n/useI18n';
+import { TexturePicker } from '@/features/style/TexturePicker';
 import { Button } from '@/sharedComponents/Button';
 import { Slider } from '@/sharedComponents/Slider';
 import { Toggle } from '@/sharedComponents/Toggle';
@@ -53,6 +54,11 @@ export const StylePanel = () => {
   if (!block) return null;
 
   const isBold = block.fontWeight >= 700;
+
+  const setShadowColor = (input: string) => {
+    const color = normalizeHex(input);
+    if (color) patchSelected({ shadowColor: color });
+  };
 
   const setOutlineColor = (input: string) => {
     const color = normalizeHex(input);
@@ -183,16 +189,29 @@ export const StylePanel = () => {
         </div>
 
         {block.shadow && (
-          <div className="mb-3">
-            <Slider
-              label={t('panel.style.shadowIntensity')}
-              value={block.shadowIntensity}
-              min={0}
-              max={100}
-              step={1}
-              onChange={(value) => patchSelected({ shadowIntensity: value })}
-            />
-          </div>
+          <>
+            <div className="mb-3">
+              <Slider
+                label={t('panel.style.shadowIntensity')}
+                value={block.shadowIntensity}
+                min={0}
+                max={100}
+                step={1}
+                onChange={(value) => patchSelected({ shadowIntensity: value })}
+              />
+            </div>
+
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs text-ink-soft">{t('panel.style.shadowColor')}</span>
+              <input
+                type="color"
+                value={block.shadowColor}
+                onChange={(event) => setShadowColor(event.target.value)}
+                aria-label={t('panel.style.shadowColor')}
+                className="h-7 w-10 cursor-pointer rounded border border-line bg-white p-0.5"
+              />
+            </div>
+          </>
         )}
 
         <div className="mb-3 flex items-center justify-between">
@@ -229,6 +248,10 @@ export const StylePanel = () => {
             </div>
           </>
         )}
+
+        <div className="mb-3">
+          <TexturePicker />
+        </div>
 
         <Slider
           label={t('panel.text.curvature')}

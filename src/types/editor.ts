@@ -25,6 +25,23 @@ export type ImageFit = 'cover' | 'contain';
 export type HexColor = `#${string}`;
 
 /**
+ * Imagen que rellena el texto de un bloque. Es una PROPIEDAD del bloque, no
+ * una capa aparte: el relleno del texto es o un color o una textura, nunca los
+ * dos. Mientras hay textura manda ella y `color` queda en reserva, de modo que
+ * al quitarla el bloque recupera exactamente el color que tenía.
+ */
+export interface BlockTexture {
+  /** URL de objeto (blob:) o data URL de la imagen cargada. */
+  src: string;
+  /** Nombre original del fichero, para mostrarlo en la UI. */
+  fileName: string;
+  /** Cómo encaja la imagen dentro del texto que rellena. */
+  fit: ImageFit;
+  /** Opacidad del relleno (0–100). El render la aplica SOLO a la textura. */
+  opacity: number;
+}
+
+/**
  * Bloque de texto: unidad editable e independiente sobre el lienzo.
  * Es "una capa". El usuario puede tener N bloques y arrastrarlos libremente.
  */
@@ -73,12 +90,27 @@ export interface TextBlock {
   // --- Color y efectos ---
   color: HexColor;
   shadow: boolean;
-  /** Intensidad de la sombra (0–100). */
+  /**
+   * Intensidad de la sombra (0–100). Gobierna a la vez el desplazamiento, el
+   * desenfoque y la opacidad: es un único mando de "cuánto se nota".
+   */
   shadowIntensity: number;
+  /**
+   * Color de la sombra. Se guarda OPACO: la transparencia la deriva el render
+   * de `shadowIntensity`, así el color elegido sigue siendo el que se ve en el
+   * selector. Una sombra clara es lo que la hace visible sobre fondos oscuros.
+   */
+  shadowColor: HexColor;
   outline: boolean;
   /** Grosor del contorno (unidades relativas del render). */
   outlineWidth: number;
   outlineColor: HexColor;
+  /**
+   * Textura que rellena el texto, o `null` para rellenar con `color`.
+   * Se cambia siempre con `setSelectedTexture`: es quien revoca la object URL
+   * anterior.
+   */
+  texture: BlockTexture | null;
   /** Curvatura del texto: -100 (cóncavo) … 0 (recto) … 100 (convexo). */
   curve: number;
 }
@@ -132,4 +164,9 @@ export interface EditorState {
   activePresetId: string;
   customFonts: CustomFont[];
   exportFormat: ExportFormat;
+  /**
+   * Calidad de los formatos con pérdida (JPEG/WebP), en % (40–100). PNG y PDF
+   * la ignoran: no tienen nada que perder.
+   */
+  exportQuality: number;
 }

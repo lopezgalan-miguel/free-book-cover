@@ -11,6 +11,18 @@
  * Vive en la cabecera (fondo claro) y muestra el código corto de cada idioma
  * (ES/CA) para caber también en móvil; el nombre completo va en `title`.
  *
+ * Forma: pastilla segmentada del mockup — la caja lleva el fondo `accent-tint`
+ * y el idioma activo se pinta encima en `accent`. El contraste sale de ese
+ * relleno, no de un borde: así el control se lee como un interruptor de dos
+ * posiciones y no como dos botones sueltos. Los botones son más altos en móvil
+ * (objetivo táctil) y se compactan en `lg`, como en los dos mockups.
+ *
+ * Posición, según los mockups: en escritorio ABRE el grupo derecho de la
+ * cabecera (idioma → dimensiones → Exportar) y en móvil ocupa el extremo
+ * izquierdo de la barra. Es una preferencia, no un control de edición: por eso
+ * va fuera de los paneles y siempre a la vista, en el mismo sitio en las dos
+ * presentaciones.
+ *
  * Accesible: es un grupo de botones con `aria-pressed` para el idioma activo.
  */
 
@@ -28,7 +40,7 @@ export const LanguageSwitcher = () => {
     <div
       role="group"
       aria-label={t('lang.label')}
-      className="inline-flex overflow-hidden rounded-full border border-line text-[11px] font-semibold"
+      className="inline-flex gap-0.5 rounded-lg bg-accent-tint p-0.5 text-[11px] font-semibold"
     >
       {LANGS.map((code) => {
         const active = code === lang;
@@ -42,11 +54,9 @@ export const LanguageSwitcher = () => {
               retranslateBlocks(code);
             }}
             aria-pressed={active}
-            className={
-              active
-                ? 'bg-accent px-2.5 py-1 text-panel'
-                : 'px-2.5 py-1 text-ink-soft hover:text-ink'
-            }
+            className={`rounded-md px-3 py-1.5 lg:px-2.5 lg:py-1 ${
+              active ? 'bg-accent text-panel' : 'text-muted hover:text-ink'
+            }`}
           >
             {code.toUpperCase()}
           </button>

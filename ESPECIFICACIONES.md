@@ -36,6 +36,7 @@ el tamaño del lienzo y exporta el resultado a resolución completa.
 | **Fuentes** | Catálogo de fuentes de alta calidad + **carga de fuentes externas** (`.ttf`/`.otf`/`.woff`). |
 | **Estilo** | Negrita, cursiva, subrayado, mayúsculas, alineación, tamaño, interlineado, espaciado, sombra, contorno y **curvatura**. |
 | **Color** | Selección por *color picker*, por **código hexadecimal** y por paleta de muestras. |
+| **Textura** | Rellenar el texto con una **imagen subida por el usuario** (JPG/PNG/WebP), con encaje *cover*/*contain* y opacidad. Sustituye al color mientras está puesta; al quitarla se recupera el color anterior. |
 | **Preview** | Vista **en tiempo real** fiel a la exportación (como una *story*). |
 | **Lienzo** | Redimensionar libremente. Accesos directos a formatos (16:9, 4:3, 1:1, KDP…) y **ancho/alto en píxeles por teclado**. |
 | **Imagen** | Subir imagen de fondo; encaje *cover*/*contain*; reposicionar arrastrando. |
@@ -88,16 +89,17 @@ src/
 │  └─ editor.ts                  # modelo de dominio — fuente única de verdad
 ├─ views/Home/Home.tsx · useMediaQuery.ts   # composición de la pantalla del editor
 ├─ features/
-│  ├─ canvas/    Stage.tsx · TextBlock.tsx · useDrag.ts   # preview en tiempo real
+│  ├─ canvas/    Stage.tsx · TextBlock.tsx · CurvedTextView.tsx · useDrag.ts  # preview
 │  ├─ text/      TextPanel.tsx                            # contenido y estilo
 │  ├─ fonts/     FontPanel.tsx · useFontLoader.ts         # fuentes + carga externa
+│  ├─ style/     TexturePicker.tsx · useTextureUpload.ts   # textura del texto
 │  ├─ color/     ColorPanel.tsx                           # picker · hex · paleta
 │  ├─ canvasSize/ SizePanel.tsx · presets.ts             # tamaño y presets
 │  └─ export/    ExportDialog.tsx                         # formato y descarga
 ├─ i18n/  config.ts · messages.ts · useI18n.ts · LanguageSwitcher.tsx  # bilingüe ES/CA
 ├─ store/editorStore.ts          # estado global (Zustand, tipado)
 ├─ core/  renderToCanvas.ts · curvedText.ts · exporters.ts  # render y export
-├─ sharedComponents/  Slider.tsx · Toggle.tsx · Sheet.tsx   # primitivas reutilizables
+├─ sharedComponents/  Button.tsx · Slider.tsx · Toggle.tsx · Sheet.tsx · Toast.tsx
 ├─ platform/  files.ts           # abstracción web ↔ Capacitor
 └─ utils/  clamp.ts · hex.ts · download.ts                # utilidades puras
 ```
@@ -127,7 +129,10 @@ describe **qué hace** y **cómo lo hará**. Es el índice vivo de responsabilid
 Definido en [`src/types/editor.ts`](src/types/editor.ts). Piezas clave:
 
 - **`TextBlock`** — una capa de texto: contenido, posición (en % del lienzo),
-  tipografía, color y efectos (sombra, contorno, curvatura).
+  tipografía, color y efectos (sombra, contorno, **textura**, curvatura).
+- **`BlockTexture`** — imagen que rellena el texto de un bloque (`src`,
+  `fileName`, encaje y opacidad). Es una **propiedad del bloque**, no una capa
+  aparte: el relleno del texto es o un color o una textura, nunca los dos.
 - **`CanvasImage`** — imagen de fondo con encaje (*cover*/*contain*) y offset.
 - **`CanvasSize`** — dimensiones reales de salida en px.
 - **`CanvasPreset`** — accesos directos de tamaño (KDP, proporciones…).
@@ -177,9 +182,14 @@ Definido en [`src/types/editor.ts`](src/types/editor.ts). Piezas clave:
 
 ---
 
-## 8. Plan de acción por fases
+## 8. Fases hechas
 
-### ✅ Fase 1 — Cimientos (este nivel)
+Historial de cómo se construyó el editor, fase a fase. **Todas están cerradas**;
+lo que queda por hacer vive en el apartado 9, ya no por fases sino por
+prioridad. Se conserva porque cada fase documenta el *porqué* de sus decisiones,
+y esas decisiones siguen vigentes en el código.
+
+### ✅ Fase 1 — Cimientos
 
 - [x] Estructura de carpetas y ficheros con su **contrato** en castellano.
 - [x] Configuración: Vite, TypeScript estricto, Tailwind v4, PWA, Capacitor.
@@ -201,7 +211,7 @@ Definido en [`src/types/editor.ts`](src/types/editor.ts). Piezas clave:
   bloques, edición inline con doble clic y redimensionado del marco con asas
   (esto último va más allá del mockup y se conserva).
 
-### Fase 2A — Cablear los paneles al store
+### ✅ Fase 2A — Cablear los paneles al store (hecha)
 
 Los paneles ya están maquetados: aquí se les da vida sin tocar su layout.
 
@@ -215,11 +225,15 @@ Los paneles ya están maquetados: aquí se les da vida sin tocar su layout.
   validación de tipo y revocado de la *object URL* anterior.
 - [x] `TextPanel`: la selección sale de `selectedBlockId`; todos los controles
   escriben con `patchSelected`.
-- [ ] `ColorPanel`: picker, hex (a través de `normalizeHex`) y paleta escribiendo
-  en el bloque seleccionado.
-- [ ] `Stage`: arrastre de la imagen de fondo (reusando `useDrag` sobre
-  `offsetX/offsetY`) y publicar su escala para que la cabecera muestre el `%` de
-  zoom como en el mockup.
+- [x] `ColorPanel`: picker, hex (a través de `normalizeHex`) y paleta escribiendo
+  en el bloque seleccionado. El campo hexadecimal mantiene un borrador local
+  mientras se teclea (un color a medio escribir no es válido) y lo descarta al
+  salir si nunca llegó a serlo.
+- [x] `Stage`: arrastre de la imagen de fondo (reusando `useDrag` sobre
+  `offsetX/offsetY`, invirtiendo el eje porque `background-position` va al revés
+  que el dedo) y publicar su escala con `onZoomChange` para que la cabecera de
+  escritorio muestre el `%` de zoom como en el mockup. Deseleccionar pasa a ser
+  cosa del clic sin arrastre: recolocar el fondo ya no pierde la capa activa.
 - [x] Acciones nuevas de store: `setImageFit`, `setImageOffset`, `centerImage`.
 - [x] Panel de imagen completo: botones **Rellenar / Ajustar / Centrar** y la
   pista de arrastre, visibles solo cuando hay imagen.
@@ -246,35 +260,172 @@ Los paneles ya están maquetados: aquí se les da vida sin tocar su layout.
   y toast son de la Fase 4; los nombres de peso ("Regular 400") no se traducen:
   son valores CSS, como el nombre de la familia.
 
-### Fase 3 — Fuentes y color
+### ✅ Fase 3 — Fuentes y color (hecha)
 
-- [ ] Autoalojar el catálogo de portadas con `@fontsource` (pesos 400 y 700 de
-  las 10 familias que faltan) y unificarlo en un único `FONT_CATALOG` — hoy la
-  lista vive duplicada dentro de `FontPanel`.
-- [ ] `FontPanel`: selección real contra el bloque activo y grupo
-  "Personalizada".
-- [ ] `useFontLoader.loadCustomFont`: registro con `FontFace`, validación de
-  extensión/tipo y acción `addCustomFont` en el store.
+- [x] Autoalojar el catálogo de portadas con `@fontsource` (peso variable donde
+  existe) y unificarlo en un único `FONT_CATALOG` — la lista vivía duplicada
+  dentro de `FontPanel` y solo cargaba una de las 13 familias que ofrecía. Los
+  `@font-face` se declaran en `coverFonts.css`: el CSS de los paquetes trae
+  alfabetos que no se usan y renombra las familias ('Lora Variable'), y el
+  nombre de la familia es un dato del proyecto que no puede cambiar.
+- [x] `FontPanel`: selección real contra el bloque activo (`patchSelected`) y
+  grupo "Personalizada" alimentado por `customFonts` del store.
+- [x] `useFontLoader.loadCustomFont`: registro con `FontFace`, validación por
+  extensión (el MIME de las fuentes no es fiable), nombre de familia único para
+  que una subida no tape a una empaquetada, y acción `addCustomFont` en el
+  store. El pegamento con la UI vive en `useFontUpload`, en paralelo a
+  `useImageUpload`.
+- [x] Sombra con **color propio** (`shadowColor`) y opacidad derivada de
+  `shadowIntensity`: era negra fija al 60 %, así que sobre el lienzo oscuro no
+  se distinguía y el efecto parecía no aplicarse. `hexToRgba` compone el color
+  del modelo (siempre opaco) con la opacidad del render.
 
-### Fase 4 — Curvatura y exportación
+### ✅ Fase 3.5 — Textura de letra (hecha)
 
-- [ ] `computeCurvedText` + rama `curve !== 0` en `TextBlock` (SVG `<textPath>`):
-  hoy el slider de curvatura no tendría efecto.
-- [ ] `renderToCanvas` a resolución real + `exportCanvas`
-  (PNG/JPEG/WebP/PDF): **export sin pérdida**.
-- [ ] `ExportDialog` en sus dos formas: modal centrado en escritorio (rejilla
+Funcionalidad nueva de los mockups del 28/07/2026. Se hizo en este orden —el
+modelo primero, la pantalla al final— y su parte de **exportación** cae en la
+Fase 4.
+
+- [x] **Modelo**: `BlockTexture` + campo `texture: BlockTexture | null` en
+  `TextBlock` (por defecto `null`). Textura y color son el mismo relleno: con
+  textura puesta manda ella y `color` queda en reserva para cuando se quite.
+- [x] **Store**: acción `setSelectedTexture(texture | null)` que **revoca la
+  object URL anterior** antes de escribir la nueva; `removeBlock` revoca también
+  la textura del bloque que borra. La revocación vive en el store, no en la UI:
+  repartida por los paneles, basta olvidarla una vez para filtrar memoria.
+  `patchSelectedTexture` acompaña a la anterior para encaje y opacidad: no
+  tocan el `src`, así que no hay nada que revocar, y evita que el panel tenga
+  que recomponer el objeto del modelo.
+- [x] **Subida**: `features/style/useTextureUpload.ts`, gemelo de
+  `useImageUpload`, reutilizando su `ACCEPTED_TYPES` (JPG/PNG/WebP) por
+  importación y devolviendo el error como clave i18n (comparte
+  `panel.image.invalidType`: mismos formatos, mismo mensaje). Nace en `cover`
+  al 100 %.
+- [x] **Preview**: relleno del texto en `TextBlock` con `background-clip: text`
+  (texto recto). La opacidad va en una capa recortada al texto, **no** en el
+  elemento entero, para no apagar contorno y sombra: el texto editable se queda
+  con `-webkit-text-fill-color: transparent` (conserva contorno y sombra, que
+  se dibujan sobre la geometría del glifo) y encima va una copia no interactiva
+  con la imagen. Mientras se edita el bloque manda el color: la copia pinta
+  `block.text`, que aún no lleva lo tecleado, y quedaría desfasada sobre el
+  texto real. El `<pattern>` SVG del texto curvo llega con la Fase 4.
+- [x] **Panel**: `TexturePicker` dentro de *Efectos*, entre Contorno y
+  Curvatura: fila «Textura» + «Quitar», botón punteado con miniatura y, con
+  textura puesta, encaje *Rellenar/Ajustar* y slider de opacidad. Un solo
+  componente para móvil y escritorio. Claves i18n `panel.style.texture*`.
+
+### ✅ Fase 4 — Curvatura y exportación (hecha)
+
+- [x] `computeCurvedText` + rama `curve !== 0` en `TextBlock`: la geometría es
+  una Bézier cuadrática que se publica a la vez como `pathD` (para el
+  `<textPath>` del preview, en `CurvedTextView`) y como puntos + recorrido por
+  longitud de arco (`pointAtDistance`), que es lo que necesita el canvas para
+  repartir los glifos. Una sola geometría para los dos caminos: con dos, el
+  preview y la exportación se separarían. Mientras se edita el bloque vuelve al
+  texto plano, porque el arco pinta `block.text` y aún no lleva lo tecleado.
+- [x] `renderToCanvas` a resolución real + `exportCanvas`
+  (PNG/JPEG/WebP/PDF): **export sin pérdida**. El PDF se escribe a mano (seis
+  objetos, imagen RGB con `/FlateDecode` vía `CompressionStream`) en vez de
+  añadir una librería de cientos de KB al bundle de la PWA.
+- [x] **Textura en el export** (Fase 3.5): `background-clip: text` no existe en
+  Canvas 2D; se reproduce pintando los glifos en un canvas intermedio del
+  bloque y componiendo la imagen con `source-in`, respetando encaje y opacidad.
+- [x] `ExportDialog` en sus dos formas: modal centrado en escritorio (rejilla
   2×2 de formatos, slider de calidad para JPEG/WebP, nota de imprenta,
-  Cancelar/Descargar) y contenido de hoja en móvil.
-- [ ] `Toast` compartido para confirmar la exportación.
+  Cancelar/Descargar) y contenido de hoja en móvil. Un solo componente: cambia
+  el envoltorio, no los controles ni la lógica.
+- [x] `Toast` compartido para confirmar la exportación. Lo pinta `Home` y no el
+  diálogo: al exportar, el diálogo se cierra y se llevaría el aviso con él.
 
-### Fase 5 — Empaquetado nativo
+Dos cosas que salieron al probarlo y quedan escritas para no repetirlas:
 
-- [ ] `platform/files` con Capacitor (Filesystem/Share).
-- [ ] Build Android; validar flujo; después iOS.
+- Las tipografías las carga `renderToCanvas` (`ensureFontsLoaded`) antes de
+  pintar. `document.fonts.ready` NO basta: el navegador solo descarga una
+  familia cuando el DOM la usa, y aquí se pinta en un canvas, así que sin
+  pedirlas expresamente la portada se exportaba con la fuente de sustitución.
+- El bloque sin marco explícito envuelve al llegar al borde del lienzo, igual
+  que el `max-width: 100%` del preview; sin ese límite el texto largo se salía
+  del lienzo exportado en vez de partirse en dos líneas.
+- El lienzo **sin imagen** se exporta con un color base liso, no con las rayas
+  del preview: esas rayas son el aviso de "aquí falta una imagen", del mismo
+  grupo que el marco de selección, y eso no se exporta.
+
+Con la Fase 4 cerrada, **el producto hace ya lo que promete**: escribir sobre
+una imagen y exportar el resultado a resolución real sin pérdida. Todo lo que
+queda es red de seguridad, acabado y empaquetado, así que a partir de aquí el
+plan deja de ir por fases numeradas y va por **prioridad**.
 
 ---
 
-## 9. Puesta en marcha
+## 9. Pendiente, por prioridad
+
+### P1 — Red de seguridad: tests y lint
+
+Lo primero porque es lo que permite tocar el resto sin miedo, y porque hoy **no
+hay ninguna comprobación automática**: las fases 3.5 y 4 se validaron a mano,
+navegador contra navegador, y eso no se puede repetir en cada cambio.
+
+- [ ] **ESLint 9** (flat config + `typescript-eslint` + `eslint-plugin-react-hooks`
+  + `eslint-plugin-react-refresh`). `package.json` declara `"lint": "eslint ."`
+  pero ESLint **no está instalado**: el script está roto desde el primer día.
+- [ ] **Vitest en tres entornos**: `unit` (node) para lógica pura —`utils`,
+  `editorStore`, `presets`, integridad del catálogo i18n, geometría de
+  `computeCurvedText`—, `dom` (jsdom + Testing Library) para el cableado de los
+  paneles contra un store real, y `browser` (Playwright/Chromium) para
+  `renderToCanvas` y `exportCanvas`, que es donde hace falta un motor de verdad.
+- [ ] Umbrales de cobertura con fallo duro: 90 % en `store`/`core`/`utils`,
+  70 % en `features`/`sharedComponents`.
+- [ ] Aserción clave del export: **el mismo proyecto exportado a 1600 y a 3200 px
+  sale proporcionalmente idéntico**. Es la promesa del producto escrita como test.
+
+### P2 — Cabos sueltos de las fases 3.5 y 4
+
+Diferencias conocidas entre preview y exportación, más los literales que se
+escaparon del catálogo. Son pequeñas y están localizadas; van antes del acabado
+porque afectan al resultado que se lleva el usuario.
+
+- [ ] **Subrayado en texto curvo**: el preview lo pinta (`CurvedTextView`) pero
+  `renderToCanvas` no lo dibuja en la rama curva (`drawCurvedBlock` no llama a
+  `drawUnderlines`). O se pinta en el export, o se retira del preview.
+- [ ] `TextBlock`: dos `aria-label` en castellano fijo, fuera del catálogo i18n.
+- [ ] `messages.ts`: la traducción catalana de `block.subtitle.default` sigue
+  siendo la castellana ("un subtítulo evocador" → "un subtítol evocador"). Es el
+  defecto que debería destapar en rojo el test de integridad del catálogo (P1).
+
+### P3 — Acabado móvil y accesibilidad
+
+- [ ] `Stage`: padding del escenario 14 px en móvil (hoy 32 fijo).
+- [ ] Altura de la hoja alineada con el mockup (≈52 % del alto) sin romper la
+  hoja de exportación ni las pestañas más largas (hoy 75 %).
+- [ ] Asas de redimensionado con área táctil ~24 px manteniendo el aspecto
+  pequeño; revisar que el doble toque para editar no compita con el arrastre.
+- [ ] `padding-bottom` de área segura en la barra de pestañas (la hoja ya lo tiene).
+- [ ] `aria-pressed`/`aria-checked` en todos los botones de estado, foco visible
+  y objetivos táctiles ≥ 44 px donde el mockup lo permita.
+- [ ] Pasada final por el mockup, pestaña a pestaña, a 390 × 844.
+
+### P4 — Empaquetado nativo (Capacitor)
+
+**Al final, por decisión de producto**: la PWA ya es usable y exporta, así que
+el empaquetado no bloquea a nadie y conviene abordarlo con la red de seguridad
+de P1 ya puesta.
+
+- [ ] `platform/files` con Capacitor (Filesystem/Share). Hoy solo tiene la vía
+  web (`downloadBlob`), que es justo el punto único de divergencia previsto.
+- [ ] Interceptar el **botón atrás de Android** con confirmación, para no perder
+  el trabajo.
+- [ ] Build Android; validar flujo; después iOS.
+
+### Fuera de alcance (por ahora)
+
+Deshacer/rehacer y guardar/restaurar proyectos (el modelo ya es serializable, se
+podrá añadir sin tocar nada más), vista "Mis portadas", reordenar capas
+(z-index), plantillas, filtros sobre la imagen, PDF en CMYK (el actual es
+`DeviceRGB`) e integración continua.
+
+---
+
+## 10. Puesta en marcha
 
 ```bash
 npm install     # instalar dependencias
@@ -282,27 +433,35 @@ npm run dev     # arrancar en desarrollo (http://localhost:5173)
 npm run build   # build de producción (dist/)
 npm run preview # previsualizar el build
 
-# Nativo (cuando toque la Fase 5)
+# Nativo (cuando toque la P4)
 npm run build && npx cap add android && npm run cap:sync
 ```
 
 ---
 
-## 10. Estado actual
+## 11. Estado actual
 
-Cimientos completos y **piel del editor terminada**. La **Home** compone el
-editor según los mockups: cabecera con marca, dimensiones del lienzo, selector
-ES/CA y botón Exportar; Stage al centro; en escritorio (≥ lg) paneles laterales
-fijos y en móvil barra inferior de pestañas con hoja inferior (`Sheet`). Todo el
-texto sale del catálogo i18n.
+**El editor está completo de punta a punta**: se escribe sobre la imagen, se ve
+en tiempo real y se exporta a resolución real. Ya no queda ningún *stub* en
+`src/`: `renderToCanvas`, `exporters`, `curvedText` y `loadCustomFont` están
+implementados. Cada pieza mantiene su **contrato** documentado en cabecera.
 
-**Ya vivo:** el modelo de dominio, el store, el i18n bilingüe con preferencia
-persistida, y el `Stage` con `TextBlock` (preview fiel, selección, arrastre,
-edición inline y redimensionado del marco).
+**Ya vivo:**
 
-**Pendiente de cablear:** los cuatro paneles están maquetados pero con valores
-fijos y controles no controlados; `ExportDialog`, `Slider` y `Toggle` son
-*stubs*; `renderToCanvas`, `exporters`, `curvedText` y `loadCustomFont` lanzan
-error a propósito. El catálogo de fuentes lista 15 familias pero solo hay 3
-instaladas, así que las muestras se ven con fuente de sustitución hasta la
-Fase 3. Cada pieza mantiene su **contrato** documentado en cabecera.
+- Modelo de dominio, store y i18n bilingüe con preferencia persistida.
+- `Stage` + `TextBlock`: preview fiel, selección, arrastre, edición inline y
+  redimensionado del marco.
+- Los cinco paneles cableados al store (texto, fuente, estilo, color, lienzo),
+  en columnas fijas en escritorio y en hoja inferior con pestañas en móvil.
+- Catálogo de 15 tipografías autoalojadas + carga de fuentes propias del usuario.
+- Color, sombra con color propio, contorno y **textura de letra** (Fase 3.5).
+- **Curvatura** (SVG `<textPath>` en el preview, glifos sobre el arco en el
+  canvas) y **exportación** a PNG/JPEG/WebP/PDF a resolución real (Fase 4).
+
+**Lo que falta** está en el apartado 9, ordenado por prioridad: red de seguridad
+(tests + lint), cabos sueltos de las fases 3.5 y 4, acabado móvil y
+accesibilidad, y por último el empaquetado nativo con Capacitor.
+
+**Verificación**: `npm run typecheck` y `npm run build` pasan. `npm run lint`
+**está roto** (ESLint no instalado) y **no hay tests**: es justo lo que abre la
+lista de prioridades.

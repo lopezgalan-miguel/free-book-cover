@@ -16,6 +16,7 @@
  *    coloca, no compone sus partes.
  */
 
+import { fontStackOf } from '@/features/fonts/catalog';
 import { useT } from '@/i18n/useI18n';
 import { Button } from '@/sharedComponents/Button';
 import { useEditorStore } from '@/store/editorStore';
@@ -71,7 +72,7 @@ export const LayerList = ({ layout }: LayerListProps) => {
               >
                 <span
                   className="flex-none text-xl leading-none text-ink"
-                  style={{ fontFamily: block.fontFamily }}
+                  style={{ fontFamily: fontStackOf(block.fontFamily) }}
                   aria-hidden="true"
                 >
                   Aa
