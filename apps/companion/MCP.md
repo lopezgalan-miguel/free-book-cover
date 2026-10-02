@@ -45,9 +45,9 @@ Los esquemas JSON de entrada y salida se publican en `tools/list` (generados con
 Sustituye a la subida de base64 arbitrario: el cliente da una **ruta local** y el proceso MCP lee el archivo y entrega sus bytes al editor. Comprobaciones, todas antes de enviar nada:
 
 - La ruta (tras resolver enlaces simbólicos) debe estar dentro de `FBC_IMPORT_DIRS` (lista separada por `:` en macOS/Linux o `;` en Windows). **Por defecto, solo el directorio de trabajo del proceso MCP**; ojo: con `pnpm --dir apps/companion mcp` ese directorio es `apps/companion`, así que define `FBC_IMPORT_DIRS`.
-- Debe ser un archivo normal, de tamaño ≤ `FBC_MAX_IMPORT_BYTES` (por defecto 20 MiB), con firma de PNG, JPEG, WebP o GIF.
+- Debe ser un archivo normal (se abre con O_NOFOLLOW y se comprueba con fstat sobre el descriptor), de tamaño ≤ `FBC_MAX_IMPORT_BYTES` (por defecto 20 MiB), con firma de PNG, JPEG, WebP o GIF.
 - El editor aplica además los límites del producto (100 MB, 80 Mpx, 500 MB por proyecto).
-- Los errores no incluyen rutas del sistema.
+- Inexistente y fuera de los directorios permitidos dan el mismo `not_found` (sin oráculo de existencia). Los errores no incluyen rutas del sistema.
 
 ## Errores tipificados
 
@@ -55,8 +55,8 @@ Un error es un resultado de herramienta con `isError: true` y un texto JSON `{"e
 
 | `kind` | Campos | Cuándo |
 | --- | --- | --- |
-| `invalid_params` | `issues[]` (ruta y motivo, nunca el valor) | Esquema, propiedad no aplicable, fuente desconocida, archivo fuera de los directorios permitidos, demasiado grande o no imagen. |
-| `not_found` | `resource` (`project`, `element`, `asset`, `file`), `id?` | Elemento, recurso o archivo ausente. |
+| `invalid_params` | `issues[]` (ruta y motivo, nunca el valor) | Esquema, propiedad no aplicable, fuente desconocida, `color` con `fit`, archivo demasiado grande o no imagen. |
+| `not_found` | `resource` (`project`, `element`, `asset`, `file`), `id?` | Elemento, recurso o archivo ausente (o fuera de los directorios permitidos). |
 | `conflict` | `expectedRevision`, `actualRevision` | Revisión obsoleta. **No se muta nada.** Léase otra vez el estado y reintente. |
 | `editor_disconnected` | `reason`: `no_companion`, `no_editor`, `not_authorized`, `timeout` | Companion apagado, editor sin abrir/conectar, proyecto sin autorizar (o distinto del autorizado) o el editor no respondió en 20 s. |
 | `busy` | — | Demasiadas llamadas pendientes en el companion (16). |

@@ -1,4 +1,5 @@
-import { open, realpath, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open, realpath } from "node:fs/promises";
 import { basename, isAbsolute, relative, resolve } from "node:path";
 import { readImageHeader, type ToolError } from "@free-book-cover/core";
 
@@ -22,11 +23,13 @@ const inside = (root: string, file: string) => {
  */
 export async function readImportFile(path: string, limits: ImportLimits): Promise<ImportFile> {
   if (path.includes("\0")) return bad("ruta no válida");
+  // Inexistente y fuera de los directorios permitidos dan el mismo error: no se revela qué existe fuera.
+  const missing: ImportFile = { ok: false, error: { kind: "not_found", resource: "file" } };
   let real: string;
   try {
     real = await realpath(resolve(path));
   } catch {
-    return { ok: false, error: { kind: "not_found", resource: "file" } };
+    return missing;
   }
   const roots: string[] = [];
   for (const d of limits.allowedDirs) {
@@ -36,14 +39,14 @@ export async function readImportFile(path: string, limits: ImportLimits): Promis
       // un directorio configurado que no existe no permite nada
     }
   }
-  if (!roots.some((r) => inside(r, real))) return bad("el archivo está fuera de los directorios permitidos");
-  const info = await stat(real).catch(() => null);
-  if (!info) return { ok: false, error: { kind: "not_found", resource: "file" } };
-  if (!info.isFile()) return bad("la ruta no es un archivo");
-  if (info.size > limits.maxBytes) return bad(`el archivo supera el límite de ${limits.maxBytes} bytes`);
-  const fh = await open(real, "r").catch(() => null);
-  if (!fh) return { ok: false, error: { kind: "not_found", resource: "file" } };
+  if (!roots.some((r) => inside(r, real))) return missing;
+  // O_NOFOLLOW + fstat sobre el descriptor: lo comprobado es lo que se lee, aunque la ruta cambie después.
+  const fh = await open(real, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => null);
+  if (!fh) return missing;
   try {
+    const info = await fh.stat();
+    if (!info.isFile()) return bad("la ruta no es un archivo");
+    if (info.size > limits.maxBytes) return bad(`el archivo supera el límite de ${limits.maxBytes} bytes`);
     // Se lee como mucho el límite + 1: un archivo que crece tras el stat tampoco lo supera.
     const buf = Buffer.alloc(limits.maxBytes + 1);
     const { bytesRead } = await fh.read(buf, 0, buf.length, 0);

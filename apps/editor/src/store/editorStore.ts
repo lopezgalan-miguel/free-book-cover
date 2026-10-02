@@ -189,8 +189,9 @@ export function createEditorStore(deps: EditorDeps) {
     },
 
     // meta: dimensiones decodificadas de la imagen, si se conocen, para el límite de megapíxeles.
-    async addAsset(asset: Asset, blob: Blob, meta: { widthPx?: number; heightPx?: number } = {}): Promise<boolean> {
-      const candidate: AssetCandidate = { kind: asset.kind, sizeBytes: blob.size, ...meta };
+    async addAsset(asset: Asset, blob: Blob, meta: { widthPx?: number; heightPx?: number; expectedRevision?: number } = {}): Promise<boolean> {
+      const { expectedRevision, ...dims } = meta;
+      const candidate: AssetCandidate = { kind: asset.kind, sizeBytes: blob.size, ...dims };
       const limit = checkAssetLimits(candidate, projectBytes());
       if (!limit.ok) {
         set({ error: { kind: "limit", error: limit.error } });
@@ -203,7 +204,8 @@ export function createEditorStore(deps: EditorDeps) {
       }
       const previous = state.assets;
       set({ assets: [...previous.filter((a) => a.id !== asset.id), { id: asset.id, blob }], nearLimit: limit.warning === "project_near_limit" });
-      if (this.dispatch({ type: "addAsset", asset })) return true;
+      // Con revisión esperada (MCP) el comando falla si el documento cambió durante la importación.
+      if (expectedRevision !== undefined ? this.applyRemote({ type: "addAsset", asset }, expectedRevision).ok : this.dispatch({ type: "addAsset", asset })) return true;
       // El comando falló: no se deja un blob huérfano ni en memoria ni en disco.
       set({ assets: previous, nearLimit: false });
       await deps.storage.deleteAsset(doc().id, asset.id).catch(() => undefined);

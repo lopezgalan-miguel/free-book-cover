@@ -121,7 +121,7 @@ describe("MCP por stdio con el companion real y un editor simulado", () => {
     expect(imp.structuredContent.assetId).toBe("as1");
     expect(imported).toEqual([{ name: "a.png", size: PNG.length }]);
     const outside = await call(client, "import_asset", { projectId: "p1", kind: "image", path: "/etc/hosts" });
-    expect(err(outside).kind).toBe("invalid_params");
+    expect(err(outside)).toEqual({ kind: "not_found", resource: "file" });
     expect(imported).toHaveLength(1);
     await client.close();
   });

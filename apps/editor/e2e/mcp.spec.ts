@@ -129,7 +129,7 @@ test("estilo, importación de recurso y fondo; revocar corta el acceso", async (
 
   // Fuera de los directorios permitidos del companion no se importa nada.
   const outside = await call(c, "import_asset", { projectId: s0.id, kind: "image", path: "/etc/hosts" });
-  expect(outside).toMatchObject({ ok: false, error: { kind: "invalid_params" } });
+  expect(outside).toEqual({ ok: false, error: { kind: "not_found", resource: "file" } });
 
   await dialog.getByRole("button", { name: "Revocar autorización" }).click();
   const after = await storeState(page);

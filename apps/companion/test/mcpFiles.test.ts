@@ -36,8 +36,12 @@ describe("readImportFile", () => {
   });
   it("rechaza rutas fuera de los directorios permitidos, incluidos .. y enlaces simbólicos", async () => {
     for (const p of [join(outside, "secreto.png"), join(allowed, "..", "fuera", "secreto.png"), join(allowed, "enlace.png")]) {
-      expect(await readImportFile(p, limits())).toMatchObject({ ok: false, error: { kind: "invalid_params" } });
+      expect(await readImportFile(p, limits())).toEqual({ ok: false, error: { kind: "not_found", resource: "file" } });
     }
+  });
+  it("sin oráculo de existencia: fuera existente, fuera inexistente y dentro inexistente dan lo mismo", async () => {
+    const results = await Promise.all([join(outside, "secreto.png"), join(outside, "no-existe.png"), join(allowed, "no-existe.png"), "/etc/hosts", "/no/existe/nada"].map((p) => readImportFile(p, limits())));
+    for (const r of results) expect(r).toEqual(results[0]);
   });
   it("archivo inexistente: not_found sin repetir la ruta", async () => {
     const r = await readImportFile(join(allowed, "no-existe.png"), limits());
@@ -49,6 +53,9 @@ describe("readImportFile", () => {
       expect(r).toMatchObject({ ok: false, error: { kind: "invalid_params" } });
       expect(JSON.stringify(r)).not.toContain(root);
     }
+  });
+  it("el descriptor abierto es el que se comprueba: un directorio no se lee", async () => {
+    expect(await readImportFile(join(allowed, "sub"), limits())).toMatchObject({ ok: false, error: { kind: "invalid_params" } });
   });
   it("sin directorios permitidos válidos no se importa nada", async () => {
     expect((await readImportFile(join(allowed, "a.png"), { allowedDirs: [join(root, "no-existe")], maxBytes: 4000 })).ok).toBe(false);

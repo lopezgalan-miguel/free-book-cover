@@ -108,7 +108,7 @@ describe("servidor MCP: llamadas", () => {
   });
   it("import_asset fuera del directorio permitido o inexistente no llega al editor", async () => {
     const out: any = await client.callTool({ name: "import_asset", arguments: { projectId: "p", kind: "image", path: "/etc/hosts" } });
-    expect(err(out).kind).toBe("invalid_params");
+    expect(err(out)).toEqual({ kind: "not_found", resource: "file" });
     const missing: any = await client.callTool({ name: "import_asset", arguments: { projectId: "p", kind: "image", path: join(dir, "nada.png") } });
     expect(err(missing)).toEqual({ kind: "not_found", resource: "file" });
     expect(calls).toHaveLength(0);

@@ -37,6 +37,7 @@ export async function importImage(
   file: File | Blob,
   target: ImportTarget,
   makeThumbnail: ThumbnailMaker = browserThumbnail,
+  expectedRevision?: number,
 ): Promise<ImportResult> {
   const head = new Uint8Array(await file.slice(0, HEADER_BYTES).arrayBuffer());
   const header = readImageHeader(head);
@@ -58,7 +59,7 @@ export async function importImage(
     },
   };
   const stored = new Blob([file], { type: header.mimeType });
-  if (!(await store.addAsset(asset, stored, { widthPx: header.widthPx, heightPx: header.heightPx }))) {
+  if (!(await store.addAsset(asset, stored, { widthPx: header.widthPx, heightPx: header.heightPx, ...(expectedRevision !== undefined ? { expectedRevision } : {}) }))) {
     return { ok: false, reason: "limit" };
   }
   const thumb = await makeThumbnail(file, THUMB_MAX_PX);

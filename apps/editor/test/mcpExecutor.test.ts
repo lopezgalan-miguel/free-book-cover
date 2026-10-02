@@ -159,7 +159,35 @@ describe("import_asset", () => {
   });
 });
 
+describe("import_asset: edición intermedia", () => {
+  it("si el documento cambia durante la importación: conflicto y ningún recurso queda", async () => {
+    const rev = doc().revision;
+    const put = storage.putAsset.bind(storage);
+    vi.spyOn(storage, "putAsset").mockImplementation(async (...a) => {
+      store.dispatch({ type: "setBackground", background: "#123456" });
+      return put(...a);
+    });
+    const out = await run("import_asset", { projectId: doc().id, expectedRevision: rev, kind: "image", dataBase64: PNG_B64 });
+    expect(err(out)).toEqual({ kind: "conflict", expectedRevision: rev, actualRevision: rev + 1 });
+    expect(doc().assets).toHaveLength(0);
+    expect(store.getState().assets).toHaveLength(0);
+  });
+  it("addAsset con revisión esperada obsoleta falla y retira el blob", async () => {
+    const rev = doc().revision;
+    store.dispatch({ type: "setBackground", background: "#123456" });
+    const ok = await store.addAsset({ id: "x1", kind: "image", mimeType: "image/png", metadata: {} }, new Blob(["x"]), { expectedRevision: rev });
+    expect(ok).toBe(false);
+    expect(doc().assets).toHaveLength(0);
+    expect(store.getState().assets.some((a) => a.id === "x1")).toBe(false);
+  });
+});
+
 describe("apply_background", () => {
+  it("color con fit es invalid_params y no muta", async () => {
+    const before = doc();
+    expect(err(await run("apply_background", { projectId: before.id, expectedRevision: before.revision, color: "#000000", fit: "fill" })).kind).toBe("invalid_params");
+    expect(doc()).toBe(before);
+  });
   it("color liso", async () => {
     const out = ok(await run("apply_background", { projectId: doc().id, expectedRevision: 0, color: "#204060" }));
     MCP_TOOLS.apply_background.output.parse(out);

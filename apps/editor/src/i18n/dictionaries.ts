@@ -707,7 +707,7 @@ export const ca: Dictionary = {
   mcpStatusAuthorized: "Projecte autoritzat: els clients MCP poden llegir-lo i editar-lo.",
   mcpFailUnreachable: "No s'ha pogut connectar amb el companion. Comprova l'adreça i que està en marxa.",
   mcpFailUnauthorized: "El companion ha rebutjat el token.",
-  mcpFailReplaced: "Una altra pestanya de l'editor ha près la connexió.",
+  mcpFailReplaced: "Una altra pestanya de l'editor ha pres la connexió.",
   mcpFailProtocol: "El companion ha tancat la connexió per un missatge no vàlid.",
   mcpConnect: "Connecta",
   mcpDisconnect: "Desconnecta",

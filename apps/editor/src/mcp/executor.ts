@@ -153,10 +153,18 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       } catch {
         return invalid("dataBase64: no es base64 válido");
       }
+      // La decodificación no es instantánea: una edición intermedia debe dar conflicto, no importar.
+      if (args.expectedRevision !== undefined && args.expectedRevision !== doc().revision) {
+        return fail({ kind: "conflict", expectedRevision: args.expectedRevision, actualRevision: doc().revision });
+      }
       const file = new File([bytes as BlobPart], args.name ?? "imagen", {});
       const before = store.getState().error;
-      const r = await importImage(store, file, "asset", deps.makeThumbnail);
+      const r = await importImage(store, file, "asset", deps.makeThumbnail, args.expectedRevision);
       if (!r.ok) {
+        // Una edición durante la importación: conflicto, sin recurso huérfano (addAsset lo retira).
+        if (args.expectedRevision !== undefined && args.expectedRevision !== doc().revision) {
+          return fail({ kind: "conflict", expectedRevision: args.expectedRevision, actualRevision: doc().revision });
+        }
         if (r.reason === "unsupported") return invalid("formato de imagen no admitido (PNG, JPEG, WebP o GIF)");
         const err = store.getState().error;
         if (r.reason === "limit" && err !== before && err?.kind === "limit") return invalid(`la imagen supera un límite del proyecto (${err.error.kind})`);
@@ -178,6 +186,7 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         if (d.revision !== args.expectedRevision) return fail({ kind: "conflict", expectedRevision: args.expectedRevision, actualRevision: d.revision });
         if (!a || a.kind !== "image") return fail({ kind: "not_found", resource: "asset", id: args.assetId });
       }
+      if (args.color !== undefined && args.fit !== undefined) return invalid("fit: solo se aplica a un fondo con assetId");
       const background = args.assetId !== undefined ? { assetId: args.assetId as string } : (args.color as string);
       const r = store.applyRemote({ type: "setBackground", background, ...(args.assetId !== undefined && args.fit !== undefined ? { fit: args.fit } : {}) }, args.expectedRevision);
       if (!r.ok) return fail(fromCommand(r.error, "asset"));
