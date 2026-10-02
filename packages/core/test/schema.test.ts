@@ -81,7 +81,7 @@ describe("migraciones y versiones", () => {
     const boom = loadProject(legacy, { migrations: { 0: () => { throw new Error("x"); } } });
     expect(boom.ok).toBe(false);
     const bad = loadProject(legacy, { migrations: { 0: (d) => ({ ...d, id: "" }) } });
-    expect(bad.ok && true).toBe(false);
+    expect(bad.ok).toBe(false);
     if (!bad.ok) expect(bad.error.kind).toBe("invalid");
   });
   it("rechaza entradas que no son objetos", () => {

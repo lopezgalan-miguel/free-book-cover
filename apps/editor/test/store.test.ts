@@ -136,3 +136,62 @@ describe("editorStore", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 });
+
+describe("robustez y límites", () => {
+  const asset = (kind: "image" | "font" = "image") => ({ id: "a1", kind, mimeType: kind === "image" ? "image/png" : "font/ttf", metadata: {} });
+  it("init es idempotente y no pisa ediciones", async () => {
+    const s = mk();
+    const a = s.init();
+    const b = s.init();
+    expect(a).toBe(b);
+    await a;
+    s.dispatch({ type: "setCanvas", widthIn: 5, heightIn: 5 });
+    await s.init();
+    expect(s.getState().history.present.canvas.widthIn).toBe(5);
+  });
+  it("modo memoria cuando IndexedDB no está disponible", async () => {
+    const { openStorageOrFallback } = await import("../src/storage/projectStorage");
+    const r = await openStorageOrFallback(() => Promise.reject(new Error("denegado")));
+    expect(r.available).toBe(false);
+    const s = createEditorStore({ storage: r.storage, storageAvailable: r.available, newId: () => "m1", downloadParts });
+    await s.init();
+    expect(s.getState().error).toEqual({ kind: "storage_unavailable" });
+    expect(s.dispatch({ type: "setCanvas", widthIn: 4, heightIn: 4 })).toBe(true);
+    expect(await s.save()).toBe(false);
+    expect(s.getState().history.present.canvas.widthIn).toBe(4);
+    expect((await openStorageOrFallback(() => openStorage(`fb-${n}`))).available).toBe(true);
+  });
+  it("rechaza imágenes y fuentes sobre el límite con error explícito", async () => {
+    const s = mk();
+    await s.init();
+    expect(await s.addAsset(asset(), new Blob(["x"]), { widthPx: 9000, heightPx: 9000 })).toBe(false);
+    expect(s.getState().error).toMatchObject({ kind: "limit", error: { kind: "image_too_many_megapixels" } });
+    const big = { size: 20 * 1024 * 1024 + 1 } as Blob;
+    expect(await s.addAsset(asset("font"), big)).toBe(false);
+    expect(s.getState().error).toMatchObject({ kind: "limit", error: { kind: "font_too_large" } });
+    expect(s.getState().history.present.assets).toHaveLength(0);
+  });
+  it("avisa al acercarse a 400 MB y rechaza al superar 500 MB", async () => {
+    const s = mk({ ...storage, putAsset: async () => ({ ok: true as const }), deleteAsset: async () => undefined });
+    await s.init();
+    const MB = 1024 * 1024;
+    const fake = (mb: number) => ({ size: mb * MB, slice: () => new Blob([]) }) as unknown as Blob;
+    expect(await s.addAsset({ ...asset(), id: "i1" }, fake(95))).toBe(true);
+    for (const id of ["i2", "i3", "i4"]) expect(await s.addAsset({ ...asset(), id }, fake(95))).toBe(true);
+    expect(s.getState().nearLimit).toBe(false);
+    expect(await s.addAsset({ ...asset(), id: "i5" }, fake(30))).toBe(true);
+    expect(s.getState().nearLimit).toBe(true);
+    for (const id of ["i6", "i7", "i8"]) await s.addAsset({ ...asset(), id }, fake(25));
+    expect(await s.addAsset({ ...asset(), id: "i9" }, fake(30))).toBe(false);
+    expect(s.getState().error).toMatchObject({ kind: "limit", error: { kind: "project_too_large" } });
+  });
+  it("si el comando falla tras guardar el blob, no queda huérfano", async () => {
+    const s = mk();
+    await s.init();
+    expect(await s.addAsset(asset(), new Blob(["x"]))).toBe(true);
+    // mismo id de recurso: el comando se rechaza (duplicado)
+    expect(await s.addAsset(asset(), new Blob(["yy"]))).toBe(false);
+    expect(s.getState().assets).toHaveLength(1);
+    expect(s.getState().assets[0]!.blob.size).toBe(1);
+  });
+});

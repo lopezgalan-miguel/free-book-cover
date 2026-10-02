@@ -3,12 +3,14 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import { App } from "./App";
 import { I18nProvider } from "./i18n";
-import { openStorage } from "./storage/projectStorage";
+import { openStorageOrFallback } from "./storage/projectStorage";
 import { downloadParts } from "./storage/backup";
 import { createEditorStore } from "./store/editorStore";
 
+const { storage, available } = await openStorageOrFallback();
 const store = createEditorStore({
-  storage: await openStorage(),
+  storage,
+  storageAvailable: available,
   newId: () => crypto.randomUUID(),
   downloadParts,
 });

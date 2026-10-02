@@ -7,18 +7,33 @@ const MESSAGE: Record<string, DictKey> = {
   save: "saveError",
   unsupported_version: "unsupportedVersion",
   load: "loadError",
+  storage_unavailable: "storageUnavailable",
+};
+
+const LIMIT_MESSAGE: Record<string, DictKey> = {
+  image_too_large: "limitImageSize",
+  image_too_many_megapixels: "limitImageMpx",
+  font_too_large: "limitFontSize",
+  project_too_large: "limitProjectSize",
+  invalid_size: "limitInvalid",
 };
 
 export function Notices() {
   const { t } = useI18n();
   const store = useStore();
-  const { error, backupParts } = useEditorState();
-  if (!error || error.kind === "command") return null;
-  const canBackup = error.kind === "quota" || error.kind === "save";
+  const { error, backupParts, nearLimit } = useEditorState();
+  const warning = nearLimit ? (
+    <div role="status" className="border-b border-line bg-chip px-[18px] py-2 text-[13px]">{t("projectNearLimit")}</div>
+  ) : null;
+  if (!error || error.kind === "command") return warning;
+  const canBackup = error.kind === "quota" || error.kind === "save" || error.kind === "storage_unavailable";
+  const text = error.kind === "limit" ? t(LIMIT_MESSAGE[error.error.kind]!) : t(MESSAGE[error.kind]!);
   return (
+  <>
+    {warning}
     <div role="alert" className="flex items-center justify-between gap-4 border-b border-[#e3c9c4] bg-[#f8e8e5] px-[18px] py-2 text-[13px] text-[#7a2e26]">
       <span>
-        {t(MESSAGE[error.kind]!)}
+        {text}
         {backupParts !== null && backupParts > 1 ? ` ${t("backupParts", { n: backupParts })}` : ""}
       </span>
       {canBackup && (
@@ -27,5 +42,6 @@ export function Notices() {
         </button>
       )}
     </div>
+  </>
   );
 }

@@ -67,6 +67,13 @@ export const es = {
   unsupportedVersion: "El proyecto guardado usa una versión del formato no compatible. No se ha modificado; se abre un proyecto nuevo.",
   loadError: "No se pudo leer el proyecto guardado. No se ha modificado; se abre un proyecto nuevo.",
   removeLayer: "Eliminar capa",
+  storageUnavailable: "No se pudo abrir el almacenamiento del navegador (¿modo privado?). Puedes editar, pero nada se guardará: descarga una copia de seguridad.",
+  projectNearLimit: "El proyecto se acerca al límite de 500 MB.",
+  limitImageSize: "La imagen supera el límite de 100 MB.",
+  limitImageMpx: "La imagen supera el límite de 80 megapíxeles.",
+  limitFontSize: "La fuente supera el límite de 20 MB.",
+  limitProjectSize: "El recurso haría que el proyecto supere los 500 MB.",
+  limitInvalid: "No se pudo determinar el tamaño del archivo.",
 }
 
 export type Dictionary = typeof es;
@@ -139,6 +146,13 @@ export const ca: Dictionary = {
   unsupportedVersion: "El projecte desat fa servir una versió del format no compatible. No s'ha modificat; s'obre un projecte nou.",
   loadError: "No s'ha pogut llegir el projecte desat. No s'ha modificat; s'obre un projecte nou.",
   removeLayer: "Elimina la capa",
+  storageUnavailable: "No s'ha pogut obrir l'emmagatzematge del navegador (mode privat?). Pots editar, però res es desarà: descarrega una còpia de seguretat.",
+  projectNearLimit: "El projecte s'acosta al límit de 500 MB.",
+  limitImageSize: "La imatge supera el límit de 100 MB.",
+  limitImageMpx: "La imatge supera el límit de 80 megapíxels.",
+  limitFontSize: "La tipografia supera el límit de 20 MB.",
+  limitProjectSize: "El recurs faria que el projecte superi els 500 MB.",
+  limitInvalid: "No s'ha pogut determinar la mida del fitxer.",
 }
 
 export const LANGS = ["es", "ca"] as const;

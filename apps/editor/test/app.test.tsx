@@ -89,3 +89,18 @@ describe("App", () => {
     await waitFor(() => expect(downloadParts).toHaveBeenCalledTimes(1));
   });
 });
+
+describe("IndexedDB no disponible", () => {
+  it("la app arranca en modo memoria con aviso visible y permite editar", async () => {
+    const user = userEvent.setup();
+    const { openStorageOrFallback } = await import("../src/storage/projectStorage");
+    const { storage, available } = await openStorageOrFallback(() => Promise.reject(new Error("denegado")));
+    const store = createEditorStore({ storage, storageAvailable: available, newId: () => `m${Math.random()}`, downloadParts });
+    render(<I18nProvider><App store={store} /></I18nProvider>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo abrir el almacenamiento");
+    await user.click(screen.getByRole("button", { name: "Añadir capa de texto" }));
+    expect(screen.getByText("Texto nuevo")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
+});

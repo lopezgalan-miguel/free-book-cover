@@ -1,6 +1,6 @@
 import {
-  canRedo, canUndo, createHistory, createProject, execute, redo as redoHistory, undo as undoHistory,
-  type Asset, type Command, type CommandError, type History, type Project,
+  checkAssetLimits, canRedo, canUndo, createHistory, createProject, execute, redo as redoHistory, undo as undoHistory,
+  type Asset, type AssetCandidate, type Command, type LimitError, type CommandError, type History, type Project,
 } from "@free-book-cover/core";
 import type { ProjectStorage, StoredAsset } from "../storage/projectStorage";
 import { createBackupParts, type BackupPart } from "../storage/backup";
@@ -10,6 +10,8 @@ export type EditorError =
   | { kind: "save" }
   | { kind: "unsupported_version" }
   | { kind: "load" }
+  | { kind: "storage_unavailable" }
+  | { kind: "limit"; error: LimitError }
   | { kind: "command"; error: CommandError };
 
 export interface EditorState {
@@ -20,10 +22,14 @@ export interface EditorState {
   status: "idle" | "saving" | "saved";
   error: EditorError | null;
   backupParts: number | null;
+  // Aviso no bloqueante: el proyecto se acerca al límite de tamaño.
+  nearLimit: boolean;
 }
 
 export interface EditorDeps {
   storage: ProjectStorage;
+  // false si IndexedDB no se pudo abrir (modo memoria con aviso).
+  storageAvailable?: boolean;
   newId: () => string;
   downloadParts: (parts: BackupPart[]) => void;
   maxBackupPartBytes?: number;
@@ -32,7 +38,7 @@ export interface EditorDeps {
 export function createEditorStore(deps: EditorDeps) {
   const fresh = () => createHistory(createProject({ id: deps.newId() }));
   let state: EditorState = {
-    ready: false, history: fresh(), assets: [], savedRevision: null, status: "idle", error: null, backupParts: null,
+    ready: false, history: fresh(), assets: [], savedRevision: null, status: "idle", error: null, backupParts: null, nearLimit: false,
   };
   const listeners = new Set<() => void>();
   const set = (patch: Partial<EditorState>) => {
@@ -40,6 +46,9 @@ export function createEditorStore(deps: EditorDeps) {
     listeners.forEach((l) => l());
   };
   const doc = (): Project => state.history.present;
+  let initPromise: Promise<void> | null = null;
+  const projectBytes = () =>
+    state.assets.reduce((n, a) => n + a.blob.size, 0) + JSON.stringify(doc()).length;
 
   return {
     getState: () => state,
@@ -53,7 +62,16 @@ export function createEditorStore(deps: EditorDeps) {
     newId: deps.newId,
 
     // Recupera el último proyecto; si no es legible se abre uno nuevo sin tocar el guardado.
-    async init() {
+    // Idempotente: StrictMode u otras llamadas repetidas no pisan ediciones.
+    init(): Promise<void> {
+      initPromise ??= this.runInit();
+      return initPromise;
+    },
+    async runInit() {
+      if (deps.storageAvailable === false) {
+        set({ ready: true, error: { kind: "storage_unavailable" } });
+        return;
+      }
       try {
         const r = await deps.storage.loadLastProject();
         if (r.ok) {
@@ -89,14 +107,26 @@ export function createEditorStore(deps: EditorDeps) {
       if (r.ok) set({ history: r.history, status: "idle" });
     },
 
-    async addAsset(asset: Asset, blob: Blob): Promise<boolean> {
+    // meta: dimensiones decodificadas de la imagen, si se conocen, para el límite de megapíxeles.
+    async addAsset(asset: Asset, blob: Blob, meta: { widthPx?: number; heightPx?: number } = {}): Promise<boolean> {
+      const candidate: AssetCandidate = { kind: asset.kind, sizeBytes: blob.size, ...meta };
+      const limit = checkAssetLimits(candidate, projectBytes());
+      if (!limit.ok) {
+        set({ error: { kind: "limit", error: limit.error } });
+        return false;
+      }
       const put = await deps.storage.putAsset(doc().id, asset.id, blob);
       if (!put.ok) {
         set({ error: { kind: put.kind === "quota" ? "quota" : "save" } });
         return false;
       }
-      set({ assets: [...state.assets.filter((a) => a.id !== asset.id), { id: asset.id, blob }] });
-      return this.dispatch({ type: "addAsset", asset });
+      const previous = state.assets;
+      set({ assets: [...previous.filter((a) => a.id !== asset.id), { id: asset.id, blob }], nearLimit: limit.warning === "project_near_limit" });
+      if (this.dispatch({ type: "addAsset", asset })) return true;
+      // El comando falló: no se deja un blob huérfano ni en memoria ni en disco.
+      set({ assets: previous, nearLimit: false });
+      await deps.storage.deleteAsset(doc().id, asset.id).catch(() => undefined);
+      return false;
     },
 
     async save(): Promise<boolean> {
