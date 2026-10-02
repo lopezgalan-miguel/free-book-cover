@@ -2,6 +2,9 @@ import type { Asset, Element, Project } from "../schema/project.js";
 import { CENTER, placeImage, rectCenter, rotatePoint, type FitMode, type Placement, type Point, type Rect } from "../geometry/fit.js";
 import { effectiveDpi, isLowDpi } from "../images/dpi.js";
 
+// Color tras una imagen de fondo con espacio libre (ajustar) o aún sin decodificar.
+export const BACKGROUND_FALLBACK = "#100e0b";
+
 export interface RenderOptions {
   // Escala de la composición: píxeles por pulgada (300 en exportación, menos en la vista previa).
   pxPerInch: number;
@@ -76,7 +79,7 @@ export function renderDocument(doc: Project, opts: RenderOptions): RenderedDocum
     const id = canvas.background.assetId;
     background = {
       kind: "image",
-      fallbackColor: "#000000",
+      fallbackColor: BACKGROUND_FALLBACK,
       draw: imageDraw(assetDims(assets.get(id)), id, null, { x: 0, y: 0, width: widthPx, height: heightPx }, canvas.backgroundFit ?? "cover", canvas.backgroundPos ?? CENTER, ppi),
     };
   }

@@ -77,8 +77,11 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
     }
     case "setCanvas":
       return { ...doc, canvas: { ...doc.canvas, widthIn: cmd.widthIn, heightIn: cmd.heightIn } };
-    case "setBackground":
-      return { ...doc, canvas: { ...doc.canvas, background: cmd.background } };
+    case "setBackground": {
+      // El encuadre pertenece al fondo: al cambiarlo vuelve a cover y centrado.
+      const { backgroundFit: _f, backgroundPos: _p, ...rest } = doc.canvas;
+      return { ...doc, canvas: { ...rest, background: cmd.background } };
+    }
     case "setBackgroundLayout": {
       const canvas = { ...doc.canvas };
       if (cmd.fit !== undefined) canvas.backgroundFit = cmd.fit;

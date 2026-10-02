@@ -127,6 +127,13 @@ describe("resizeCanvas (políticas) vía applyCommand", () => {
     expect(huge.ok).toBe(false);
   });
 
+  it("setBackground con otra imagen restablece el encuadre del fondo", () => {
+    const framed = applyCommand(base(), { type: "setBackgroundLayout", fit: "contain", pos: { x: 0.1, y: 0.1 } }, 0);
+    if (!framed.ok) throw new Error();
+    const r = applyCommand(framed.doc, { type: "setBackground", background: { assetId: "a2" } }, 1);
+    expect(r.ok && r.doc.canvas).toEqual({ widthIn: 6, heightIn: 9, background: { assetId: "a2" } });
+  });
+
   it("setBackgroundLayout valida la posición y respeta la revisión esperada", () => {
     const d = base();
     const ok = applyCommand(d, { type: "setBackgroundLayout", fit: "contain", pos: { x: 0.2, y: 0.9 } }, 0);

@@ -11,6 +11,7 @@ export type EditorError =
   | { kind: "unsupported_version" }
   | { kind: "load" }
   | { kind: "storage_unavailable" }
+  | { kind: "unsupported_image" }
   | { kind: "limit"; error: LimitError }
   | { kind: "command"; error: CommandError };
 
@@ -24,7 +25,15 @@ export interface EditorState {
   backupParts: number | null;
   // Aviso no bloqueante: el proyecto se acerca al límite de tamaño.
   nearLimit: boolean;
+  // Estado de vista, fuera del documento y del historial.
+  selectedId: string | null;
+  zoom: number;
+  stageTone: StageTone;
 }
+
+export type StageTone = "charcoal" | "stone" | "linen";
+export const ZOOM_MIN = 0.25;
+export const ZOOM_MAX = 4;
 
 export interface EditorDeps {
   storage: ProjectStorage;
@@ -39,6 +48,7 @@ export function createEditorStore(deps: EditorDeps) {
   const fresh = () => createHistory(createProject({ id: deps.newId() }));
   let state: EditorState = {
     ready: false, history: fresh(), assets: [], savedRevision: null, status: "idle", error: null, backupParts: null, nearLimit: false,
+    selectedId: null, zoom: 1, stageTone: "charcoal",
   };
   const listeners = new Set<() => void>();
   const set = (patch: Partial<EditorState>) => {
@@ -88,6 +98,20 @@ export function createEditorStore(deps: EditorDeps) {
       }
     },
 
+    select(id: string | null) {
+      if (state.selectedId !== id) set({ selectedId: id });
+    },
+    setZoom(zoom: number) {
+      const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+      if (Number.isFinite(z) && z !== state.zoom) set({ zoom: z });
+    },
+    setStageTone(stageTone: StageTone) {
+      set({ stageTone });
+    },
+    reportError(error: EditorError) {
+      set({ error });
+    },
+
     // Única entrada de mutación de la UI: siempre pasa por los comandos de core.
     dispatch(cmd: Command): boolean {
       const r = execute(state.history, cmd, doc().revision);
@@ -127,6 +151,14 @@ export function createEditorStore(deps: EditorDeps) {
       set({ assets: previous, nearLimit: false });
       await deps.storage.deleteAsset(doc().id, asset.id).catch(() => undefined);
       return false;
+    },
+
+    // Derivado (p. ej. miniatura): se guarda como blob aparte y nunca sustituye al original.
+    async addDerivedBlob(id: string, blob: Blob): Promise<boolean> {
+      const put = await deps.storage.putAsset(doc().id, id, blob);
+      if (!put.ok) return false;
+      set({ assets: [...state.assets.filter((a) => a.id !== id), { id, blob }] });
+      return true;
     },
 
     async save(): Promise<boolean> {

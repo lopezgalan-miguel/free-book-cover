@@ -32,7 +32,7 @@ export function Header() {
     <Tooltip.Provider delayDuration={300}>
       <header className="z-10 flex h-14 flex-none items-center justify-between border-b border-line bg-panel px-[18px]">
         <div className="flex items-center gap-[11px]">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-ink font-serif text-base leading-none text-[#f4efe6]">P</div>
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-ink font-serif text-base leading-none text-paper">P</div>
           <div className="text-sm font-semibold tracking-[.01em]">{t("appName")}</div>
           <div className="rounded-full border border-line px-[7px] py-0.5 font-mono text-[11px] text-muted">{t("badge")}</div>
         </div>

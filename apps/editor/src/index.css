@@ -11,7 +11,21 @@
   --color-ink: #2b2824;
   --color-muted: #a49b8c;
   --color-stage: #26231d;
+  --color-stage-stone: #3a362e;
+  --color-stage-linen: #5a5346;
   --color-chip: #f0e9dc;
+  --color-field: #e0d8c8;
+  --color-dash: #d5cdbb;
+  --color-card: #fbf9f4;
+  --color-faint: #c4bcac;
+  --color-paper: #f4efe6;
+  --color-danger: #b4453a;
+  --color-danger-ink: #7a2e26;
+  --color-danger-bg: #f8e8e5;
+  --color-danger-line: #e3c9c4;
+  --color-warn-ink: #8a5a14;
+  --color-warn-bg: #fbf1dc;
+  --color-warn-line: #ecd9ab;
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
