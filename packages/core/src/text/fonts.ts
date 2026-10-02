@@ -179,12 +179,14 @@ export function checkFontsReady(doc: Project, stateOf: (family: string) => FontS
       continue;
     }
     const s = stateOf(family);
-    if (s !== "loaded") {
-      problems.push({ family, reason: s === undefined ? "not_loaded" : s, elementIds });
+    if (s === "failed" || s === "loading") {
+      problems.push({ family, reason: s, elementIds });
       continue;
     }
+    // Una cara que no existe nunca se pidió al navegador, así que su estado puede faltar: se informa la cara.
     const fp = faceProblem(family, elementIds);
     if (fp) problems.push(fp);
+    else if (s === undefined) problems.push({ family, reason: "not_loaded", elementIds });
   }
   return problems.length ? { ok: false, problems } : { ok: true };
 }

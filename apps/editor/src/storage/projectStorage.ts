@@ -29,6 +29,8 @@ export interface ProjectStorage {
   saveProject(doc: Project): Promise<SaveResult>;
   putAsset(projectId: string, assetId: string, blob: Blob): Promise<SaveResult>;
   deleteAsset(projectId: string, assetId: string): Promise<void>;
+  // Identificadores de todos los blobs guardados del proyecto (también miniaturas).
+  listAssetIds(projectId: string): Promise<string[]>;
   loadProject(id: string): Promise<LoadStoredResult>;
   loadLastProject(): Promise<LoadStoredResult>;
   listProjects(): Promise<Array<{ id: string; name: string; revision: number; updatedAt: number }>>;
@@ -103,6 +105,10 @@ export function createStorage(db: IDBPDatabase<CoverDB>): ProjectStorage {
     async deleteAsset(projectId, assetId) {
       await db.delete("assets", assetKey(projectId, assetId));
     },
+    async listAssetIds(projectId) {
+      const prefix = assetKey(projectId, "");
+      return (await db.getAllKeysFromIndex("assets", "byProject", projectId)).map((k) => k.slice(prefix.length));
+    },
     loadProject: load,
     async loadLastProject() {
       const id = await db.get("meta", LAST_KEY);
@@ -135,6 +141,7 @@ export function createUnavailableStorage(): ProjectStorage {
     saveProject: async () => failed,
     putAsset: async () => ({ ok: true }),
     deleteAsset: async () => undefined,
+    listAssetIds: async () => [],
     loadProject: async () => ({ ok: false, error: { kind: "not_found" } }),
     loadLastProject: async () => ({ ok: false, error: { kind: "not_found" } }),
     listProjects: async () => [],
