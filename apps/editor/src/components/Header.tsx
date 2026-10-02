@@ -5,6 +5,8 @@ import { LANGS, type Lang } from "../i18n/dictionaries";
 import { useI18n } from "../i18n";
 import { useEditorState, useStore } from "../store/react";
 import { ExportDialog } from "./ExportDialog";
+import { McpDialog } from "./McpDialog";
+import { useMcpSnapshot } from "../mcp/context";
 
 const iconBtn =
   "h-8 rounded-lg border border-line bg-white px-3 text-[12.5px] text-ink enabled:hover:bg-chip disabled:cursor-not-allowed disabled:opacity-40";
@@ -29,6 +31,9 @@ export function Header() {
   const doc = state.history.present;
   const dirty = store.isDirty();
   const [exportOpen, setExportOpen] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
+  const mcp = useMcpSnapshot();
+  const mcpOn = mcp.authorizedProjectId === doc.id;
   const status = state.status === "saving" ? t("saving") : dirty ? t("unsaved") : state.status === "saved" ? t("saved") : "";
 
   return (
@@ -67,6 +72,10 @@ export function Header() {
             <button className={iconBtn} aria-label={t("redo")} disabled={!store.canRedo()} onClick={() => store.redo()}>↷</button>
           </Tip>
           <span className="min-w-28 text-right text-xs text-muted" role="status">{status}</span>
+          <button className={iconBtn} onClick={() => setMcpOpen(true)} data-testid="mcp-open" data-mcp={mcp.link === "connected" ? (mcpOn ? "authorized" : "connected") : "off"}>
+            <span aria-hidden className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${mcpOn ? "bg-ok" : mcp.link === "connected" ? "bg-accent" : "bg-field"}`} />
+            {t("mcpBtn")}
+          </button>
           <button className={iconBtn} onClick={() => void store.save()} disabled={state.status === "saving"}>
             {t("save")}
           </button>
@@ -76,6 +85,7 @@ export function Header() {
         </div>
       </header>
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
+      <McpDialog open={mcpOpen} onClose={() => setMcpOpen(false)} />
     </Tooltip.Provider>
   );
 }

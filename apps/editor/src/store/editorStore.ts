@@ -171,6 +171,14 @@ export function createEditorStore(deps: EditorDeps) {
       set({ history: r.history, error: state.error?.kind === "command" ? null : state.error, status: "idle" });
       return true;
     },
+    // Mutación pedida desde fuera (MCP): misma vía de comandos, pero con la revisión que el cliente leyó
+    // y sin tocar el aviso de error de la interfaz. Un conflicto o un fallo no cambia nada.
+    applyRemote(cmd: Command, expectedRevision: number): { ok: true; revision: number } | { ok: false; error: CommandError } {
+      const r = execute(state.history, cmd, expectedRevision);
+      if (!r.ok) return r;
+      set({ history: r.history, status: "idle" });
+      return { ok: true, revision: r.history.present.revision };
+    },
     undo() {
       const r = undoHistory(state.history, doc().revision);
       if (r.ok) set({ history: r.history, status: "idle" });
