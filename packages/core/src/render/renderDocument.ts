@@ -23,7 +23,8 @@ export interface ImageDraw extends Placement {
 
 export type RenderBackground =
   | { kind: "color"; color: string }
-  | { kind: "image"; draw: ImageDraw | null; fallbackColor: string };
+  // frame: caja (px) respecto a la que se encuadra la imagen; por defecto, el lienzo entero.
+  | { kind: "image"; draw: ImageDraw | null; fallbackColor: string; frame: Rect };
 
 interface ItemBase {
   id: string;
@@ -88,10 +89,13 @@ export function renderDocument(doc: Project, opts: RenderOptions): RenderedDocum
     background = { kind: "color", color: canvas.background };
   } else {
     const id = canvas.background.assetId;
+    const f = canvas.backgroundFrame;
+    const frame: Rect = f ? { x: f.x * ppi, y: f.y * ppi, width: f.width * ppi, height: f.height * ppi } : { x: 0, y: 0, width: widthPx, height: heightPx };
     background = {
       kind: "image",
       fallbackColor: BACKGROUND_FALLBACK,
-      draw: imageDraw(assetDims(assets.get(id)), id, null, { x: 0, y: 0, width: widthPx, height: heightPx }, canvas.backgroundFit ?? "cover", canvas.backgroundPos ?? CENTER, ppi),
+      frame,
+      draw: imageDraw(assetDims(assets.get(id)), id, null, frame, canvas.backgroundFit ?? "cover", canvas.backgroundPos ?? CENTER, ppi),
     };
   }
 

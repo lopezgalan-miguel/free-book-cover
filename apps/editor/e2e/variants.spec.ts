@@ -235,3 +235,17 @@ test("una fuente no disponible bloquea la exportación con un informe claro y no
   await expect(dialog.getByTestId("export-font-problem")).toContainText("«Perdida»");
   expect(downloaded).toBe(false);
 });
+
+test("el fondo de la variante sigue el mismo mapa que los elementos aunque su proporción y posición difieran del base", async ({ page }) => {
+  // Fondo apaisado en un lienzo vertical, pegado a la izquierda: el base solo muestra la mitad izquierda (rojo/azul).
+  await page.getByLabel("Subir imagen", { exact: true }).setInputFiles({ name: "fondo.png", mimeType: "image/png", buffer: quadrants(900, 600) });
+  await expect.poll(async () => (await doc(page)).canvas.background).toEqual({ assetId: expect.any(String) });
+  await page.evaluate(() => (window as unknown as { __editorStore: { dispatch(c: unknown): void } }).__editorStore.dispatch({ type: "setBackgroundLayout", pos: { x: 0, y: 0.5 } }));
+  const A = await addVariant(page, "instagram-feed-portrait");
+  const base = decodePng((await exportAs(page, "base", "PNG")).bytes);
+  exact(base.px(1790, 10), RED); exact(base.px(1790, 2690), BLUE);
+  const pa = decodePng((await exportAs(page, A, "PNG")).bytes);
+  // la variante es el mismo recorte del base escalado: nunca aparece el verde/amarillo de la derecha
+  exact(pa.px(1070, 10), RED); exact(pa.px(1070, 1340), BLUE); exact(pa.px(10, 10), RED); exact(pa.px(10, 1340), BLUE);
+  exact(pa.px(540, 600), RED); exact(pa.px(540, 750), BLUE);
+});

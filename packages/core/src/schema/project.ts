@@ -172,6 +172,8 @@ export const projectSchema = z
         // Opcionales para no invalidar proyectos guardados; por defecto cover y centrado.
         backgroundFit: backgroundFitSchema.optional(),
         backgroundPos: backgroundPosSchema.optional(),
+        // Solo en documentos derivados de una variante: caja (pulgadas) respecto a la que se encuadra el fondo.
+        backgroundFrame: z.object({ x: finite, y: finite, width: finite.positive(), height: finite.positive() }).strict().optional(),
       })
       .strict(),
     digitalTargets: z.array(digitalTargetSchema).optional(),

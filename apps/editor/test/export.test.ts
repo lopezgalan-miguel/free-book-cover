@@ -79,8 +79,9 @@ describe("runExport", () => {
   it("si el navegador no codifica el formato pedido no entrega otro en silencio", async () => {
     const d = deps({ encode: async () => new Blob([new Uint8Array(10)], { type: "image/png" }) });
     expect(await runExport(req({ format: "webp" }), d)).toEqual({ ok: false, error: { kind: "encode_unsupported", format: "webp" } });
+    // sin blob (p. ej. lienzo demasiado grande para el navegador) es otro error, no "formato no admitido"
     const d2 = deps({ encode: async () => null });
-    expect((await runExport(req(), d2)).ok).toBe(false);
+    expect(await runExport(req(), d2)).toEqual({ ok: false, error: { kind: "encode_failed" } });
   });
   it("un fallo al rasterizar se informa", async () => {
     const d = deps({ render: async () => { throw new Error("boom"); } });

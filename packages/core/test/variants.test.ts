@@ -266,3 +266,39 @@ describe("límite y informe de exportación", () => {
     expect(formatBytes(3 * 1024 * 1024)).toBe("3.00 MB");
   });
 });
+
+describe("fondo de la variante alineado con los elementos", () => {
+  // El fondo pintado en la variante es el del base transformado con el mismo mapa que los elementos.
+  function check(fit: "cover" | "contain" | "fill", pos: { x: number; y: number }, bg: { w: number; h: number }, t: ReturnType<typeof ig>) {
+    let doc = base();
+    doc.assets = [{ id: "a1", kind: "image", mimeType: "image/png", metadata: { widthPx: bg.w, heightPx: bg.h } }];
+    doc = run(doc, { type: "setBackgroundLayout", fit, pos });
+    doc = run(doc, { type: "addDigitalTarget", target: t });
+    const rb = renderDocument(doc, { pxPerInch: 300 });
+    const v = variantDocument(doc, doc.digitalTargets![0] as never);
+    const rv = renderDocument(v, { pxPerInch: 300 });
+    if (rb.background.kind !== "image" || rv.background.kind !== "image" || !rb.background.draw || !rv.background.draw) throw new Error("sin fondo");
+    const s = Math.max(t.widthPx / rb.widthPx, t.heightPx / rb.heightPx);
+    const d = rb.background.draw;
+    const e = rv.background.draw;
+    for (const k of ["x", "y", "width", "height"] as const) expect(e.src[k]).toBeCloseTo(d.src[k], 6);
+    expect(e.dest.x).toBeCloseTo((d.dest.x - rb.widthPx / 2) * s + t.widthPx / 2, 6);
+    expect(e.dest.y).toBeCloseTo((d.dest.y - rb.heightPx / 2) * s + t.heightPx / 2, 6);
+    expect(e.dest.width).toBeCloseTo(d.dest.width * s, 6);
+    expect(e.dest.height).toBeCloseTo(d.dest.height * s, 6);
+    expect(doc.canvas.backgroundFrame).toBeUndefined();
+  }
+  it("cover con proporción distinta del lienzo base", () => check("cover", { x: 0.5, y: 0.5 }, { w: 900, h: 600 }, ig()));
+  it("cover con posición no centrada", () => check("cover", { x: 0, y: 1 }, { w: 900, h: 600 }, story()));
+  it("contain (con espacio libre) y fill", () => {
+    check("contain", { x: 0.2, y: 0.8 }, { w: 900, h: 600 }, ig());
+    check("contain", { x: 0.5, y: 0.5 }, { w: 600, h: 900 }, story());
+    check("fill", { x: 0.5, y: 0.5 }, { w: 300, h: 300 }, ig());
+  });
+  it("el base no recibe marco y su fondo se encuadra en el lienzo entero", () => {
+    const doc = run(base(), { type: "addDigitalTarget", target: ig() });
+    expect(doc.canvas.backgroundFrame).toBeUndefined();
+    const r = renderDocument(doc, { pxPerInch: 100 });
+    expect(r.background.kind === "image" && r.background.frame).toEqual({ x: 0, y: 0, width: 600, height: 900 });
+  });
+});

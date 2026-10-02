@@ -223,6 +223,23 @@ describe("modal de exportación", () => {
     expect(download).toHaveBeenCalledTimes(1);
   });
 
+  it("si el reintento de fuentes vuelve a fallar, el aviso se mantiene", async () => {
+    const user = userEvent.setup();
+    const env: FontEnv = { addFace: async () => undefined, loadCatalog: async () => { throw new Error("sin red"); } };
+    const fonts = new FontRegistry(env);
+    const { store } = await mount({ fonts, exportServices: { deps: okDeps({ fonts: fonts as unknown as ExportDeps["fonts"] }), download: vi.fn() } });
+    await user.click(screen.getByRole("button", { name: "Añadir capa de texto" }));
+    const family = (store.getState().history.present.elements[0] as { runs: Array<{ fontFamily: string }> }).runs[0]!.fontFamily;
+    await waitFor(() => expect(fonts.stateOf(family)).toBe("failed"));
+    await user.click(screen.getByRole("button", { name: "Exportar" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Descargar PNG" }));
+    await within(dialog).findByTestId("export-error");
+    await user.click(within(dialog).getByRole("button", { name: "Reintentar carga de fuentes" }));
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Reintentar carga de fuentes" })).toBeEnabled());
+    expect(within(dialog).getByTestId("export-font-problem")).toHaveTextContent(`«${family}»`);
+  });
+
   it("Escape y el fondo cierran el modal; la interfaz sigue en catalán al cambiar de idioma", async () => {
     const user = userEvent.setup();
     await mount({ exportServices: { deps: okDeps(), download: vi.fn() } });

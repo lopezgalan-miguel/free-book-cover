@@ -27,6 +27,8 @@ export type ExportError =
   | { kind: "fonts"; problems: FontProblem[] }
   | { kind: "missing_assets"; assetIds: string[] }
   | { kind: "encode_unsupported"; format: ExportFormat }
+  // El navegador no pudo producir la imagen (p. ej. lienzo demasiado grande para él).
+  | { kind: "encode_failed" }
   | { kind: "render_failed"; message: string };
 
 export type ExportOutcome = { ok: true; blob: Blob; report: ExportReport } | { ok: false; error: ExportError };
@@ -76,7 +78,8 @@ export async function runExport(req: ExportRequest, deps: ExportDeps): Promise<E
     return { ok: false, error: { kind: "render_failed", message: String((e as Error)?.message ?? e) } };
   }
   // Un navegador sin codificador para el formato devuelve PNG o nada: no se entrega como si fuese lo pedido.
-  if (!blob || blob.type !== info.mimeType) return { ok: false, error: { kind: "encode_unsupported", format: req.format } };
+  if (!blob) return { ok: false, error: { kind: "encode_failed" } };
+  if (blob.type !== info.mimeType) return { ok: false, error: { kind: "encode_unsupported", format: req.format } };
   const report = buildExportReport({
     format: req.format, widthPx: req.widthPx, heightPx: req.heightPx, bytes: blob.size,
     ...(quality !== undefined ? { quality } : {}), destination: req.destination, projectName: req.projectName,

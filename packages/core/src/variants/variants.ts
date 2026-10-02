@@ -106,7 +106,12 @@ export function variantDocument(base: Project, target: ResolvedTarget): Project 
   const m = coverMap(base, vw, vh);
   const ov = overridesOf(target);
   const { printSetup: _p, digitalTargets: _d, ...rest } = base;
-  const canvas = { ...base.canvas, widthIn: vw, heightIn: vh };
+  // El fondo se encuadra respecto al lienzo base escalado con el mismo mapa que los elementos, de modo
+  // que fondo y elementos siguen alineados aunque el fondo sea "ajustar", no esté centrado o la
+  // proporción de la variante difiera de la del base.
+  const bw = base.canvas.widthIn * m.scale;
+  const bh = base.canvas.heightIn * m.scale;
+  const canvas = { ...base.canvas, widthIn: vw, heightIn: vh, backgroundFrame: { x: (vw - bw) / 2, y: (vh - bh) / 2, width: bw, height: bh } };
   if (ov.background?.fit) canvas.backgroundFit = ov.background.fit;
   if (ov.background?.pos) canvas.backgroundPos = ov.background.pos;
   return {

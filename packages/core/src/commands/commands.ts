@@ -1,5 +1,6 @@
 import { applyResizePolicy, type ResizePolicy, type ResizeTargets } from "../geometry/resize.js";
-import { layoutOverridesSchema, projectSchema, type Asset, type BackgroundOverride, type DigitalTarget, type Element, type ElementOverride, type ImageElement, type Project, type ShapeElement, type TextElement } from "../schema/project.js";
+import { overridesOf } from "../variants/variants.js";
+import { projectSchema, type Asset, type BackgroundOverride, type DigitalTarget, type Element, type ElementOverride, type ImageElement, type Project, type ShapeElement, type TextElement } from "../schema/project.js";
 
 // Campos que un updateElement no puede tocar: identidad, tipo y orden de apilado.
 type Immutable = "id" | "type" | "zIndex";
@@ -59,11 +60,6 @@ function withTarget(doc: Project, id: string, change: (t: DigitalTarget) => Digi
   if (!targets.some((t) => t.id === id)) return notFound(id);
   return { ...doc, digitalTargets: targets.map((t) => (t.id === id ? change(t) : t)) };
 }
-function overridesOf(t: DigitalTarget) {
-  const r = layoutOverridesSchema.safeParse(t.layoutOverrides);
-  return r.success ? r.data : {};
-}
-
 // Calcula el documento candidato (sin validar ni numerar la revisión).
 function build(doc: Project, cmd: Command): Project | CommandResult {
   switch (cmd.type) {

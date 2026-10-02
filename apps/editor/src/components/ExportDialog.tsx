@@ -108,8 +108,11 @@ function Dialog({ onClose }: { onClose: () => void }) {
   const retryFonts = async () => {
     setBusy(true);
     try {
-      await fonts.retryFailed(docFor(), store.getState().assets);
-      setError(null);
+      const d = docFor();
+      await fonts.retryFailed(d, store.getState().assets);
+      // Solo se limpia el aviso si de verdad se recuperaron las fuentes.
+      const again = fonts.checkFontsReady(d);
+      setError(again.ok ? null : { kind: "fonts", problems: again.problems });
     } finally {
       setBusy(false);
     }
@@ -198,7 +201,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
           )}
           {error && error.kind !== "limit" && (
             <div role="alert" data-testid="export-error" className="mt-3 rounded-lg border border-danger-line bg-danger-bg px-3 py-2 text-xs text-danger-ink">
-              <ErrorBody error={error} />
+              <ErrorBody error={error} size={size} />
               {error.kind === "fonts" && (
                 <button className={`${chipBtn} mt-1.5`} disabled={busy} onClick={() => void retryFonts()}>{t("fontRetry")}</button>
               )}
@@ -230,7 +233,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ErrorBody({ error }: { error: ExportError }) {
+function ErrorBody({ error, size }: { error: ExportError; size: { widthPx: number; heightPx: number } }) {
   const { t } = useI18n();
   switch (error.kind) {
     case "fonts":
@@ -250,6 +253,8 @@ function ErrorBody({ error }: { error: ExportError }) {
       return <p>{t("exFormatNotAllowed")}</p>;
     case "encode_unsupported":
       return <p>{t("exEncodeUnsupported", { format: FORMAT_LABEL[error.format] })}</p>;
+    case "encode_failed":
+      return <p>{t("exEncodeFailed", { w: size.widthPx, h: size.heightPx })}</p>;
     case "render_failed":
       return <p>{t("exRenderFailed", { message: error.message })}</p>;
     case "limit":

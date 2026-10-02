@@ -182,7 +182,7 @@ export class CoverScene {
         this.bg = {
           obj, src, fit: bg.draw.fit, pos: doc.canvas.backgroundPos ?? { x: 0.5, y: 0.5 },
           region: { x: 0, y: 0, width: dims.widthPx, height: dims.heightPx },
-          box: { x: 0, y: 0, width: r.widthPx, height: r.heightPx },
+          box: bg.frame,
         };
       }
     }
