@@ -25,7 +25,8 @@ Fuente: [Barcodes](https://kdp.amazon.com/en_US/help/topic/G5HDYGP4BXLX4RUW)
 
 Fuente: [Print Options](https://kdp.amazon.com/en_US/help/topic/G201834180)
 
-- Mínimo de 24 páginas (72 en color estándar). Máximo para 5 × 8 y 6 × 9 in: B/N blanco 828, crema 776, *groundwood* 812, color estándar 600, color premium 828. Los demás tamaños tienen sus propios máximos; se tomarán de la tabla oficial al implementar la entrega 6.
+- Mínimo de 24 páginas (72 en color estándar). Máximo para 5 × 8 y 6 × 9 in: B/N blanco 828, crema 776, *groundwood* 812, color estándar 600, color premium 828. Los demás tamaños tienen sus propios máximos.
+- **Hueco documentado (entrega 6):** la tabla oficial completa no se pudo contrastar de forma fiable (una lectura resumida de la página sugería los mismos máximos para 6,14 × 9,21, 7 × 10 y 8,25 × 11 in, pero no está verificada). El producto solo admite 5 × 8 y 6 × 9 in y rechaza el resto (`trim_unsupported`, incluidos los tamaños personalizados dentro de 4–8,5 × 6–11,69 in) hasta contrastar la tabla oficial; ampliar `SUPPORTED_TRIMS` en `kdp.ts` cuando se haga.
 - Tamaño grande: más de 6,12 in de ancho o más de 9 in de alto.
 - Tamaño personalizado: de 4 a 8,5 in de ancho y de 6 a 11,69 in de alto.
 

@@ -1,5 +1,7 @@
 import { applyResizePolicy, type ResizePolicy, type ResizeTargets } from "../geometry/resize.js";
 import { overridesOf } from "../variants/variants.js";
+import { validatePrintSetup, type PrintSetup } from "../kdp/kdp.js";
+import { applyPrintSetup } from "../kdp/recalc.js";
 import { projectSchema, type Asset, type BackgroundOverride, type DigitalTarget, type Element, type ElementOverride, type ImageElement, type Project, type ShapeElement, type TextElement } from "../schema/project.js";
 
 // Campos que un updateElement no puede tocar: identidad, tipo y orden de apilado.
@@ -31,7 +33,9 @@ export type Command =
   | { type: "resetVariantElement"; targetId: string; elementId: string }
   | { type: "setVariantBackground"; targetId: string; props: BackgroundOverride }
   // Borra todos los ajustes de la variante (vuelve a la derivación por defecto).
-  | { type: "resetVariant"; targetId: string };
+  | { type: "resetVariant"; targetId: string }
+  // Cubierta KDP (SDD R-01): fija los datos de impresión, recalcula el lienzo y reposiciona sin deformar.
+  | { type: "setPrintSetup"; printSetup: PrintSetup };
 
 export type CommandError =
   | { kind: "invalid"; issues: string[] }
@@ -149,6 +153,11 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
       });
     case "resetVariant":
       return withTarget(doc, cmd.targetId, (t) => ({ ...t, layoutOverrides: {} }));
+    case "setPrintSetup": {
+      const v = validatePrintSetup(cmd.printSetup);
+      if (!v.ok) return invalid(...v.issues.map((i) => `printSetup: ${i.kind}`));
+      return { ...doc, ...applyPrintSetup(doc, cmd.printSetup) };
+    }
   }
 }
 
