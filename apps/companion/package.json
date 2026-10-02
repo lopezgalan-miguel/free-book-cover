@@ -5,7 +5,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "spike": "tsx src/preflight/spike.ts"
+    "spike": "tsx src/preflight/spike.ts",
+    "start": "tsx src/main.ts"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1",

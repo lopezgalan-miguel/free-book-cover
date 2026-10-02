@@ -46,9 +46,24 @@ Valores CMYK leídos del flujo de la imagen:
 | `#E63946` | 3/93/73/0 | 169 % |
 | `#000000` | 72/68/67/89 | **296 %** |
 
-## Puntos abiertos (antes de la entrega 7)
+## Decisiones de la entrega 7
 
-- **Tinta total máxima:** el negro puro llega al 296 %. Decidir si se limita (p. ej. a 260–300 %) con otro perfil de salida o con un límite de tinta total, y añadir la medición al inspector.
-- **Grises neutros:** se componen sobre todo con CMY y poca K, lo que hace más probables las dominantes de color. Valorar un perfil con GCR más fuerte.
-- **Perfil de salida:** `default_cmyk.icc` es genérico. Si se elige un perfil estándar (FOGRA/GRACoL), revisar antes su licencia de distribución.
-- **Prueba visual:** el SDD (R-07) pide generar una prueba visual de la conversión. Se hará con `gs -sDEVICE=png16m` a partir del PDF CMYK.
+- **Tinta total máxima:** se mide en el inspector renderizando el PDF final a CMYK (`gs -sDEVICE=pamcmyk32`, 150 ppp) y tomando la suma C+M+Y+K máxima por píxel. Umbral **300 %**; superarlo es un **aviso**, no bloquea «listo para KDP». El negro puro (296 %) queda justo por debajo. Se mantiene `default_cmyk.icc`.
+- **Prueba visual (R-07):** el PDF CMYK se rasteriza de nuevo con `gs -sDEVICE=png16m -r100` y el PNG vuelve al editor junto al informe, para comparar con el diseño.
+- **Entrada desde el navegador:** el canvas exporta PNG RGBA; se acepta si el alfa es 255 en todos los píxeles y se aplana. Si hay alfa real se rechaza (informe `input`).
+- **Peso:** se genera con Flate; si pasa de 40 MB se regenera con JPEG (QFactor 0,15). Aviso por encima de 40 MB y fallo por encima de 200 MB.
+- **Grises y perfil:** sin cambios; se sigue con `default_cmyk.icc`. El valor de la prueba visual permite revisar dominantes; cambiar de perfil queda como mejora futura (licencia FOGRA/GRACoL sin revisar).
+
+## Servidor local
+
+`pnpm --filter @free-book-cover/companion start` arranca un servidor HTTP mínimo (Node, sin dependencias) solo en `127.0.0.1` (puerto 47321 o `FBC_PORT`). El Paso 8 añadirá WebSocket/MCP sobre el mismo servidor.
+
+- **Token** aleatorio por arranque (impreso en consola; `FBC_TOKEN` lo fija en pruebas). Se envía como `Authorization: Bearer`.
+- **CORS** restringido a `FBC_ALLOWED_ORIGIN` (lista separada por comas; por defecto `http://localhost:5173`). Se rechazan otros orígenes y cualquier `Host` no local (DNS rebinding).
+- `GET /health` (sin token): `{ ok, name, version, authorized }`; el editor lo usa para habilitar la opción PDF.
+- `POST /preflight?widthIn=&heightIn=` (token): cuerpo PNG; responde `{ id, report, proofPng }` (`id` nulo si la entrada se rechazó).
+- `GET /preflight/:id/pdf` (token): el PDF. Se conservan los dos últimos resultados.
+
+## Puntos abiertos
+
+- **Grises neutros / perfil de salida:** `default_cmyk.icc` es genérico; valorar FOGRA/GRACoL tras revisar su licencia.
