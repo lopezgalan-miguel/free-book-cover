@@ -1,4 +1,5 @@
 import { cachedDpiReport as dpiReport } from "../panels/dpiCache";
+import { useFontProblems } from "../fonts/fontContext";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";
@@ -10,6 +11,7 @@ const MESSAGE: Record<string, DictKey> = {
   load: "loadError",
   storage_unavailable: "storageUnavailable",
   unsupported_image: "unsupportedImage",
+  unsupported_font: "unsupportedFont",
 };
 
 const LIMIT_MESSAGE: Record<string, DictKey> = {
@@ -25,6 +27,7 @@ export function Notices() {
   const store = useStore();
   const { error, backupParts, nearLimit, history } = useEditorState();
   const doc = history.present;
+  const fontProblems = useFontProblems();
   // Aviso de ppp efectivos < 300 con el elemento afectado (SDD R-03).
   const low = dpiReport(doc).filter((d) => d.lowDpi).map((d) => {
     const el = doc.elements.find((e) => e.id === d.id);
@@ -35,6 +38,11 @@ export function Notices() {
   const warning = (
     <>
       {nearLimit && <div role="status" className="border-b border-line bg-chip px-[18px] py-2 text-[13px]">{t("projectNearLimit")}</div>}
+      {fontProblems.map((p) => (
+        <div key={p.family} role="status" data-testid="font-warning" className="border-b border-warn-line bg-warn-bg px-[18px] py-2 text-[13px] text-warn-ink">
+          {t(p.reason === "missing" ? "fontNoticeMissing" : "fontNoticeFailed", { family: p.family })}
+        </div>
+      ))}
       {low.map((l) => (
         <div key={l.id} role="status" data-testid="dpi-warning" className="border-b border-warn-line bg-warn-bg px-[18px] py-2 text-[13px] text-warn-ink">{l.text}</div>
       ))}
@@ -42,7 +50,10 @@ export function Notices() {
   );
   if (!error || error.kind === "command") return warning;
   const canBackup = error.kind === "quota" || error.kind === "save" || error.kind === "storage_unavailable";
-  const text = error.kind === "limit" ? t(LIMIT_MESSAGE[error.error.kind]!) : t(MESSAGE[error.kind]!);
+  const text =
+    error.kind === "limit" ? t(LIMIT_MESSAGE[error.error.kind]!)
+    : error.kind === "font_load_failed" ? t("fontLoadFailed", { family: error.family })
+    : t(MESSAGE[error.kind]!);
   return (
   <>
     {warning}

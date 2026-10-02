@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 
 export const sectionTitle = "mb-2.5 text-[10.5px] font-semibold uppercase tracking-[.11em] text-muted";
 export const chipBtn =
@@ -46,3 +46,57 @@ export function NumberField({
     </div>
   );
 }
+
+// Deslizador con etiqueta y valor visibles. Durante el arrastre solo cambia el valor mostrado y se
+// confirma al soltar (un único paso de historial); con teclado confirma en cada cambio.
+export function Slider({
+  label, value, min, max, step, onCommit, format = (v) => String(v), testId,
+}: { label: string; value: number; min: number; max: number; step: number; onCommit: (v: number) => void; format?: (v: number) => string; testId?: string }) {
+  const id = useId();
+  const [draft, setDraft] = useState<number | null>(null);
+  const dragging = useRef(false);
+  const shown = draft ?? value;
+  const finish = () => {
+    dragging.current = false;
+    if (draft !== null && draft !== value) onCommit(draft);
+    setDraft(null);
+  };
+  return (
+    <div className="mb-3">
+      <div className="mb-1.5 flex justify-between text-[11px] text-subtle">
+        <label htmlFor={id}>{label}</label>
+        <span className="font-mono text-muted">{format(shown)}</span>
+      </div>
+      <input
+        id={id} type="range" className="w-full accent-accent" min={min} max={max} step={step} value={shown} data-testid={testId}
+        onPointerDown={() => (dragging.current = true)}
+        onPointerUp={finish}
+        onPointerCancel={finish}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          if (dragging.current) setDraft(v);
+          else if (v !== value) onCommit(v);
+        }}
+      />
+    </div>
+  );
+}
+
+// Interruptor accesible del mockup (sombra, contorno).
+export function Switch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="mb-2 flex items-center justify-between">
+      <span className="text-[13px] text-ink">{label}</span>
+      <button
+        type="button" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}
+        className={`relative h-[22px] w-[38px] rounded-full transition-colors ${checked ? "bg-accent" : "bg-switch-off"}`}
+      >
+        <span className={`absolute top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-[left] ${checked ? "left-[18px]" : "left-0.5"}`} />
+      </button>
+    </div>
+  );
+}
+
+// Botón de conmutación (negrita, cursiva, alineación...).
+export const toggleBtn =
+  "flex h-8 w-[34px] items-center justify-center rounded-[7px] border border-line-chip bg-white text-[13px] text-chip-ink enabled:hover:bg-chip aria-pressed:border-accent aria-pressed:bg-chip-on aria-pressed:text-accent-dark";

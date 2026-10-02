@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderDocument, type Rect } from "@free-book-cover/core";
+import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { CoverScene } from "../canvas/scene";
+import { useFontVersion } from "../fonts/fontContext";
 import { useImageSources } from "../canvas/useImageSources";
 import { useI18n } from "../i18n";
 import { ZOOM_MAX, ZOOM_MIN, type StageTone } from "../store/editorStore";
@@ -27,6 +29,9 @@ export function Stage() {
   const [scene, setScene] = useState<CoverScene | null>(null);
   const [area, setArea] = useState({ w: 0, h: 0 });
   const supported = useMemo(canvasSupported, []);
+  const measure = useMemo(browserMeasure, []);
+  // Cuando una fuente termina de cargar hay que volver a maquetar y pintar.
+  const fontVersion = useFontVersion();
 
   useEffect(() => {
     if (!supported || !host.current) return;
@@ -37,7 +42,14 @@ export function Stage() {
       onSelect: (id) => store.select(id),
       onTransform: (id, box: Rect, rotation) => {
         const ppi = pxPerInchRef.current;
-        store.dispatch({ type: "updateElement", id, props: { x: box.x / ppi, y: box.y / ppi, width: box.width / ppi, height: box.height / ppi, rotation } });
+        const el = store.getState().history.present.elements.find((e) => e.id === id);
+        const props = { x: box.x / ppi, y: box.y / ppi, width: box.width / ppi, height: box.height / ppi, rotation };
+        // En un bloque de texto el alto lo da el contenido: solo el ancho se controla a mano.
+        if (el?.type === "text") {
+          const m = browserMeasure();
+          if (m) props.height = textHeightIn({ ...el, width: props.width }, m);
+        }
+        store.dispatch({ type: "updateElement", id, props });
       },
       onBackgroundPan: (pos) => store.dispatch({ type: "setBackgroundLayout", pos }),
     });
@@ -77,9 +89,9 @@ export function Stage() {
 
   useEffect(() => {
     if (!scene) return;
-    const r = renderDocument(doc, { pxPerInch });
+    const r = renderDocument(doc, { pxPerInch, ...(measure ? { measureText: measure } : {}) });
     scene.render(doc, r, sources, store.getState().selectedId, { width: Math.round(r.widthPx), height: Math.round(r.heightPx) });
-  }, [scene, doc, pxPerInch, sources, store]);
+  }, [scene, doc, pxPerInch, sources, store, measure, fontVersion]);
 
   // Cambiar la selección no reconstruye la escena.
   useEffect(() => {

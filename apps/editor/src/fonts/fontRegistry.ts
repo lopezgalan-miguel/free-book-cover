@@ -12,6 +12,10 @@ export interface FontEnv {
   removeFace?(family: string): void;
 }
 
+// Blob.arrayBuffer no existe en todos los entornos (p. ej. jsdom con blobs de otro realm).
+const readBlob = (b: Blob): Promise<ArrayBuffer> =>
+  typeof b.arrayBuffer === "function" ? b.arrayBuffer() : new Response(b).arrayBuffer();
+
 const LOAD_TIMEOUT_MS = 10_000;
 const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
   new Promise<T>((res, rej) => {
@@ -160,7 +164,7 @@ export class FontRegistry {
         this.upload.set(family, { state: "loading" });
         this.bump();
         try {
-          await this.env.addFace(family, await blob.arrayBuffer());
+          await this.env.addFace(family, await readBlob(blob));
           this.upload.set(family, { state: "loaded" });
         } catch (e) {
           this.upload.set(family, { state: "failed", message: String((e as Error)?.message ?? e) });

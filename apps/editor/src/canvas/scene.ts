@@ -1,4 +1,5 @@
-import { Canvas, Ellipse, FabricImage, Rect as FRect, Textbox, type FabricObject } from "fabric";
+import { Canvas, Ellipse, FabricImage, FabricObject, Rect as FRect } from "fabric";
+import { paintTextItem, type TextItem } from "./paintText";
 import {
   BACKGROUND_FALLBACK, assetDims, drawCenter, panPosition, placeImage, rectCenter,
   type ImageDraw, type Point, type Project, type Rect, type RenderItem, type RenderedDocument,
@@ -19,6 +20,20 @@ export interface SceneCallbacks {
 }
 
 const ACCENT = "#a98a5f";
+
+// Bloque de texto en Fabric: caja seleccionable y transformable que delega el dibujo en el pintor
+// compartido, así la vista previa pinta exactamente lo mismo que la exportación.
+class TextBlock extends FabricObject {
+  constructor(private readonly textItem: TextItem, private readonly textSources: ImageSources) {
+    super({ width: textItem.box.width, height: textItem.box.height, objectCaching: false, strokeWidth: 0, fill: "transparent" });
+  }
+  override _render(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    ctx.translate(-this.width / 2, -this.height / 2);
+    paintTextItem(ctx, this.textItem, this.textSources);
+    ctx.restore();
+  }
+}
 interface Tracked {
   id: string;
   box: Rect;
@@ -203,16 +218,11 @@ export class CoverScene {
         ? new Ellipse({ ...common, rx: it.box.width / 2, ry: it.box.height / 2, fill: e.fill, ...stroke })
         : new FRect({ ...common, width: it.box.width, height: it.box.height, fill: e.fill, ...stroke });
     }
-    // Texto: representación básica; el motor tipográfico completo llega en el paso de texto.
-    const e = it.element;
-    const run = e.runs[0];
-    const ppi = it.box.width / Math.max(e.width, 1e-9);
-    return new Textbox(e.runs.map((x) => (x.uppercase ? x.text.toUpperCase() : x.text)).join(""), {
-      ...common, width: it.box.width, editable: false,
-      fontFamily: run?.fontFamily ?? "serif", fontSize: ((run?.fontSizePt ?? 24) / 72) * ppi, fontWeight: run?.weight ?? 400,
-      fontStyle: run?.italic ? "italic" : "normal", fill: run?.color ?? "#ffffff", textAlign: e.align === "justify" ? "justify" : e.align,
-      lineHeight: e.lineHeight,
-    });
+    // Texto: pinta el mismo código que la exportación (paintTextItem).
+    const block = new TextBlock(it, sources);
+    block.set({ ...common });
+    block.setControlsVisibility({ mt: false, mb: false });
+    return block;
   }
 
   // Solo para pruebas e2e: píxeles del lienzo Fabric.

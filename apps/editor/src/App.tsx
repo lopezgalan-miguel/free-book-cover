@@ -6,17 +6,31 @@ import { RightPanel } from "./components/RightPanel";
 import { Notices } from "./components/Notices";
 import { StoreProvider } from "./store/react";
 import { useI18n } from "./i18n";
+import { FontsProvider, useFontSync } from "./fonts/fontContext";
+import type { FontRegistry } from "./fonts/fontRegistry";
 import type { EditorStore } from "./store/editorStore";
 
 // Layout del mockup: cabecera 56 px, panel izquierdo 264 px, escenario, panel derecho 300 px.
-export function App({ store }: { store: EditorStore }) {
-  const { t } = useI18n();
+// `fonts`: registro de fuentes inyectable (pruebas); por defecto el del navegador.
+export function App({ store, fonts }: { store: EditorStore; fonts?: FontRegistry }) {
   useEffect(() => {
     void store.init();
   }, [store]);
 
   return (
     <StoreProvider store={store}>
+      <FontsProvider {...(fonts ? { registry: fonts } : {})}>
+        <Layout />
+      </FontsProvider>
+    </StoreProvider>
+  );
+}
+
+function Layout() {
+  const { t } = useI18n();
+  useFontSync();
+  return (
+    <>
       <div className="flex h-screen w-full flex-col overflow-hidden bg-bg">
         <Header />
         <Notices />
@@ -30,6 +44,6 @@ export function App({ store }: { store: EditorStore }) {
           </aside>
         </div>
       </div>
-    </StoreProvider>
+    </>
   );
 }

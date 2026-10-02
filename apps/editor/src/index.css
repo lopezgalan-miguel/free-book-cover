@@ -26,6 +26,11 @@
   --color-warn-ink: #8a5a14;
   --color-warn-bg: #fbf1dc;
   --color-warn-line: #ecd9ab;
+  --color-subtle: #8c8578;
+  --color-switch-off: #d8d0c0;
+  --color-line-chip: #e6ddcc;
+  --color-chip-on: #f4ecdd;
+  --color-chip-ink: #5c554a;
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }

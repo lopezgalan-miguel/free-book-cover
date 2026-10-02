@@ -1,4 +1,5 @@
 import { drawCenter, rectCenter, type ImageDraw, type RenderedDocument } from "@free-book-cover/core";
+import { paintTextItem } from "./paintText";
 import type { ImageSources } from "./scene";
 
 // Pintor 2D de una composición: el camino de la futura exportación. Usa exactamente
@@ -19,7 +20,15 @@ export function paintDocument(ctx: CanvasRenderingContext2D, r: RenderedDocument
   if (r.background.kind === "image" && r.background.draw) drawImage(r.background.draw, rectCenter(r.background.draw.dest), 0);
   for (const it of r.items) {
     if (it.kind === "image" && it.draw) drawImage(it.draw, drawCenter(it, it.draw.dest), it.rotation);
-    else if (it.kind === "shape") {
+    else if (it.kind === "text") {
+      const c = rectCenter(it.box);
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate((it.rotation * Math.PI) / 180);
+      ctx.translate(-it.box.width / 2, -it.box.height / 2);
+      paintTextItem(ctx, it, sources);
+      ctx.restore();
+    } else if (it.kind === "shape") {
       const c = rectCenter(it.box);
       ctx.save();
       ctx.translate(c.x, c.y);

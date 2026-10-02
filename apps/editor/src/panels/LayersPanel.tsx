@@ -1,6 +1,7 @@
 import { cachedDpiReport as dpiReport } from "./dpiCache";
 import { type Element, type ImageElement, type TextElement } from "@free-book-cover/core";
 import { useRef } from "react";
+import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { useAssetUrl } from "../canvas/useImageSources";
 import { importImage } from "../images/importImage";
 import { useI18n } from "../i18n";
@@ -56,16 +57,15 @@ export function LayersPanel() {
 
   const addText = () => {
     const id = store.newId();
-    const ok = store.dispatch({
-      type: "addElement",
-      element: {
+    const draft: TextElement = {
         id, type: "text", x: doc.canvas.widthIn / 4, y: doc.canvas.heightIn * 0.65,
         width: doc.canvas.widthIn / 2, height: 1, rotation: 0, zIndex: 0, visible: true,
         runs: [{ text: t("newText"), fontFamily: "Lora", fontSizePt: 36, weight: 500, italic: false, underline: false, uppercase: false, color: "#f4efe6" }],
         align: "center", lineHeight: 1.2, letterSpacing: 0.02,
         shadow: { on: false, intensity: 40 }, outline: { on: false, width: 3, color: "#1a1712" }, curvature: 0,
-      },
-    });
+    };
+    const measure = browserMeasure();
+    const ok = store.dispatch({ type: "addElement", element: measure ? { ...draft, height: textHeightIn(draft, measure) } : draft });
     if (ok) store.select(id);
   };
 
