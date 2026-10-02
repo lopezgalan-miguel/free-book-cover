@@ -3,21 +3,22 @@ import { cachedDpiReport as dpiReport } from "./dpiCache";
 import { useAssetUrl } from "../canvas/useImageSources";
 import { importImage } from "../images/importImage";
 import { useI18n } from "../i18n";
-import { useEditorState, useStore } from "../store/react";
+import { useDisplayDoc, useEditorState, useStore } from "../store/react";
 import { chipBtn, NumberField, Section } from "./ui";
 
 // Fondo: imagen o color, con encuadre Rellenar/Ajustar/Centrar. Independiente del contenedor.
 export function BackgroundPanel() {
   const { t } = useI18n();
   const store = useStore();
-  const { history, assets } = useEditorState();
-  const canvas = history.present.canvas;
+  const { assets } = useEditorState();
+  const display = useDisplayDoc();
+  const canvas = display.canvas;
   const assetId = typeof canvas.background === "object" ? canvas.background.assetId : null;
   const thumb = useAssetUrl(assets, assetId);
   const input = useRef<HTMLInputElement>(null);
   const fit = canvas.backgroundFit ?? "cover";
   const pos = canvas.backgroundPos ?? { x: 0.5, y: 0.5 };
-  const dpi = assetId ? dpiReport(history.present).find((e) => e.id === "background") : undefined;
+  const dpi = assetId ? dpiReport(display).find((e) => e.id === "background") : undefined;
 
   return (
     <Section title={t("bg")}>
@@ -47,13 +48,13 @@ export function BackgroundPanel() {
       {assetId ? (
         <>
           <div className="mt-[9px] flex gap-1.5">
-            <button className={`${chipBtn} flex-1`} aria-pressed={fit === "cover"} onClick={() => store.dispatch({ type: "setBackgroundLayout", fit: "cover" })}>{t("fill")}</button>
-            <button className={`${chipBtn} flex-1`} aria-pressed={fit === "contain"} onClick={() => store.dispatch({ type: "setBackgroundLayout", fit: "contain" })}>{t("fit")}</button>
-            <button className={chipBtn} onClick={() => store.dispatch({ type: "setBackgroundLayout", pos: { x: 0.5, y: 0.5 } })}>{t("center")}</button>
+            <button className={`${chipBtn} flex-1`} aria-pressed={fit === "cover"} onClick={() => store.editBackgroundLayout({ fit: "cover" })}>{t("fill")}</button>
+            <button className={`${chipBtn} flex-1`} aria-pressed={fit === "contain"} onClick={() => store.editBackgroundLayout({ fit: "contain" })}>{t("fit")}</button>
+            <button className={chipBtn} onClick={() => store.editBackgroundLayout({ pos: { x: 0.5, y: 0.5 } })}>{t("center")}</button>
           </div>
           <div className="mt-2 flex gap-2">
-            <NumberField label={t("bgPosX")} value={pos.x * 100} min={0} max={100} digits={1} onCommit={(v) => store.dispatch({ type: "setBackgroundLayout", pos: { x: Math.min(100, Math.max(0, v)) / 100, y: pos.y } })} />
-            <NumberField label={t("bgPosY")} value={pos.y * 100} min={0} max={100} digits={1} onCommit={(v) => store.dispatch({ type: "setBackgroundLayout", pos: { x: pos.x, y: Math.min(100, Math.max(0, v)) / 100 } })} />
+            <NumberField label={t("bgPosX")} value={pos.x * 100} min={0} max={100} digits={1} onCommit={(v) => store.editBackgroundLayout({ pos: { x: Math.min(100, Math.max(0, v)) / 100, y: pos.y } })} />
+            <NumberField label={t("bgPosY")} value={pos.y * 100} min={0} max={100} digits={1} onCommit={(v) => store.editBackgroundLayout({ pos: { x: pos.x, y: Math.min(100, Math.max(0, v)) / 100 } })} />
           </div>
           <p className="mt-[7px] text-[10.5px] leading-snug text-muted">{t("bgHint")}</p>
           {dpi && (

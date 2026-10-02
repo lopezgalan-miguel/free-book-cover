@@ -174,6 +174,40 @@ export class FontRegistry {
     );
   }
 
+  // Reintenta las fuentes fallidas que usa el documento: las del catálogo se vuelven a pedir y las subidas
+  // se vuelven a registrar desde su blob. Devuelve cuando han terminado de cargar o de fallar otra vez.
+  async retryFailed(doc: Project, stored: readonly StoredAsset[]): Promise<void> {
+    for (const family of usedFamilies(doc).keys()) {
+      const cat = this.catalog.get(family);
+      if (!cat) continue;
+      for (const [key, e] of [...cat]) if (e.state === "failed") cat.delete(key);
+    }
+    this.ensureDoc(doc);
+    await this.syncAssets(doc.assets, stored);
+    await this.whenSettled(doc);
+  }
+
+  // Espera a que ninguna fuente usada por el documento siga cargando (con tope de tiempo).
+  whenSettled(doc: Project, timeoutMs = 15_000): Promise<void> {
+    const loading = () => {
+      const r = checkFontsReady(doc, this.stateOf);
+      return !r.ok && r.problems.some((p) => p.reason === "loading");
+    };
+    if (!loading()) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      let off = () => {};
+      const done = () => {
+        clearTimeout(timer);
+        off();
+        resolve();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      off = this.subscribe(() => {
+        if (!loading()) done();
+      });
+    });
+  }
+
   // Para la exportación (pasos 5 y 7): bloquea la sustitución silenciosa de fuentes.
   // Sin efectos: quien exporte llama antes a ensureDoc y espera a que no queden fuentes "loading".
   checkFontsReady(doc: Project): FontsReport {

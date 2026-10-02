@@ -1,15 +1,16 @@
-import type { ElementPatch } from "@free-book-cover/core";
 import { cachedDpiReport as dpiReport } from "./dpiCache";
 import { useI18n } from "../i18n";
-import { useEditorState, useStore } from "../store/react";
+import type { GeometryEdit } from "../store/editorStore";
+import { useDisplayDoc, useEditorState, useStore } from "../store/react";
 import { NumberField, Section, fieldCls } from "./ui";
 
 // Alternativa numérica y accesible a arrastrar: posición, tamaño, rotación (y recorte en imágenes).
 export function GeometryPanel() {
   const { t } = useI18n();
   const store = useStore();
-  const { history, selectedId } = useEditorState();
-  const doc = history.present;
+  const { selectedId } = useEditorState();
+  // En una variante se muestran y editan los valores de la variante.
+  const doc = useDisplayDoc();
   const el = doc.elements.find((e) => e.id === selectedId);
   if (!el) {
     return (
@@ -19,7 +20,7 @@ export function GeometryPanel() {
       </>
     );
   }
-  const set = (props: ElementPatch) => store.dispatch({ type: "updateElement", id: el.id, props });
+  const set = (props: GeometryEdit) => store.editGeometry(el.id, props);
   const dpi = el.type === "image" ? dpiReport(doc).find((d) => d.id === el.id) : undefined;
   const pct = (v: number) => v * 100;
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));

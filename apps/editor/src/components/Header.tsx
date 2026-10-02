@@ -1,8 +1,10 @@
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import * as Tooltip from "@radix-ui/react-tooltip";
+import { useState } from "react";
 import { LANGS, type Lang } from "../i18n/dictionaries";
 import { useI18n } from "../i18n";
 import { useEditorState, useStore } from "../store/react";
+import { ExportDialog } from "./ExportDialog";
 
 const iconBtn =
   "h-8 rounded-lg border border-line bg-white px-3 text-[12.5px] text-ink enabled:hover:bg-chip disabled:cursor-not-allowed disabled:opacity-40";
@@ -26,6 +28,7 @@ export function Header() {
   const state = useEditorState();
   const doc = state.history.present;
   const dirty = store.isDirty();
+  const [exportOpen, setExportOpen] = useState(false);
   const status = state.status === "saving" ? t("saving") : dirty ? t("unsaved") : state.status === "saved" ? t("saved") : "";
 
   return (
@@ -67,11 +70,12 @@ export function Header() {
           <button className={iconBtn} onClick={() => void store.save()} disabled={state.status === "saving"}>
             {t("save")}
           </button>
-          <button className="cursor-not-allowed rounded-lg bg-accent px-[18px] py-[9px] text-[13px] font-semibold text-white opacity-60" disabled>
+          <button className="rounded-lg bg-accent px-[18px] py-[9px] text-[13px] font-semibold text-white hover:brightness-110" onClick={() => setExportOpen(true)}>
             {t("exportBtn")}
           </button>
         </div>
       </header>
+      <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
     </Tooltip.Provider>
   );
 }

@@ -6,7 +6,7 @@ import { useFontVersion } from "../fonts/fontContext";
 import { useImageSources } from "../canvas/useImageSources";
 import { useI18n } from "../i18n";
 import { ZOOM_MAX, ZOOM_MIN, type StageTone } from "../store/editorStore";
-import { useEditorState, useStore } from "../store/react";
+import { useDisplayDoc, useEditorState, useStore } from "../store/react";
 
 const TONE_CLASS: Record<StageTone, string> = { charcoal: "bg-stage", stone: "bg-stage-stone", linen: "bg-stage-linen" };
 const TONES: StageTone[] = ["charcoal", "stone", "linen"];
@@ -21,8 +21,9 @@ const canvasSupported = () => typeof globalThis.CanvasRenderingContext2D !== "un
 export function Stage() {
   const { t } = useI18n();
   const store = useStore();
-  const { history, assets, selectedId, zoom, stageTone } = useEditorState();
-  const doc = history.present;
+  const { assets, selectedId, zoom, stageTone } = useEditorState();
+  // Con una variante activa se pinta la variante derivada; las transformaciones se guardan como sus ajustes.
+  const doc = useDisplayDoc();
   const sources = useImageSources(doc.assets, assets);
   const host = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -42,16 +43,16 @@ export function Stage() {
       onSelect: (id) => store.select(id),
       onTransform: (id, box: Rect, rotation) => {
         const ppi = pxPerInchRef.current;
-        const el = store.getState().history.present.elements.find((e) => e.id === id);
+        const el = store.displayDoc().elements.find((e) => e.id === id);
         const props = { x: box.x / ppi, y: box.y / ppi, width: box.width / ppi, height: box.height / ppi, rotation };
         // En un bloque de texto el alto lo da el contenido: solo el ancho se controla a mano.
         if (el?.type === "text") {
           const m = browserMeasure();
           if (m) props.height = textHeightIn({ ...el, width: props.width }, m);
         }
-        store.dispatch({ type: "updateElement", id, props });
+        store.editGeometry(id, props);
       },
-      onBackgroundPan: (pos) => store.dispatch({ type: "setBackgroundLayout", pos }),
+      onBackgroundPan: (pos) => store.editBackgroundLayout({ pos }),
     });
     setScene(sc);
     if (import.meta.env.DEV) (window as unknown as { __coverScene?: CoverScene }).__coverScene = sc;

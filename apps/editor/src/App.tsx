@@ -7,12 +7,13 @@ import { Notices } from "./components/Notices";
 import { StoreProvider } from "./store/react";
 import { useI18n } from "./i18n";
 import { FontsProvider, useFontSync } from "./fonts/fontContext";
+import { ExportServicesProvider, type ExportServices } from "./export/exportContext";
 import type { FontRegistry } from "./fonts/fontRegistry";
 import type { EditorStore } from "./store/editorStore";
 
 // Layout del mockup: cabecera 56 px, panel izquierdo 264 px, escenario, panel derecho 300 px.
 // `fonts`: registro de fuentes inyectable (pruebas); por defecto el del navegador.
-export function App({ store, fonts }: { store: EditorStore; fonts?: FontRegistry }) {
+export function App({ store, fonts, exportServices }: { store: EditorStore; fonts?: FontRegistry; exportServices?: ExportServices }) {
   useEffect(() => {
     void store.init();
   }, [store]);
@@ -20,7 +21,9 @@ export function App({ store, fonts }: { store: EditorStore; fonts?: FontRegistry
   return (
     <StoreProvider store={store}>
       <FontsProvider {...(fonts ? { registry: fonts } : {})}>
-        <Layout />
+        <ExportServicesProvider {...(exportServices ? { value: exportServices } : {})}>
+          <Layout />
+        </ExportServicesProvider>
       </FontsProvider>
     </StoreProvider>
   );

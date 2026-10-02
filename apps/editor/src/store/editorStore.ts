@@ -1,6 +1,8 @@
 import {
   checkAssetLimits, canRedo, canUndo, createHistory, createProject, execute, redo as redoHistory, undo as undoHistory,
-  type Asset, type AssetCandidate, type Command, type LimitError, type CommandError, type History, type Project,
+  isResolvedTarget, variantDocument,
+  type Asset, type AssetCandidate, type Command, type LimitError, type CommandError, type ElementOverride, type History, type Project,
+  type ResolvedTarget,
 } from "@free-book-cover/core";
 import type { ProjectStorage, StoredAsset } from "../storage/projectStorage";
 import { createBackupParts, type BackupPart } from "../storage/backup";
@@ -31,7 +33,12 @@ export interface EditorState {
   selectedId: string | null;
   zoom: number;
   stageTone: StageTone;
+  // Variante digital que se está viendo/editando (vista, no documento); null = diseño base.
+  activeVariantId: string | null;
 }
+
+// Propiedades geométricas que se editan en el base o, con una variante activa, solo en ella.
+export type GeometryEdit = Pick<ElementOverride, "x" | "y" | "width" | "height" | "rotation" | "crop" | "fit">;
 
 export type StageTone = "charcoal" | "stone" | "linen";
 export const ZOOM_MIN = 0.25;
@@ -50,14 +57,23 @@ export function createEditorStore(deps: EditorDeps) {
   const fresh = () => createHistory(createProject({ id: deps.newId() }));
   let state: EditorState = {
     ready: false, history: fresh(), assets: [], savedRevision: null, status: "idle", error: null, backupParts: null, nearLimit: false,
-    selectedId: null, zoom: 1, stageTone: "charcoal",
+    selectedId: null, zoom: 1, stageTone: "charcoal", activeVariantId: null,
   };
   const listeners = new Set<() => void>();
   const set = (patch: Partial<EditorState>) => {
     state = { ...state, ...patch };
+    // Una variante que ya no existe (borrada, deshacer, otro proyecto) deja de estar activa.
+    if (state.activeVariantId && !state.history.present.digitalTargets?.some((t) => t.id === state.activeVariantId)) {
+      state = { ...state, activeVariantId: null };
+    }
     listeners.forEach((l) => l());
   };
   const doc = (): Project => state.history.present;
+  const activeTarget = (): ResolvedTarget | null => {
+    const t = state.history.present.digitalTargets?.find((x) => x.id === state.activeVariantId);
+    return t && isResolvedTarget(t) ? t : null;
+  };
+  let displayCache: { base: Project; target: ResolvedTarget; doc: Project } | null = null;
   let initPromise: Promise<void> | null = null;
   const projectBytes = () =>
     state.assets.reduce((n, a) => n + a.blob.size, 0) + JSON.stringify(doc()).length;
@@ -72,6 +88,32 @@ export function createEditorStore(deps: EditorDeps) {
     canUndo: () => canUndo(state.history),
     canRedo: () => canRedo(state.history),
     newId: deps.newId,
+
+    // Documento que se muestra: el base o la variante derivada (memoizado por base y destino).
+    displayDoc(): Project {
+      const target = activeTarget();
+      const base = doc();
+      if (!target) return base;
+      if (displayCache && displayCache.base === base && displayCache.target === target) return displayCache.doc;
+      displayCache = { base, target, doc: variantDocument(base, target) };
+      return displayCache.doc;
+    },
+    setActiveVariant(id: string | null) {
+      if (state.activeVariantId === id) return;
+      if (id !== null && !doc().digitalTargets?.some((t) => t.id === id)) return;
+      set({ activeVariantId: id });
+    },
+    // Geometría: con una variante activa solo cambia esa variante; si no, el elemento del base.
+    editGeometry(id: string, props: GeometryEdit): boolean {
+      const target = activeTarget();
+      if (target) return this.dispatch({ type: "setVariantElement", targetId: target.id, elementId: id, props });
+      return this.dispatch({ type: "updateElement", id, props: props as never });
+    },
+    editBackgroundLayout(props: { fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number } }): boolean {
+      const target = activeTarget();
+      if (target) return this.dispatch({ type: "setVariantBackground", targetId: target.id, props });
+      return this.dispatch({ type: "setBackgroundLayout", ...props });
+    },
 
     // Recupera el último proyecto; si no es legible se abre uno nuevo sin tocar el guardado.
     // Idempotente: StrictMode u otras llamadas repetidas no pisan ediciones.
