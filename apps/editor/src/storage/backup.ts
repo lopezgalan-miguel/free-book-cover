@@ -158,9 +158,11 @@ export async function restoreBackup(blobs: Blob[]): Promise<RestoreResult> {
   const loaded = loadProject(first.doc);
   if (!loaded.ok) return loaded;
   const kinds = new Map(loaded.project.assets.map((a) => [a.id, a]));
+  // Las miniaturas `<id>.thumb` de una imagen del documento también viajan en la copia.
+  const isThumb = (id: string) => id.endsWith(".thumb") && kinds.get(id.slice(0, -".thumb".length))?.kind === "image";
   const pieces = new Map<string, Array<Uint8Array | undefined>>();
   for (const a of first.assets) {
-    if (!kinds.has(a.id) || pieces.has(a.id)) return bad(`recurso desconocido: ${a.id}`);
+    if ((!kinds.has(a.id) && !isThumb(a.id)) || pieces.has(a.id)) return bad(`recurso desconocido: ${a.id}`);
     pieces.set(a.id, []);
   }
   try {
@@ -181,7 +183,7 @@ export async function restoreBackup(blobs: Blob[]): Promise<RestoreResult> {
   let total = JSON.stringify(first.doc).length;
   for (const [id, list] of pieces) {
     if (list.length === 0 || list.some((x) => x === undefined)) return bad(`recurso incompleto: ${id}`);
-    const blob = new Blob(list as Uint8Array<ArrayBuffer>[], { type: kinds.get(id)?.mimeType ?? "application/octet-stream" });
+    const blob = new Blob(list as Uint8Array<ArrayBuffer>[], { type: isThumb(id) ? "image/webp" : (kinds.get(id)?.mimeType ?? "application/octet-stream") });
     if (blob.size !== declared.get(id)) return bad(`tamaño distinto del declarado: ${id}`);
     // Los mismos límites que al importar (SDD §6).
     const limit = checkAssetLimits({ kind: kinds.get(id)?.kind === "font" ? "font" : "image", sizeBytes: blob.size }, total);
