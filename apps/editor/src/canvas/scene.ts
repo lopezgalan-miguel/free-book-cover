@@ -1,8 +1,8 @@
-import { Canvas, Ellipse, FabricImage, FabricObject, Rect as FRect } from "fabric";
+import { Canvas, Ellipse, FabricImage, FabricObject, Line, Rect as FRect } from "fabric";
 import { paintTextItem, type TextItem } from "./paintText";
 import {
   BACKGROUND_FALLBACK, assetDims, drawCenter, panPosition, placeImage, rectCenter,
-  type ImageDraw, type Point, type Project, type Rect, type RenderItem, type RenderedDocument,
+  type GuideShape, type ImageDraw, type Point, type Project, type Rect, type RenderItem, type RenderedDocument,
 } from "@free-book-cover/core";
 
 // Imagen ya decodificada para la vista previa. scale = píxeles de la miniatura / píxeles del original.
@@ -60,6 +60,31 @@ function applyDraw(obj: FabricImage, draw: ImageDraw, k: number, center: Point, 
     left: center.x, top: center.y, originX: "center", originY: "center", angle,
   });
   obj.setCoords();
+}
+
+const GUIDE_RED = "#d64545";
+const GUIDE_GREEN = "#2e9e6b";
+const GUIDE_BLUE = "#3b82c4";
+const ghost = { selectable: false, evented: false, excludeFromExport: true, objectCaching: false, hoverCursor: "default" } as const;
+
+// Capa de guías: objetos Fabric no seleccionables y marcados como no exportables. La exportación no pasa
+// por Fabric (renderDocument + paintDocument), así que nunca los pinta.
+export function guideObjects(g: GuideShape, ppi: number): FabricObject[] {
+  const box = (r: Rect) => ({ left: r.x * ppi, top: r.y * ppi, width: r.width * ppi, height: r.height * ppi });
+  switch (g.kind) {
+    case "bleed":
+      return [new FRect({ ...box(g.rect), ...ghost, fill: "rgba(214,69,69,.28)", strokeWidth: 0 })];
+    case "trim":
+      return [new FRect({ ...box(g.rect), ...ghost, fill: "transparent", stroke: GUIDE_RED, strokeWidth: 1, strokeDashArray: [6, 4], strokeUniform: true })];
+    case "safe":
+      return [new FRect({ ...box(g.rect), ...ghost, fill: "transparent", stroke: GUIDE_GREEN, strokeWidth: 1, strokeDashArray: [4, 4], strokeUniform: true })];
+    case "spineSafe":
+      return [new FRect({ ...box(g.rect), ...ghost, fill: "transparent", stroke: GUIDE_BLUE, strokeWidth: 1, strokeDashArray: [3, 3], strokeUniform: true })];
+    case "barcode":
+      return [new FRect({ ...box(g.rect), ...ghost, fill: "rgba(255,255,255,.85)", stroke: "#555555", strokeWidth: 1, strokeDashArray: [5, 3], strokeUniform: true })];
+    case "fold":
+      return [new Line([g.x * ppi, g.y1 * ppi, g.x * ppi, g.y2 * ppi], { ...ghost, stroke: GUIDE_BLUE, strokeWidth: 1, strokeDashArray: [8, 4] })];
+  }
 }
 
 // Vista Fabric del documento. Fabric es solo vista: nada de su estado se persiste (SDD D-03).
@@ -160,7 +185,7 @@ export class CoverScene {
   }
 
   // Reconstruye los objetos desde la composición. Barato para pocos elementos y evita estados divergentes.
-  render(doc: Project, r: RenderedDocument, sources: ImageSources, selectedId: string | null, size: { width: number; height: number }): void {
+  render(doc: Project, r: RenderedDocument, sources: ImageSources, selectedId: string | null, size: { width: number; height: number }, guides: GuideShape[] = []): void {
     this.rebuilding = true;
     const c = this.canvas;
     this.doc = doc;
@@ -197,6 +222,7 @@ export class CoverScene {
       this.track(o, it.id, it.box);
       if (it.id === selectedId) active = o;
     }
+    for (const g of guides) for (const o of guideObjects(g, r.pxPerInch)) c.add(o);
     if (active) c.setActiveObject(active);
     this.rebuilding = false;
     c.requestRenderAll();

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { renderDocument, type Rect } from "@free-book-cover/core";
+import { kdpGuides, kdpLayout, renderDocument, validatePrintSetup, type Rect } from "@free-book-cover/core";
 import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { CoverScene } from "../canvas/scene";
 import { useFontVersion } from "../fonts/fontContext";
@@ -21,7 +21,7 @@ const canvasSupported = () => typeof globalThis.CanvasRenderingContext2D !== "un
 export function Stage() {
   const { t } = useI18n();
   const store = useStore();
-  const { assets, selectedId, zoom, stageTone } = useEditorState();
+  const { assets, selectedId, zoom, stageTone, guidesVisible, activeVariantId } = useEditorState();
   // Con una variante activa se pinta la variante derivada; las transformaciones se guardan como sus ajustes.
   const doc = useDisplayDoc();
   const sources = useImageSources(doc.assets, assets);
@@ -91,8 +91,11 @@ export function Stage() {
   useEffect(() => {
     if (!scene) return;
     const r = renderDocument(doc, { pxPerInch, ...(measure ? { measureText: measure } : {}) });
-    scene.render(doc, r, sources, store.getState().selectedId, { width: Math.round(r.widthPx), height: Math.round(r.heightPx) });
-  }, [scene, doc, pxPerInch, sources, store, measure, fontVersion]);
+    // Las guías solo acompañan al diseño base de una cubierta KDP válida.
+    const ps = doc.printSetup;
+    const guides = guidesVisible && !activeVariantId && doc.mode === "kdp-paperback" && ps && validatePrintSetup(ps).ok ? kdpGuides(kdpLayout(ps)) : [];
+    scene.render(doc, r, sources, store.getState().selectedId, { width: Math.round(r.widthPx), height: Math.round(r.heightPx) }, guides);
+  }, [scene, doc, pxPerInch, sources, store, measure, fontVersion, guidesVisible, activeVariantId]);
 
   // Cambiar la selección no reconstruye la escena.
   useEffect(() => {

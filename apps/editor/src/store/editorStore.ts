@@ -35,6 +35,8 @@ export interface EditorState {
   stageTone: StageTone;
   // Variante digital que se está viendo/editando (vista, no documento); null = diseño base.
   activeVariantId: string | null;
+  // Guías de la cubierta KDP (vista; nunca se exportan).
+  guidesVisible: boolean;
 }
 
 // Propiedades geométricas que se editan en el base o, con una variante activa, solo en ella.
@@ -57,7 +59,7 @@ export function createEditorStore(deps: EditorDeps) {
   const fresh = () => createHistory(createProject({ id: deps.newId() }));
   let state: EditorState = {
     ready: false, history: fresh(), assets: [], savedRevision: null, status: "idle", error: null, backupParts: null, nearLimit: false,
-    selectedId: null, zoom: 1, stageTone: "charcoal", activeVariantId: null,
+    selectedId: null, zoom: 1, stageTone: "charcoal", activeVariantId: null, guidesVisible: true,
   };
   const listeners = new Set<() => void>();
   const set = (patch: Partial<EditorState>) => {
@@ -148,6 +150,9 @@ export function createEditorStore(deps: EditorDeps) {
     setZoom(zoom: number) {
       const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
       if (Number.isFinite(z) && z !== state.zoom) set({ zoom: z });
+    },
+    setGuidesVisible(guidesVisible: boolean) {
+      if (state.guidesVisible !== guidesVisible) set({ guidesVisible });
     },
     setStageTone(stageTone: StageTone) {
       set({ stageTone });
