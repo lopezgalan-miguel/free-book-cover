@@ -39,5 +39,5 @@ export function useFontProblems(): FontProblem[] {
   useFontVersion();
   const { history } = useEditorState();
   const report = r.checkFontsReady(history.present);
-  return report.ok ? [] : report.problems.filter((p) => p.reason === "failed" || p.reason === "missing");
+  return report.ok ? [] : report.problems.filter((p) => p.reason === "failed" || p.reason === "missing" || p.reason === "face_missing");
 }

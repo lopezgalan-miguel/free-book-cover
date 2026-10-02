@@ -147,9 +147,9 @@ describe("panel de texto: controles", () => {
     const { store } = await mount();
     await addAndWrite(user, store, "Uno");
     const before = store.getState().history.past.length;
-    fireEvent.change(screen.getByLabelText("Peso"), { target: { value: "800" } });
+    fireEvent.change(screen.getByLabelText("Peso"), { target: { value: "600" } });
     expect(store.getState().history.past.length).toBe(before + 1);
-    expect(textOf(store).runs[0]!.weight).toBe(800);
+    expect(textOf(store).runs[0]!.weight).toBe(600);
   });
 });
 

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import {
-  FONT_CATALOG, applyStyleToRange, documentFontFamilies, fontStack, rangeStyle, replaceText, runsToText,
+  FONT_CATALOG, applyStyleToRange, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, nearestFace, rangeStyle, replaceText, runsToText,
   type FontGroupId, type RunStylePatch, type TextElement,
 } from "@free-book-cover/core";
 import { browserMeasure, textHeightIn } from "../canvas/measure";
@@ -48,19 +48,20 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
 
   const latest = () => store.getState().history.present.elements.find((e): e is TextElement => e.id === id && e.type === "text");
   // Un solo comando por cambio; el alto sigue al contenido cuando se puede medir.
-  const commit = (props: Partial<Omit<TextElement, "id" | "type" | "zIndex">>) => {
+  // mergeKey: los cambios continuos de un mismo gesto (teclas, selector de color) son un solo paso de deshacer.
+  const commit = (props: Partial<Omit<TextElement, "id" | "type" | "zIndex">>, mergeKey?: string) => {
     const cur = latest();
     if (!cur) return;
     const measure = browserMeasure();
     const next = { ...cur, ...props };
-    store.dispatch({ type: "updateElement", id, props: measure ? { ...props, height: textHeightIn(next, measure) } : props });
+    store.dispatch({ type: "updateElement", id, props: measure ? { ...props, height: textHeightIn(next, measure) } : props }, mergeKey ? { mergeKey: `${id}:${mergeKey}` } : {});
   };
   const range = () => ({ start: area.current?.selectionStart ?? sel.start, end: area.current?.selectionEnd ?? sel.end });
-  const style = (patch: RunStylePatch) => {
+  const style = (patch: RunStylePatch, mergeKey?: string) => {
     const cur = latest();
     if (!cur) return;
     const r = range();
-    commit({ runs: applyStyleToRange(cur.runs, r.start, r.end, patch) });
+    commit({ runs: applyStyleToRange(cur.runs, r.start, r.end, patch) }, mergeKey);
   };
 
   const text = runsToText(el.runs);
@@ -75,11 +76,30 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
   const family = cur.fontFamily;
   const weight = cur.weight;
   const color = (cur.color ?? first?.color ?? "#ffffff").toLowerCase();
-  const uploads = [...documentFontFamilies(doc)];
+  const own = documentFontFamilies(doc);
+  const uploads = [...own];
+  const italic = cur.italic;
+  // Solo se ofrecen las caras que la familia realmente tiene; con varias familias mezcladas no se restringe.
+  const known = family !== undefined && availableFaces(family, own) !== null;
+  const weightOptions = known ? WEIGHTS.filter(([v]) => availableWeights(family, italic ?? false, own).includes(v)) : WEIGHTS;
+  const faceOk = (w: number, it: boolean) => !known || hasFace(family, w, it, own);
+  const canItalic = !known || (availableFaces(family, own) ?? []).some((f) => f.italic) || italic === true;
+  const canBold = faceOk(700, italic ?? false) || (weight ?? 0) >= 700;
 
   const pickFont = (name: string) => {
-    registry.ensureCatalog(name, weight ?? first?.weight ?? 400, cur.italic ?? false);
-    style({ fontFamily: name });
+    // Si la familia nueva no tiene el peso o la cursiva actuales se pasa a la cara más próxima, a la vista.
+    const w = weight ?? first?.weight ?? 400;
+    const nf = nearestFace(name, w, italic ?? false, own);
+    const patch: RunStylePatch = { fontFamily: name };
+    if (nf && weight !== undefined && nf.weight !== weight) patch.weight = nf.weight;
+    if (nf && italic !== undefined && nf.italic !== italic) patch.italic = nf.italic;
+    registry.ensureCatalog(name, patch.weight ?? w, patch.italic ?? italic ?? false);
+    style(patch);
+  };
+  const toggleItalic = () => {
+    if (italic) return style({ italic: false });
+    const nf = family !== undefined ? nearestFace(family, weight ?? 400, true, own) : null;
+    style(nf?.italic && weight !== undefined && nf.weight !== weight ? { italic: true, weight: nf.weight } : { italic: true });
   };
   const fontMark = (name: string) => {
     const s = registry.stateOf(name);
@@ -106,10 +126,11 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
           ref={area} rows={2} className={`${fieldCls} font-sans text-sm leading-snug`} aria-label={t("textContent")} placeholder={t("textPh")}
           onChange={(e) => {
             const cur = latest();
-            if (cur) commit({ runs: replaceText(cur.runs, e.target.value) });
+            if (cur) commit({ runs: replaceText(cur.runs, e.target.value) }, "text");
             setSel({ start: e.target.selectionStart, end: e.target.selectionEnd });
           }}
           onSelect={(e) => setSel({ start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd })}
+          onBlur={() => store.endGesture()}
         />
         <p className="mt-1.5 text-[10.5px] leading-snug text-muted" data-testid="style-scope">
           {t("applyTo", { scope: selected > 0 ? t("scopeSelection", { n: selected }) : t("scopeAll") })}
@@ -160,12 +181,17 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
             onChange={(e) => style({ weight: Number(e.target.value) })}
           >
             {weight === undefined && <option value="" disabled>{t("mixed")}</option>}
-            {WEIGHTS.map(([v, label]) => <option key={v} value={v}>{t(label)}</option>)}
+            {weight !== undefined && !weightOptions.some(([v]) => v === weight) && (
+              <option value={weight} disabled={!faceOk(weight, italic ?? false)}>
+                {faceOk(weight, italic ?? false) ? String(weight) : t("weightUnavailable", { weight })}
+              </option>
+            )}
+            {weightOptions.map(([v, label]) => <option key={v} value={v}>{t(label)}</option>)}
           </select>
         </div>
         <div className="mb-3.5 flex gap-1.5">
-          <button type="button" aria-label={t("bold")} aria-pressed={(weight ?? 0) >= 700} className={toggleBtn} onClick={() => style({ weight: (weight ?? 400) >= 700 ? 400 : 700 })}><b>B</b></button>
-          <button type="button" aria-label={t("italic")} aria-pressed={cur.italic === true} className={toggleBtn} onClick={() => style({ italic: !cur.italic })}><i className="font-serif">I</i></button>
+          <button type="button" aria-label={t("bold")} aria-pressed={(weight ?? 0) >= 700} disabled={!canBold} className={toggleBtn} onClick={() => style({ weight: (weight ?? 400) >= 700 ? 400 : 700 })}><b>B</b></button>
+          <button type="button" aria-label={t("italic")} aria-pressed={cur.italic === true} disabled={!canItalic} className={toggleBtn} onClick={toggleItalic}><i className="font-serif">I</i></button>
           <button type="button" aria-label={t("underline")} aria-pressed={cur.underline === true} className={toggleBtn} onClick={() => style({ underline: !cur.underline })}><u>U</u></button>
           <button type="button" aria-label={t("uppercase")} aria-pressed={cur.uppercase === true} className={toggleBtn} onClick={() => style({ uppercase: !cur.uppercase })}><span className="text-[11px]">AA</span></button>
           <span className="flex-1" />
@@ -187,7 +213,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
       {show("color") && <Section title={t("color")}>
         <div className="mb-[11px] flex items-center gap-2.5">
           <input
-            type="color" aria-label={t("colorPicker")} value={color} onChange={(e) => style({ color: e.target.value })}
+            type="color" aria-label={t("colorPicker")} value={color} onChange={(e) => style({ color: e.target.value }, "color")} onBlur={() => store.endGesture()}
             className="h-[38px] w-11 cursor-pointer rounded-lg border border-field bg-white p-[3px]"
           />
           <div className="flex flex-1 items-center rounded-lg border border-field bg-white px-2.5">
@@ -199,9 +225,9 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
               onChange={(e) => {
                 const v = e.target.value.replace("#", "");
                 setHexDraft(v);
-                if (HEX.test(v)) style({ color: `#${v.toLowerCase()}` });
+                if (HEX.test(v)) style({ color: `#${v.toLowerCase()}` }, "color");
               }}
-              onBlur={() => setHexDraft(null)}
+              onBlur={() => { setHexDraft(null); store.endGesture(); }}
             />
           </div>
         </div>
@@ -228,7 +254,8 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
             </div>
             <input
               type="color" aria-label={t("outlineColor")} value={el.outline.color}
-              onChange={(e) => commit({ outline: { ...el.outline, color: e.target.value } })}
+              onChange={(e) => commit({ outline: { ...el.outline, color: e.target.value } }, "outline-color")}
+              onBlur={() => store.endGesture()}
               className="mb-3 h-[30px] w-9 cursor-pointer rounded-[7px] border border-field bg-white p-0.5"
             />
           </div>

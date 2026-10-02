@@ -1,5 +1,5 @@
 import {
-  catalogGroup, checkFontsReady, usedFamilies, type Asset, type FontState, type FontsReport, type Project, type TextElement,
+  catalogGroup, checkFontsReady, hasFace, usedFamilies, type Asset, type FontState, type FontsReport, type Project, type TextElement,
 } from "@free-book-cover/core";
 import type { StoredAsset } from "../storage/projectStorage";
 
@@ -99,6 +99,8 @@ export class FontRegistry {
   // Para la lista de fuentes: pide una muestra del catálogo.
   ensureCatalog(family: string, weight = 400, italic = false): void {
     if (catalogGroup(family) === null || catalogGroup(family) === "system" || this.upload.has(family)) return;
+    // Una cara que la familia no publica no se pide: el navegador devolvería otra más próxima y la daría por cargada.
+    if (!hasFace(family, weight, italic)) return;
     const key = `${weight}|${italic}`;
     const perFamily = this.catalog.get(family) ?? new Map<string, Entry>();
     this.catalog.set(family, perFamily);

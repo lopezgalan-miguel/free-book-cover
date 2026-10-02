@@ -1,3 +1,4 @@
+import { facesText } from "../fonts/facesText";
 import { cachedDpiReport as dpiReport } from "../panels/dpiCache";
 import { useFonts, useFontProblems } from "../fonts/fontContext";
 import { useI18n } from "../i18n";
@@ -41,7 +42,7 @@ export function Notices() {
       {nearLimit && <div role="status" className="border-b border-line bg-chip px-[18px] py-2 text-[13px]">{t("projectNearLimit")}</div>}
       {fontProblems.map((p) => (
         <div key={p.family} role="status" data-testid="font-warning" className="border-b border-warn-line bg-warn-bg px-[18px] py-2 text-[13px] text-warn-ink">
-          {t(p.reason === "missing" ? "fontNoticeMissing" : "fontNoticeFailed", { family: p.family })}
+          {t(p.reason === "missing" ? "fontNoticeMissing" : p.reason === "face_missing" ? "fontNoticeFace" : "fontNoticeFailed", { family: p.family, faces: facesText(p) })}
           {p.reason === "failed" && (
             <button className="ml-3 rounded-md border border-warn-line bg-white px-2.5 py-0.5 text-xs font-medium" onClick={() => void fonts.retryFailed(doc, assets)}>
               {t("fontRetry")}

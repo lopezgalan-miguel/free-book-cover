@@ -4,6 +4,7 @@ import {
   type ExportFormat, type ExportReport, type Project, type ResolvedTarget,
 } from "@free-book-cover/core";
 import { useFonts } from "../fonts/fontContext";
+import { facesText } from "../fonts/facesText";
 import { useExportServices } from "../export/exportContext";
 import { useCompanion } from "../export/useCompanion";
 import { CompanionConnect, PdfExportPanel } from "./PdfExportPanel";
@@ -244,7 +245,7 @@ function ErrorBody({ error, size }: { error: ExportError; size: { widthPx: numbe
           <p>{t("exFontsBlocked")}</p>
           <ul className="mt-1 list-disc pl-4">
             {error.problems.map((p) => (
-              <li key={p.family} data-testid="export-font-problem">{t(p.reason === "failed" ? "exFontFailed" : p.reason === "missing" ? "exFontMissing" : "exFontLoading", { family: p.family })}</li>
+              <li key={p.family} data-testid="export-font-problem">{t(p.reason === "failed" ? "exFontFailed" : p.reason === "missing" ? "exFontMissing" : p.reason === "face_missing" ? "exFontFace" : "exFontLoading", { family: p.family, faces: facesText(p) })}</li>
             ))}
           </ul>
         </>
