@@ -3,7 +3,7 @@ import { CANVAS_PRESETS, DEFAULT_PX_PER_IN, MAX_CANVAS_IN, convert, presetSizeIn
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";
-import { chipBtn, fieldCls, Section } from "./ui";
+import { BaseDesignNotice, chipBtn, fieldCls, Section } from "./ui";
 
 const UNITS: Unit[] = ["px", "mm", "in"];
 const POLICIES: Array<{ id: ResizePolicy; label: DictKey; hint: DictKey }> = [
@@ -57,6 +57,7 @@ export function CanvasPanel() {
   const groups: Array<{ title: DictKey; group: "kdp" | "ratio" }> = [{ title: "kdp", group: "kdp" }, { title: "ratio", group: "ratio" }];
   return (
     <Section title={t("canvas")}>
+      <BaseDesignNotice />
       {groups.map((g) => (
         <div key={g.group} className="mb-3">
           <div className="mb-[7px] text-[11px] text-muted">{t(g.title)}</div>

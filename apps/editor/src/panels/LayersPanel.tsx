@@ -6,7 +6,7 @@ import { useAssetUrl } from "../canvas/useImageSources";
 import { importImage } from "../images/importImage";
 import { useI18n } from "../i18n";
 import { useEditorState, useStore } from "../store/react";
-import { Section } from "./ui";
+import { BaseDesignNotice, Section } from "./ui";
 
 const layerLabel = (e: TextElement) => e.runs.map((r) => r.text).join("") || "—";
 const isText = (e: Element): e is TextElement => e.type === "text";
@@ -72,6 +72,7 @@ export function LayersPanel() {
   return (
     <>
       <Section title={t("layers")} action={<button aria-label={t("addText")} onClick={addText} className={plus}>+</button>}>
+        <BaseDesignNotice />
         {texts.length === 0 ? (
           <p className="text-xs text-muted">{t("noLayers")}</p>
         ) : (

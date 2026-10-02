@@ -13,6 +13,7 @@ const MESSAGE: Record<string, DictKey> = {
   storage_unavailable: "storageUnavailable",
   unsupported_image: "unsupportedImage",
   unsupported_font: "unsupportedFont",
+  restore: "restoreError",
 };
 
 const LIMIT_MESSAGE: Record<string, DictKey> = {

@@ -11,6 +11,7 @@ import { TextPanel } from "../../panels/TextPanel";
 import { VariantsPanel } from "../../panels/VariantsPanel";
 import { useEditorState, useStore } from "../../store/react";
 import { ExportDialog } from "../ExportDialog";
+import { ProjectDialog } from "../ProjectDialog";
 import { LangToggle } from "../Header";
 import { Notices } from "../Notices";
 import { Stage } from "../Stage";
@@ -27,6 +28,7 @@ export function MobileLayout() {
   const { t } = useI18n();
   const [sheet, setSheet] = useState(initialSheet);
   const [exportOpen, setExportOpen] = useState(false);
+  const [projectOpen, setProjectOpen] = useState(false);
   const tabs = useRef<Partial<Record<MobileTab, HTMLButtonElement | null>>>({});
 
   const onTabKey = (tab: MobileTab) => (e: KeyboardEvent) => {
@@ -38,7 +40,7 @@ export function MobileLayout() {
 
   return (
     <div data-layout="mobile" className="flex h-dvh w-full flex-col overflow-hidden bg-stage">
-      <MobileBar onExport={() => setExportOpen(true)} />
+      <MobileBar onExport={() => setExportOpen(true)} onProject={() => setProjectOpen(true)} />
       <div className="max-h-24 flex-none overflow-y-auto bg-bg"><Notices /></div>
       <Stage />
       <nav aria-label={t("tabsLabel")} className="flex-none border-t border-line bg-panel pb-[max(env(safe-area-inset-bottom),6px)]">
@@ -62,11 +64,12 @@ export function MobileLayout() {
         </BottomSheet>
       )}
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
+      <ProjectDialog open={projectOpen} onClose={() => setProjectOpen(false)} />
     </div>
   );
 }
 
-function MobileBar({ onExport }: { onExport: () => void }) {
+function MobileBar({ onExport, onProject }: { onExport: () => void; onProject: () => void }) {
   const { t } = useI18n();
   const store = useStore();
   const state = useEditorState();
@@ -86,6 +89,7 @@ function MobileBar({ onExport }: { onExport: () => void }) {
         <button type="button" className={barBtn} aria-label={t("undo")} disabled={!store.canUndo()} onClick={() => store.undo()}>↶</button>
         <button type="button" className={barBtn} aria-label={t("redo")} disabled={!store.canRedo()} onClick={() => store.redo()}>↷</button>
         <span className="min-w-0 flex-1 truncate text-right text-xs text-subtle" role="status">{status}</span>
+        <button type="button" className={`${barBtn} max-w-28 truncate`} onClick={onProject} data-testid="project-open" aria-haspopup="dialog">{doc.name || t("projectBtn")}</button>
         <button type="button" className={barBtn} onClick={() => void store.save()} disabled={state.status === "saving"}>{t("save")}</button>
       </div>
     </header>

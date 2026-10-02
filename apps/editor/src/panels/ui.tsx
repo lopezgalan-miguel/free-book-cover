@@ -1,4 +1,6 @@
 import { useId, useRef, useState, type ReactNode } from "react";
+import { useI18n } from "../i18n";
+import { useEditorState } from "../store/react";
 
 export const sectionTitle = "mb-2.5 text-[10.5px] font-semibold uppercase tracking-[.11em] text-muted";
 export const chipBtn =
@@ -100,3 +102,11 @@ export function Switch({ label, checked, onChange }: { label: string; checked: b
 // Botón de conmutación (negrita, cursiva, alineación...).
 export const toggleBtn =
   "flex h-8 w-[34px] items-center justify-center rounded-[7px] border border-line-chip bg-white text-[13px] text-chip-ink enabled:hover:bg-chip aria-pressed:border-accent aria-pressed:bg-chip-on aria-pressed:text-accent-dark";
+
+// Con una variante activa, Lienzo y Capas siguen actuando sobre el diseño base: se avisa.
+export function BaseDesignNotice() {
+  const { t } = useI18n();
+  const { activeVariantId } = useEditorState();
+  if (!activeVariantId) return null;
+  return <p role="note" data-testid="base-design-notice" className="mb-3 rounded-lg border border-warn-line bg-warn-bg px-2.5 py-2 text-[11.5px] leading-snug text-warn-ink">{t("variantBaseNotice")}</p>;
+}
