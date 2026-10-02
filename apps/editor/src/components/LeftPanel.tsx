@@ -8,8 +8,9 @@ import { VariantsPanel } from "../panels/VariantsPanel";
 export function LeftPanel() {
   return (
     <>
-      <KdpPanel />      <BackgroundPanel />
+      <BackgroundPanel />
       <CanvasPanel />
+      <KdpPanel />
       <LayersPanel />
       <VariantsPanel />
     </>
