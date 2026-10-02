@@ -12,6 +12,9 @@ const positiveIn = finite.positive().max(MAX_CANVAS_IN);
 export const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "color #rrggbb");
 export const assetRefSchema = z.object({ assetId: z.string().min(1) }).strict();
 export const backgroundSchema = z.union([assetRefSchema, colorSchema]);
+// Encuadre del fondo: modo de ajuste y posición (0..1, como background-position).
+export const backgroundFitSchema = z.enum(["cover", "contain", "fill"]);
+export const backgroundPosSchema = z.object({ x: finite.min(0).max(1), y: finite.min(0).max(1) }).strict();
 
 const elementBase = {
   id: z.string().min(1),
@@ -122,7 +125,14 @@ export const projectSchema = z
     mode: z.enum(["kdp-paperback", "digital", "freeform"]),
     printSetup: printSetupSchema.optional(),
     canvas: z
-      .object({ widthIn: positiveIn, heightIn: positiveIn, background: backgroundSchema })
+      .object({
+        widthIn: positiveIn,
+        heightIn: positiveIn,
+        background: backgroundSchema,
+        // Opcionales para no invalidar proyectos guardados; por defecto cover y centrado.
+        backgroundFit: backgroundFitSchema.optional(),
+        backgroundPos: backgroundPosSchema.optional(),
+      })
       .strict(),
     digitalTargets: z.array(digitalTargetSchema).optional(),
     elements: z.array(elementSchema),

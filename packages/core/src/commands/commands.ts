@@ -1,3 +1,4 @@
+import { applyResizePolicy, type ResizePolicy, type ResizeTargets } from "../geometry/resize.js";
 import { projectSchema, type Asset, type Element, type ImageElement, type Project, type ShapeElement, type TextElement } from "../schema/project.js";
 
 // Campos que un updateElement no puede tocar: identidad, tipo y orden de apilado.
@@ -16,6 +17,10 @@ export type Command =
   | { type: "reorderElement"; id: string; toIndex: number }
   | { type: "setCanvas"; widthIn: number; heightIn: number }
   | { type: "setBackground"; background: Project["canvas"]["background"] }
+  // Encuadre del fondo: modo de ajuste y/o posición (0..1).
+  | { type: "setBackgroundLayout"; fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number } }
+  // Cambia el tamaño aplicando la política a los objetivos, en un solo paso atómico (un único deshacer).
+  | { type: "resizeCanvas"; widthIn: number; heightIn: number; policy: ResizePolicy; targets: ResizeTargets }
   | { type: "addAsset"; asset: Asset }
   | { type: "removeAsset"; id: string };
 
@@ -74,6 +79,17 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
       return { ...doc, canvas: { ...doc.canvas, widthIn: cmd.widthIn, heightIn: cmd.heightIn } };
     case "setBackground":
       return { ...doc, canvas: { ...doc.canvas, background: cmd.background } };
+    case "setBackgroundLayout": {
+      const canvas = { ...doc.canvas };
+      if (cmd.fit !== undefined) canvas.backgroundFit = cmd.fit;
+      if (cmd.pos !== undefined) canvas.backgroundPos = cmd.pos;
+      return { ...doc, canvas };
+    }
+    case "resizeCanvas": {
+      const r = applyResizePolicy(doc, cmd.widthIn, cmd.heightIn, cmd.policy, cmd.targets);
+      if (!r.ok) return notFound(r.missingId);
+      return { ...doc, canvas: r.canvas, elements: r.elements };
+    }
     case "addAsset":
       return { ...doc, assets: [...doc.assets, cmd.asset] };
     case "removeAsset": {
