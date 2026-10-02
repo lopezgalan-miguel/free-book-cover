@@ -6,7 +6,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "spike": "tsx src/preflight/spike.ts",
-    "start": "tsx src/main.ts"
+    "start": "tsx src/main.ts",
+    "mcp": "tsx src/mcp/main.ts"
   },
   "dependencies": {
     "@free-book-cover/core": "workspace:*",

@@ -4,8 +4,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { attachBridge, type Bridge, type BridgeOptions } from "./bridge.js";
 import { runPreflight, type PreflightResult } from "../preflight/pipeline.js";
-
-export const COMPANION_VERSION = "0.1.0";
+import { COMPANION_VERSION } from "../version.js";
+export { COMPANION_VERSION };
 export const DEFAULT_PORT = 47321;
 /** Máximo del PNG de entrada (50 MP sin comprimir caben de sobra). */
 export const MAX_BODY_BYTES = 400 * 1024 * 1024;
