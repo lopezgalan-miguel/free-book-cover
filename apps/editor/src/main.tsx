@@ -16,7 +16,13 @@ const store = createEditorStore({
 });
 
 // Gancho solo para pruebas e2e con el servidor de desarrollo.
-if (import.meta.env.DEV) (window as unknown as { __editorStore: typeof store }).__editorStore = store;
+if (import.meta.env.DEV) {
+  (window as unknown as { __editorStore: typeof store }).__editorStore = store;
+  // Herramientas de render para las pruebas e2e (vista previa frente a exportación).
+  void Promise.all([import("@free-book-cover/core"), import("./canvas/paint"), import("./canvas/measure")]).then(([core, paint, measure]) => {
+    (window as unknown as { __coverTools: unknown }).__coverTools = { renderDocument: core.renderDocument, paintDocument: paint.paintDocument, measure: measure.browserMeasure() };
+  });
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -31,7 +31,7 @@ export function Notices() {
   // Aviso de ppp efectivos < 300 con el elemento afectado (SDD R-03).
   const low = dpiReport(doc).filter((d) => d.lowDpi).map((d) => {
     const el = doc.elements.find((e) => e.id === d.id);
-    const asset = doc.assets.find((a) => a.id === (el?.type === "image" ? el.assetRef.assetId : typeof doc.canvas.background === "object" ? doc.canvas.background.assetId : ""));
+    const asset = doc.assets.find((a) => a.id === (el?.type === "image" ? el.assetRef.assetId : el?.type === "text" ? (el.texture?.assetId ?? "") : typeof doc.canvas.background === "object" ? doc.canvas.background.assetId : ""));
     const name = d.id === "background" ? t("backgroundName") : typeof asset?.metadata.name === "string" ? asset.metadata.name : t("imageLayer");
     return { id: d.id, text: t("dpiLow", { name, dpi: Math.round(d.dpi) }) };
   });
