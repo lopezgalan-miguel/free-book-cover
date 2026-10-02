@@ -18,6 +18,8 @@ export type Command =
   | { type: "removeElement"; id: string }
   // toIndex: posición en la pila de apilado (0 = fondo), acotada a [0, n-1].
   | { type: "reorderElement"; id: string; toIndex: number }
+  // Nombre del proyecto (se usa en los archivos exportados y en la lista de proyectos).
+  | { type: "setName"; name: string }
   | { type: "setCanvas"; widthIn: number; heightIn: number }
   // fit/pos opcionales: fijan el encuadre en el mismo paso atómico (un solo comando, una revisión).
   | { type: "setBackground"; background: Project["canvas"]["background"]; fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number } }
@@ -48,6 +50,7 @@ export type CommandResult = { ok: true; doc: Project } | { ok: false; error: Com
 const invalid = (...issues: string[]): CommandResult => ({ ok: false, error: { kind: "invalid", issues } });
 const notFound = (id: string): CommandResult => ({ ok: false, error: { kind: "not_found", id } });
 
+export const MAX_NAME_LENGTH = 120;
 const FORBIDDEN = new Set<string>(["id", "type", "zIndex"]);
 
 function stripUndefined<T extends object>(o: T): T {
@@ -102,6 +105,9 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
       const z = new Map(stack.map((e, i) => [e.id, i]));
       return { ...doc, elements: doc.elements.map((e) => ({ ...e, zIndex: z.get(e.id)! })) };
     }
+    case "setName":
+      if (cmd.name.trim().length > MAX_NAME_LENGTH) return invalid(`name: máximo ${MAX_NAME_LENGTH} caracteres`);
+      return { ...doc, name: cmd.name.trim() };
     case "setCanvas":
       return { ...doc, canvas: { ...doc.canvas, widthIn: cmd.widthIn, heightIn: cmd.heightIn } };
     case "setBackground": {

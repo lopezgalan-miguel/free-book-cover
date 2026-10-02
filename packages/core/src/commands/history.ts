@@ -12,7 +12,18 @@ export interface History {
   readonly present: Project;
   readonly future: readonly Project[];
   readonly limit: number;
+  // Último paso fusionable (gesto continuo): clave y marca de tiempo. Deshacer/rehacer y cualquier
+  // otro comando lo anulan.
+  readonly merge?: { readonly key: string; readonly at: number };
 }
+
+// Fusión de comandos consecutivos de un mismo gesto (teclas, selector de color) en un único paso.
+export interface MergeOptions {
+  key: string;
+  at: number;
+  windowMs?: number;
+}
+export const DEFAULT_MERGE_WINDOW_MS = 1000;
 
 export type HistoryResult = { ok: true; history: History } | { ok: false; error: CommandError };
 
@@ -25,11 +36,24 @@ export function createHistory(doc: Project, limit: number = DEFAULT_HISTORY_LIMI
 export const canUndo = (h: History): boolean => h.past.length > 0;
 export const canRedo = (h: History): boolean => h.future.length > 0;
 
-export function execute(h: History, cmd: Command, expectedRevision: number): HistoryResult {
+export function execute(h: History, cmd: Command, expectedRevision: number, merge?: MergeOptions): HistoryResult {
   const r = applyCommand(h.present, cmd, expectedRevision);
   if (!r.ok) return r;
+  const mark = merge ? { merge: { key: merge.key, at: merge.at } } : {};
+  const window = merge?.windowMs ?? DEFAULT_MERGE_WINDOW_MS;
+  // Mismo gesto: el documento candidato ya está validado; el paso anterior del historial se conserva.
+  if (merge && h.merge && h.merge.key === merge.key && h.past.length > 0 && merge.at - h.merge.at <= window) {
+    return { ok: true, history: { past: h.past, present: r.doc, future: [], limit: h.limit, ...mark } };
+  }
   const past = [...h.past, h.present].slice(-h.limit);
-  return { ok: true, history: { past, present: r.doc, future: [], limit: h.limit } };
+  return { ok: true, history: { past, present: r.doc, future: [], limit: h.limit, ...mark } };
+}
+
+// Cierra el gesto en curso: el siguiente comando abre un paso nuevo.
+export function endMerge(h: History): History {
+  if (!h.merge) return h;
+  const { merge: _m, ...rest } = h;
+  return rest;
 }
 
 function conflict(h: History, expected: number | undefined): HistoryResult | null {
