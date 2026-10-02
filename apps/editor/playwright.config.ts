@@ -7,7 +7,16 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: { baseURL: "http://localhost:5199", viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+  projects: [
+    // Escritorio: todas las pruebas.
+    { name: "chromium", use: { browserName: "chromium" } },
+    // Móvil (390 × 844, táctil): solo los flujos que existen en ambos diseños.
+    {
+      name: "mobile",
+      testMatch: /(flows|a11y)\.spec\.ts$/,
+      use: { browserName: "chromium", viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 },
+    },
+  ],
   webServer: [
     { command: "pnpm exec vite --port 5199 --strictPort", url: "http://localhost:5199", reuseExistingServer: false, timeout: 60_000 },
     // Companion real (Paso 7): origen del editor de pruebas y token fijo. Requiere gs, poppler y qpdf instalados.
