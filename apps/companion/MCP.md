@@ -11,6 +11,7 @@ cliente MCP ──stdio──> proceso MCP (src/mcp/main.ts) ──WebSocket /ws
 - **Proceso MCP** (`pnpm --silent --dir apps/companion mcp`): lo lanza el cliente MCP por stdio. stdout es solo del protocolo; los avisos van a stderr. Es un cliente del companion que ya está en marcha (`pnpm --filter @free-book-cover/companion start`); conecta bajo demanda y reconecta en la llamada siguiente.
 - **Companion**: el servidor HTTP del Paso 7 ahora acepta WebSocket en `/ws/editor` y `/ws/mcp`. Solo reenvía; no modifica documentos.
 - **Editor**: ejecuta cada llamada con los comandos de `core`. Es la única vía de mutación, con deshacer/rehacer y persistencia.
+- `zod` figura en `apps/companion/package.json` aunque el código del companion no lo importa: el SDK MCP lo exige como dependencia par (`peerDependencies: zod ^3.25 || ^4`) y pnpm, al ser estricto, no lo resuelve si no está declarado en el paquete que usa el SDK. Se mantiene por eso y debe seguir en un rango compatible con el de `packages/core`.
 - Los esquemas (zod), los errores y los mensajes del canal viven en `packages/core/src/mcp/protocol.ts` y los comparten companion y editor.
 
 ## Versión del protocolo

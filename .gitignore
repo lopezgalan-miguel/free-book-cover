@@ -6,3 +6,5 @@ coverage/
 apps/companion/test/out/
 test-results/
 playwright-report/
+.superpowers/
+blob-report/

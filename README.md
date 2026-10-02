@@ -35,6 +35,12 @@ En el editor, *Exportar → PDF* pide la dirección (`http://127.0.0.1:47321`) y
 
 En móvil (menos de 768 px de ancho) el editor muestra barra superior, lienzo, pestañas Texto/Fuente/Color/Estilo/Lienzo y una hoja inferior con los mismos paneles. La exportación PDF KDP sigue necesitando el companion (que corre en tu ordenador), por lo que en el móvil queda deshabilitada y explicada hasta que se conecte uno; PNG, JPEG y WebP funcionan siempre.
 
+## Guardado y proyectos
+
+- El editor autoguarda en IndexedDB tras una pausa de unos segundos y avisa al cerrar o recargar si quedan cambios sin guardar; *Guardar* sigue disponible.
+- El botón con el nombre del proyecto (cabecera de escritorio y barra móvil) abre el diálogo de proyecto: renombrar, crear uno nuevo, abrir o borrar otros guardados, descargar e **importar copias de seguridad** (todas las partes juntas) y **liberar espacio** (quita los recursos sin uso tras confirmar y vacía el historial de deshacer). Los blobs que ningún paso del historial referencia se purgan solos al guardar y al abrir.
+- Los cambios continuos (escribir, arrastrar el selector de color) cuentan como un solo paso de deshacer.
+
 ## Tests
 
 Desde la raíz:
@@ -58,6 +64,7 @@ Lo siguiente no se puede automatizar y sigue **sin comprobar**:
 
 1. **Código de barras y pliegue frente a la plantilla oficial de KDP**: lomo ± 0,0125 in con el calculador de cubiertas, posición real del código de barras y zona segura junto al pliegue (`packages/core/src/kdp/VERIFICACION.md`, `sources.md`).
 2. **Inspector MCP y segundo cliente MCP real** (MCP Inspector y Claude Code o similar): pasos en `apps/companion/MCP.md`, sección «Verificación manual».
-3. **Valores de los preajustes de redes** (Instagram, Facebook): se fijaron sin contrastar en línea con cada plataforma (`packages/core/src/presets/sources.md`).
+3. **Valores de los preajustes de redes** (Instagram, Facebook): se fijaron sin contrastar en línea con cada plataforma (`packages/core/src/presets/sources.md`). Incluye confirmar con Meta si el vertical de feed de Instagram es 1080 × 1440 (3:4), que no está en el catálogo.
 4. **Subida de la muestra al previsualizador de KDP** con tu cuenta: `samples/SAMPLE.md` (lista de comprobación).
-5. Probar el editor en un **móvil real** (memoria con imágenes de 80 Mpx, gestos táctiles sobre el lienzo, lectores de pantalla): ver `apps/editor/PERFORMANCE.md` y `ACCESSIBILITY.md`.
+5. **Decisión pendiente de producto: fuentes por CDN (Google Fonts).** `apps/editor/index.html` carga la tipografía de la interfaz y el catálogo de fuentes desde Google Fonts. Esto contradice «los archivos permanecen en el dispositivo» (SDD §6): se envía la IP y el uso a un tercero (riesgo de privacidad, relevante en la UE), el editor no renderiza el texto del catálogo sin red, la exportación depende de un tercero y fuerza el render del PDF en el hilo principal. Opciones: autoalojar las fuentes (p. ej. con fontsource) o mantenerlo y declararlo en la política de privacidad. No se ha cambiado nada hasta que se decida.
+6. Probar el editor en un **móvil real** (memoria con imágenes de 80 Mpx, gestos táctiles sobre el lienzo, lectores de pantalla): ver `apps/editor/PERFORMANCE.md` y `ACCESSIBILITY.md`.

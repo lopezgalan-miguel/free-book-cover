@@ -15,6 +15,11 @@ fuente. Contrastarlos antes de cada versión; si cambian, se sube `version` del 
 | `facebook-vertical` | 1080 × 1920 | 9:16 | PNG, JPEG, WebP | Guía de Facebook: historias (solo imagen estática) |
 | `custom` | libre | libre | PNG, JPEG, WebP | Tamaño propio del usuario (1–30000 px por lado) |
 
+Pendiente de contrastar con Meta: `packages/core/src/kdp/sources.md` menciona un vertical de feed de Instagram
+de 1080 × 1440 (3:4, nativo desde 2025). **No está en el catálogo** porque no se ha confirmado con la
+documentación de la plataforma; hasta entonces no se añade el preajuste `instagram-feed-3x4`. Si se confirma,
+se añade como v1 sin tocar los demás ni las variantes guardadas.
+
 Notas:
 - Instagram solo se ofrece en PNG y JPEG (formatos que admite al subir); Facebook admite también WebP.
 - La exportación está limitada a 50 megapíxeles por imagen (SDD §6), independiente de la plataforma.

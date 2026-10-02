@@ -15,7 +15,8 @@ export interface DigitalPreset {
   formats: readonly ExportFormat[];
   // Versión del propio preajuste: sube cuando cambian sus valores.
   version: number;
-  // Fecha (AAAA-MM-DD) en que se contrastó con la documentación de la plataforma.
+  // Fecha (AAAA-MM-DD) en que el valor se fijó en el catálogo. No acredita una verificación contra la
+  // documentación oficial de la plataforma (ver sources.md).
   reviewedAt: string;
 }
 
