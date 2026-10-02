@@ -131,6 +131,19 @@ export class CoverScene {
     return obj;
   }
 
+  // Sincroniza la selección sin reconstruir (reconstruir en pleno gesto perdería el arrastre).
+  setSelection(id: string | null): void {
+    const c = this.canvas;
+    const current = c.getActiveObject();
+    if ((current ? this.tracked.get(current)?.id : null) === (id ?? undefined) || (!current && id === null)) return;
+    this.rebuilding = true;
+    const target = id ? c.getObjects().find((o) => this.tracked.get(o)?.id === id) : undefined;
+    if (target) c.setActiveObject(target);
+    else c.discardActiveObject();
+    this.rebuilding = false;
+    c.requestRenderAll();
+  }
+
   // Reconstruye los objetos desde la composición. Barato para pocos elementos y evita estados divergentes.
   render(doc: Project, r: RenderedDocument, sources: ImageSources, selectedId: string | null, size: { width: number; height: number }): void {
     this.rebuilding = true;

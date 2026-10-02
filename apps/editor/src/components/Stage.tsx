@@ -78,8 +78,13 @@ export function Stage() {
   useEffect(() => {
     if (!scene) return;
     const r = renderDocument(doc, { pxPerInch });
-    scene.render(doc, r, sources, selectedId, { width: Math.round(r.widthPx), height: Math.round(r.heightPx) });
-  }, [scene, doc, pxPerInch, sources, selectedId]);
+    scene.render(doc, r, sources, store.getState().selectedId, { width: Math.round(r.widthPx), height: Math.round(r.heightPx) });
+  }, [scene, doc, pxPerInch, sources, store]);
+
+  // Cambiar la selección no reconstruye la escena.
+  useEffect(() => {
+    scene?.setSelection(selectedId);
+  }, [scene, selectedId, doc, pxPerInch, sources]);
 
   // La selección solo es válida si el elemento sigue existiendo (borrado o deshacer).
   useEffect(() => {

@@ -51,6 +51,7 @@ export async function importImage(
       widthPx: header.widthPx,
       heightPx: header.heightPx,
       format: header.format,
+      ...(header.orientation ? { orientation: header.orientation } : {}),
       sizeBytes: file.size,
       ...("name" in file && typeof file.name === "string" ? { name: file.name } : {}),
     },

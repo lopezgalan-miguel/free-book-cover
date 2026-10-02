@@ -1,4 +1,5 @@
-import { dpiReport, type Element, type ImageElement, type TextElement } from "@free-book-cover/core";
+import { cachedDpiReport as dpiReport } from "./dpiCache";
+import { type Element, type ImageElement, type TextElement } from "@free-book-cover/core";
 import { useRef } from "react";
 import { useAssetUrl } from "../canvas/useImageSources";
 import { importImage } from "../images/importImage";

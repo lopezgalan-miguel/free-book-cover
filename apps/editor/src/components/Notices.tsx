@@ -1,4 +1,4 @@
-import { dpiReport } from "@free-book-cover/core";
+import { cachedDpiReport as dpiReport } from "../panels/dpiCache";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";

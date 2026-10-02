@@ -155,3 +155,22 @@ describe("capas y alternativa numérica", () => {
     expect(screen.getByRole("button", { name: "Aplica la mida" })).toBeInTheDocument();
   });
 });
+
+describe("foco en la alternativa numérica", () => {
+  it("Enter y Tab confirman sin perder el foco ni remontar el campo", async () => {
+    const user = userEvent.setup();
+    const store = await mount();
+    await importImage(store, png(600, 900), "layer", noThumb);
+    const x = await screen.findByLabelText("X (in)");
+    await user.clear(x);
+    await user.type(x, "2{Enter}");
+    expect(store.getState().history.present.elements[0]).toMatchObject({ x: 2 });
+    expect(screen.getByLabelText("X (in)")).toBe(x); // mismo nodo: no se remontó
+    expect(x).toHaveFocus();
+    await user.clear(x);
+    await user.type(x, "3");
+    await user.tab();
+    expect(store.getState().history.present.elements[0]).toMatchObject({ x: 3 });
+    expect(screen.getByLabelText("Y (in)")).toHaveFocus();
+  });
+});

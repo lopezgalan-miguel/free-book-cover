@@ -1,4 +1,5 @@
-import { dpiReport } from "@free-book-cover/core";
+import type { ElementPatch } from "@free-book-cover/core";
+import { cachedDpiReport as dpiReport } from "./dpiCache";
 import { useI18n } from "../i18n";
 import { useEditorState, useStore } from "../store/react";
 import { NumberField, Section, fieldCls } from "./ui";
@@ -18,14 +19,14 @@ export function GeometryPanel() {
       </>
     );
   }
-  const set = (props: Record<string, unknown>) => store.dispatch({ type: "updateElement", id: el.id, props } as never);
+  const set = (props: ElementPatch) => store.dispatch({ type: "updateElement", id: el.id, props });
   const dpi = el.type === "image" ? dpiReport(doc).find((d) => d.id === el.id) : undefined;
   const pct = (v: number) => v * 100;
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
   return (
-    // key: al cambiar de elemento o de revisión se descartan borradores obsoletos.
-    <section key={`${el.id}:${doc.revision}`} aria-label={t("geometry")}>
+    // key solo por elemento: remontar tras cada commit perdería el foco del teclado.
+    <section key={el.id} aria-label={t("geometry")}>
       <h2 className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-[.11em] text-muted">{t("geometry")}</h2>
       <div className="flex gap-2">
         <NumberField label={t("posX")} value={el.x} step={0.01} onCommit={(x) => set({ x })} />
@@ -50,7 +51,7 @@ export function GeometryPanel() {
             <NumberField label={t("cropH")} value={pct(el.crop.height)} min={1} max={100} digits={1} onCommit={(v) => set({ crop: { ...el.crop, height: clamp(v, 1, pct(1 - el.crop.y)) / 100 } })} />
           </div>
           <label className="mt-3 block text-[10px] text-muted" htmlFor="fit-mode">{t("fitMode")}</label>
-          <select id="fit-mode" className={`${fieldCls} mt-1`} value={el.fit} onChange={(e) => set({ fit: e.target.value })}>
+          <select id="fit-mode" className={`${fieldCls} mt-1`} value={el.fit} onChange={(e) => set({ fit: e.target.value as "cover" | "contain" | "fill" })}>
             <option value="cover">{t("fitCover")}</option>
             <option value="contain">{t("fitContain")}</option>
             <option value="fill">{t("fitFill")}</option>

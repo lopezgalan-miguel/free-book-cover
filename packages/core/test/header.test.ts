@@ -52,3 +52,28 @@ describe("preajustes", () => {
     expect(new Set(CANVAS_PRESETS.map((p) => p.id)).size).toBe(CANVAS_PRESETS.length);
   });
 });
+
+describe("orientación EXIF en JPEG", () => {
+  const u16 = (n: number, le: boolean) => (le ? [n & 255, n >> 8] : [n >> 8, n & 255]);
+  // JPEG con APP1 Exif (una entrada de orientación) y SOF0 de w x h almacenados.
+  const jpegExif = (w: number, h: number, orientation: number, le = true) => {
+    const tiff = [...(le ? [0x49, 0x49] : [0x4d, 0x4d]), ...u16(42, le), ...(le ? [8, 0, 0, 0] : [0, 0, 0, 8]), ...u16(1, le), ...u16(0x0112, le), ...u16(3, le), ...(le ? [1, 0, 0, 0] : [0, 0, 0, 1]), ...u16(orientation, le), 0, 0, 0, 0, 0, 0];
+    const app1 = [...ascii("Exif"), 0, 0, ...tiff];
+    const len = app1.length + 2;
+    return new Uint8Array([0xff, 0xd8, 0xff, 0xe1, len >> 8, len & 255, ...app1, 0xff, 0xc0, 0, 11, 8, h >> 8, h & 255, w >> 8, w & 255, 1, 1, 0x11, 0]);
+  };
+  it("orientaciones 1-4 mantienen las dimensiones; 5-8 las permutan", () => {
+    for (const o of [1, 2, 3, 4]) expect(readImageHeader(jpegExif(4000, 3000, o))).toMatchObject({ widthPx: 4000, heightPx: 3000 });
+    for (const o of [5, 6, 7, 8]) expect(readImageHeader(jpegExif(4000, 3000, o))).toMatchObject({ widthPx: 3000, heightPx: 4000, orientation: o });
+  });
+  it("lee ambos órdenes de bytes y la orientación 1 no añade campo", () => {
+    expect(readImageHeader(jpegExif(400, 300, 6, false))).toMatchObject({ widthPx: 300, heightPx: 400 });
+    expect(readImageHeader(jpegExif(400, 300, 1))).not.toHaveProperty("orientation");
+  });
+  it("Exif corrupto o valores fuera de rango se ignoran", () => {
+    expect(readImageHeader(jpegExif(400, 300, 9))).toMatchObject({ widthPx: 400, heightPx: 300 });
+    const bad = jpegExif(400, 300, 6);
+    bad[12] = 0x58; // cabecera TIFF inválida
+    expect(readImageHeader(bad)).toMatchObject({ widthPx: 400, heightPx: 300 });
+  });
+});

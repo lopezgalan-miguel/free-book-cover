@@ -146,3 +146,24 @@ test("el fondo guardado se recupera tras recargar", async ({ page }) => {
   await expect.poll(async () => near(await pixel(page, 0.25, 0.25), RED)).toBe(true);
   expect(near(await pixel(page, 0.75, 0.75), YELLOW)).toBe(true);
 });
+
+test("un solo gesto de clic y arrastre sobre un elemento no seleccionado lo selecciona y lo mueve", async ({ page }) => {
+  await page.getByTestId("layer-image-input").setInputFiles({ name: "capa.png", mimeType: "image/png", buffer: quadrants(300, 300) });
+  await expect.poll(async () => (await doc(page)).elements.length).toBe(1);
+  const before = (await doc(page)).elements[0];
+  const b = await canvasBox(page);
+  const ppi = b.width / 6;
+  // Clic en una esquina vacía: deselecciona.
+  await page.mouse.click(b.x + 4, b.y + 4);
+  await expect.poll(() => page.evaluate(() => (window as any).__editorStore.getState().selectedId)).toBeNull();
+  const cx = b.x + (before.x + before.width / 2) * ppi, cy = b.y + (before.y + before.height / 2) * ppi;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 50, cy + 20, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await doc(page)).elements[0].x).toBeGreaterThan(before.x + 0.1);
+  const after = (await doc(page)).elements[0];
+  expect(after.x - before.x).toBeCloseTo(50 / ppi, 1);
+  expect(after.y - before.y).toBeCloseTo(20 / ppi, 1);
+  expect(await page.evaluate(() => (window as any).__editorStore.getState().selectedId)).toBe(after.id);
+});

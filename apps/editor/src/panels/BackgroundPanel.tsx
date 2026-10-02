@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { dpiReport } from "@free-book-cover/core";
+import { cachedDpiReport as dpiReport } from "./dpiCache";
 import { useAssetUrl } from "../canvas/useImageSources";
 import { importImage } from "../images/importImage";
 import { useI18n } from "../i18n";
