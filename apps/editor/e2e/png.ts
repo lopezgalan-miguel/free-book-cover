@@ -78,3 +78,29 @@ export function decodePng(buf: Buffer): { width: number; height: number; px: (x:
     },
   };
 }
+
+// PNG RGB grande para las pruebas de rendimiento: el color solo depende de la fila, así comprime muy bien
+// y se genera sin construir la imagen entera como matriz de píxeles.
+export function makeBandedPng(w: number, h: number): Buffer {
+  const stride = w * 3 + 1;
+  const raw = Buffer.alloc(stride * h);
+  for (let y = 0; y < h; y++) {
+    const o = y * stride;
+    const v = (y * 255) / h;
+    raw[o] = 0;
+    raw.fill(Buffer.from([40 + v / 2, 80 + v / 3, 160 - v / 2]), o + 1, o + stride);
+  }
+  const chunk = (type: string, data: Buffer) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw, { level: 1 })), chunk("IEND", Buffer.alloc(0))]);
+}
