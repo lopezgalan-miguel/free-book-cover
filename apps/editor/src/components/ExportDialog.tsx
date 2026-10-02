@@ -225,7 +225,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
           </button>
           {!pdfOn && <button
             onClick={() => void doExport()} disabled={busy || !limit.ok}
-            className="flex-1 rounded-[9px] bg-accent p-[11px] text-[13.5px] font-semibold text-white enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 rounded-[9px] bg-accent p-[11px] text-[13.5px] font-semibold text-on-accent enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? t("exExporting") : `${t("download")} ${FORMAT_LABEL[effFormat]}`}
           </button>}

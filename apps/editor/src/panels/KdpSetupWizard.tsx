@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   PAPERS, SUPPORTED_TRIMS, elementsOutsideCanvas, kdpLayout, validatePrintSetup, type PrintSetup, type SetupIssue,
 } from "@free-book-cover/core";
@@ -34,12 +34,28 @@ export function KdpSetupWizard() {
   const { history } = useEditorState();
   const current = history.present.printSetup;
   const uid = useId();
-  const [trim, setTrim] = useState(current ? (SUPPORTED_TRIMS.some((s) => s.widthIn === current.trimWidthIn && s.heightIn === current.trimHeightIn) ? trimKey(current.trimWidthIn, current.trimHeightIn) : CUSTOM) : "6x9");
+  const trimOf = (c: PrintSetup | undefined) =>
+    c ? (SUPPORTED_TRIMS.some((s) => s.widthIn === c.trimWidthIn && s.heightIn === c.trimHeightIn) ? trimKey(c.trimWidthIn, c.trimHeightIn) : CUSTOM) : "6x9";
+  const [trim, setTrim] = useState(trimOf(current));
   const [cw, setCw] = useState(String(current?.trimWidthIn ?? 6));
   const [ch, setCh] = useState(String(current?.trimHeightIn ?? 9));
   const [pages, setPages] = useState(String(current?.pageCount ?? 100));
   const [paper, setPaper] = useState(current?.paperAndInk ?? "bw-white");
   const [message, setMessage] = useState<string | null>(null);
+
+  // El formulario sigue al documento: deshacer, rehacer o abrir otro proyecto actualizan los campos.
+  const projectId = history.present.id;
+  useEffect(() => {
+    setTrim(trimOf(current));
+    setCw(String(current?.trimWidthIn ?? 6));
+    setCh(String(current?.trimHeightIn ?? 9));
+    setPages(String(current?.pageCount ?? 100));
+    setPaper(current?.paperAndInk ?? "bw-white");
+    if (!current) setMessage(null);
+    // trimOf solo depende de SUPPORTED_TRIMS (constante)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, current?.trimWidthIn, current?.trimHeightIn, current?.pageCount, current?.paperAndInk]);
+  useEffect(() => setMessage(null), [projectId]);
 
   const dims = trim === CUSTOM ? { w: Number(cw), h: Number(ch) } : { w: Number(trim.split("x")[0]), h: Number(trim.split("x")[1]) };
   const setup: PrintSetup = {
@@ -96,12 +112,14 @@ export function KdpSetupWizard() {
         </ul>
       )}
       {layout && (
-        <dl data-testid="kdp-summary" className="space-y-0.5 rounded-lg border border-line-soft bg-white p-2 font-mono text-[11px]">
-          <div className="flex justify-between"><dt>{t("kdpSpine")}</dt><dd>{fmt(layout.spineIn)} in · {fmt(layout.spineIn * MM_PER_IN, 2)} mm</dd></div>
-          <div className="flex justify-between"><dt>{t("kdpTotalSize")}</dt><dd>{fmt(layout.widthIn)} × {fmt(layout.heightIn)} in</dd></div>
+        <div data-testid="kdp-summary" className="space-y-0.5 rounded-lg border border-line-soft bg-white p-2 font-mono text-[11px]">
+          <dl className="space-y-0.5">
+            <div className="flex justify-between"><dt>{t("kdpSpine")}</dt><dd>{fmt(layout.spineIn)} in · {fmt(layout.spineIn * MM_PER_IN, 2)} mm</dd></div>
+            <div className="flex justify-between"><dt>{t("kdpTotalSize")}</dt><dd>{fmt(layout.widthIn)} × {fmt(layout.heightIn)} in</dd></div>
+          </dl>
           <p className="pt-1 font-sans text-[10.5px] leading-snug text-muted">{t("kdpBleedNote")} {t("kdpZones")}.</p>
           <p className="font-sans text-[10.5px] leading-snug text-muted">{layout.spineTextAllowed ? t("kdpSpineTextOk") : t("kdpSpineTextNo")}</p>
-        </dl>
+        </div>
       )}
       <button type="submit" className={`${chipBtn} w-full`} disabled={!result.ok}>{t("kdpApply")}</button>
       {message && <p role="status" className="text-[11px] text-muted">{message}</p>}

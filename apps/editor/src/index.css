@@ -7,9 +7,10 @@
   --color-line: #e7e2d8;
   --color-line-soft: #eee7db;
   --color-accent: #a98a5f;
-  --color-accent-dark: #8c6f47;
+  --color-accent-dark: #7a6038;  /* mockup #8c6f47: 4,42:1 sobre panel; ajustado a AA */
+  --color-on-accent: #2b2824;
   --color-ink: #2b2824;
-  --color-muted: #a49b8c;
+  --color-muted: #6b6458;  /* mockup #a49b8c: 2,59:1; ajustado a AA */
   --color-stage: #26231d;
   --color-stage-stone: #3a362e;
   --color-stage-linen: #5a5346;
@@ -17,7 +18,7 @@
   --color-field: #e0d8c8;
   --color-dash: #d5cdbb;
   --color-card: #fbf9f4;
-  --color-faint: #c4bcac;
+  --color-faint: #736c5f;  /* mockup #c4bcac: 1,89:1; ajustado a AA */
   --color-paper: #f4efe6;
   --color-danger: #b4453a;
   --color-danger-ink: #7a2e26;
@@ -27,7 +28,7 @@
   --color-warn-ink: #8a5a14;
   --color-warn-bg: #fbf1dc;
   --color-warn-line: #ecd9ab;
-  --color-subtle: #8c8578;
+  --color-subtle: #5e584d;  /* mockup #8c8578: 3,45:1; ajustado a AA */
   --color-switch-off: #d8d0c0;
   --color-line-chip: #e6ddcc;
   --color-chip-on: #f4ecdd;

@@ -45,6 +45,8 @@ export interface McpBridge {
   /** El usuario autoriza explícitamente el proyecto abierto. */
   authorize(): void;
   revoke(): void;
+  /** Vuelve a suscribirse al almacén (idempotente); permite reutilizar el puente tras un dispose (StrictMode). */
+  attach(): void;
   dispose(): void;
 }
 
@@ -91,9 +93,13 @@ export function createMcpBridge(deps: McpBridgeDeps): McpBridge {
   };
 
   // Si el proyecto abierto cambia, la autorización caduca.
-  const unsubscribeStore = store.subscribe(() => {
-    if (snap.authorizedProjectId !== null && store.getState().history.present.id !== snap.authorizedProjectId) bridge.revoke();
-  });
+  let unsubscribeStore: (() => void) | null = null;
+  const attach = () => {
+    unsubscribeStore ??= store.subscribe(() => {
+      if (snap.authorizedProjectId !== null && store.getState().history.present.id !== snap.authorizedProjectId) bridge.revoke();
+    });
+  };
+  attach();
 
   const close = (failure: McpFailure | null, link: McpLink) => {
     const s = socket;
@@ -156,8 +162,10 @@ export function createMcpBridge(deps: McpBridgeDeps): McpBridge {
       send({ type: "authorize", projectId: id });
       set({ authorizedProjectId: id });
     },
+    attach,
     dispose() {
-      unsubscribeStore();
+      unsubscribeStore?.();
+      unsubscribeStore = null;
       close(null, "off");
     },
     revoke() {

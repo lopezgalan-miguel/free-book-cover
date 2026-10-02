@@ -22,7 +22,7 @@ const WEIGHTS = [
 ] as const satisfies ReadonlyArray<readonly [number, DictKey]>;
 const SWATCHES = ["#FFFFFF", "#F4EFE6", "#C2B6A1", "#8C6F47", "#2B2824", "#1A1712", "#B4453A", "#3E5C4B"];
 const HEX = /^[0-9a-fA-F]{6}$/;
-const uploadBtn = "cursor-pointer text-[11px] font-medium text-accent hover:text-accent-dark";
+const uploadBtn = "cursor-pointer text-[11px] font-medium text-accent-dark hover:text-ink";
 
 // Panel de tipografía del elemento de texto seleccionado. Independiente del contenedor: solo usa el almacén.
 // `sections` permite que el contenedor móvil muestre una parte por pestaña con los mismos controles.

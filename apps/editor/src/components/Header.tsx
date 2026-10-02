@@ -87,7 +87,7 @@ export function Header() {
           <button className={iconBtn} onClick={() => void store.save()} disabled={state.status === "saving"}>
             {t("save")}
           </button>
-          <button className="rounded-lg bg-accent px-[18px] py-[9px] text-[13px] font-semibold text-white hover:brightness-110" onClick={() => setExportOpen(true)}>
+          <button className="rounded-lg bg-accent px-[18px] py-[9px] text-[13px] font-semibold text-on-accent hover:brightness-110" onClick={() => setExportOpen(true)}>
             {t("exportBtn")}
           </button>
         </div>

@@ -1,15 +1,20 @@
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { browserMeasure } from "../canvas/measure";
 import { useStore } from "../store/react";
-import { createMcpBridge, type McpBridge, type McpSnapshot } from "./bridge";
+import { createMcpBridge, type McpBridge, type McpBridgeDeps, type McpSnapshot } from "./bridge";
 
 const Ctx = createContext<McpBridge | null>(null);
 
 // `bridge` permite inyectar uno en las pruebas; por defecto se crea con el store y el medidor del navegador.
-export function McpBridgeProvider({ bridge, children }: { bridge?: McpBridge; children: ReactNode }) {
+// Con StrictMode el montaje simulado llama a dispose(); el segundo efecto lo vuelve a suscribir (attach).
+export function McpBridgeProvider({ bridge, createSocket, children }: { bridge?: McpBridge; createSocket?: McpBridgeDeps["createSocket"]; children: ReactNode }) {
   const store = useStore();
-  const own = useMemo(() => bridge ?? createMcpBridge({ store, measure: browserMeasure }), [bridge, store]);
-  useEffect(() => (bridge ? undefined : () => own.dispose()), [bridge, own]);
+  const own = useMemo(() => bridge ?? createMcpBridge({ store, measure: browserMeasure, ...(createSocket ? { createSocket } : {}) }), [bridge, store, createSocket]);
+  useEffect(() => {
+    if (bridge) return;
+    own.attach();
+    return () => own.dispose();
+  }, [bridge, own]);
   return <Ctx.Provider value={own}>{children}</Ctx.Provider>;
 }
 

@@ -95,7 +95,7 @@ export function PdfExportPanel({ conn, doc }: { conn: CompanionConnection; doc: 
     <div className="mt-4" data-testid="pdf-panel">
       <button
         onClick={() => void run()} disabled={busy}
-        className="w-full rounded-[9px] bg-accent p-[11px] text-[13.5px] font-semibold text-white enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-[9px] bg-accent p-[11px] text-[13.5px] font-semibold text-on-accent enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? t("pdfRunning") : t("pdfRun")}
       </button>

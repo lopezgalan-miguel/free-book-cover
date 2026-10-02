@@ -80,7 +80,7 @@ function MobileBar({ onExport }: { onExport: () => void }) {
           <div className="truncate text-sm font-semibold leading-none">{t("appName")}</div>
           <div className="mt-0.5 font-mono text-[10px] text-subtle" data-testid="dims">{doc.canvas.widthIn} × {doc.canvas.heightIn} in</div>
         </div>
-        <button type="button" onClick={onExport} className="rounded-lg bg-accent px-3.5 text-[13px] font-semibold text-white">{t("exportBtn")}</button>
+        <button type="button" onClick={onExport} className="rounded-lg bg-accent px-3.5 text-[13px] font-semibold text-on-accent">{t("exportBtn")}</button>
       </div>
       <div className="flex items-center gap-2 border-t border-line-soft px-3 py-1">
         <button type="button" className={barBtn} aria-label={t("undo")} disabled={!store.canUndo()} onClick={() => store.undo()}>↶</button>
