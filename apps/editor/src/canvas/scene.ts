@@ -55,6 +55,9 @@ export class CoverScene {
   private bg: BgContext | null = null;
   private pan: { x: number; y: number; start: Point; pos: Point } | null = null;
   private doc: Project | null = null;
+  // Última composición y recursos: los usan las pruebas e2e para comparar con el pintor 2D.
+  lastRender: RenderedDocument | null = null;
+  lastSources: ImageSources = new Map();
 
   constructor(el: HTMLCanvasElement, private cb: SceneCallbacks) {
     this.canvas = new Canvas(el, { selection: false, preserveObjectStacking: true, renderOnAddRemove: false, uniformScaling: false });
@@ -133,6 +136,8 @@ export class CoverScene {
     this.rebuilding = true;
     const c = this.canvas;
     this.doc = doc;
+    this.lastRender = r;
+    this.lastSources = sources;
     c.discardActiveObject();
     c.remove(...c.getObjects());
     c.setDimensions({ width: size.width, height: size.height });

@@ -4,3 +4,5 @@ coverage/
 .DS_Store
 *.log
 apps/companion/test/out/
+test-results/
+playwright-report/

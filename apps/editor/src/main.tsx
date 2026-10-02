@@ -15,6 +15,9 @@ const store = createEditorStore({
   downloadParts,
 });
 
+// Gancho solo para pruebas e2e con el servidor de desarrollo.
+if (import.meta.env.DEV) (window as unknown as { __editorStore: typeof store }).__editorStore = store;
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <I18nProvider>
