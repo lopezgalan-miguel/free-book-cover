@@ -1,6 +1,7 @@
 import type { Asset, Element, Project } from "../schema/project.js";
 import { CENTER, placeImage, rectCenter, rotatePoint, type FitMode, type Placement, type Point, type Rect } from "../geometry/fit.js";
 import { effectiveDpi, isLowDpi } from "../images/dpi.js";
+import { layoutText, textEffects, type TextEffects, type TextLayout, type TextMeasure } from "../text/layout.js";
 
 // Color tras una imagen de fondo con espacio libre (ajustar) o aún sin decodificar.
 export const BACKGROUND_FALLBACK = "#100e0b";
@@ -8,6 +9,8 @@ export const BACKGROUND_FALLBACK = "#100e0b";
 export interface RenderOptions {
   // Escala de la composición: píxeles por pulgada (300 en exportación, menos en la vista previa).
   pxPerInch: number;
+  // Medidor de texto del entorno (canvas en el navegador). Sin él los bloques de texto salen sin maquetar.
+  measureText?: TextMeasure;
 }
 
 export interface ImageDraw extends Placement {
@@ -30,7 +33,15 @@ interface ItemBase {
 }
 export type RenderItem =
   | (ItemBase & { kind: "image"; draw: ImageDraw | null })
-  | (ItemBase & { kind: "text"; element: Extract<Element, { type: "text" }> })
+  | (ItemBase & {
+      kind: "text";
+      element: Extract<Element, { type: "text" }>;
+      // null si no hay medidor. Coordenadas relativas a la esquina de la caja.
+      layout: TextLayout | null;
+      effects: TextEffects;
+      // Encuadre "cubrir" de la textura sobre la caja (coordenadas relativas a la caja).
+      texture: ImageDraw | null;
+    })
   | (ItemBase & { kind: "shape"; element: Extract<Element, { type: "shape" }> });
 
 export interface RenderedDocument {
@@ -98,7 +109,16 @@ export function renderDocument(doc: Project, opts: RenderOptions): RenderedDocum
           : null;
         return { ...base, kind: "image", draw: imageDraw(dims, e.assetRef.assetId, region, base.box, e.fit, CENTER, ppi) };
       }
-      return e.type === "text" ? { ...base, kind: "text", element: e } : { ...base, kind: "shape", element: e };
+      if (e.type === "text") {
+        const tex = e.texture?.assetId;
+        return {
+          ...base, kind: "text", element: e,
+          layout: opts.measureText ? layoutText(e, ppi, opts.measureText) : null,
+          effects: textEffects(e, ppi),
+          texture: tex ? imageDraw(assetDims(assets.get(tex)), tex, null, { x: 0, y: 0, width: base.box.width, height: base.box.height }, "cover", CENTER, ppi) : null,
+        };
+      }
+      return { ...base, kind: "shape", element: e };
     });
 
   return { widthPx, heightPx, pxPerInch: ppi, background, items };
@@ -123,6 +143,9 @@ export function dpiReport(doc: Project): DpiEntry[] {
   if (r.background.kind === "image" && r.background.draw?.dpi != null) {
     out.push({ id: "background", dpi: r.background.draw.dpi, lowDpi: r.background.draw.lowDpi });
   }
-  for (const it of r.items) if (it.kind === "image" && it.draw?.dpi != null) out.push({ id: it.id, dpi: it.draw.dpi, lowDpi: it.draw.lowDpi });
+  for (const it of r.items) {
+    const d = it.kind === "image" ? it.draw : it.kind === "text" ? it.texture : null;
+    if (d?.dpi != null) out.push({ id: it.id, dpi: d.dpi, lowDpi: d.lowDpi });
+  }
   return out;
 }

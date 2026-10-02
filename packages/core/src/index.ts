@@ -10,3 +10,6 @@ export * from "./render/renderDocument.js";
 export * from "./images/header.js";
 export * from "./images/dpi.js";
 export * from "./canvas/presets.js";
+export * from "./text/fonts.js";
+export * from "./text/runs.js";
+export * from "./text/layout.js";
