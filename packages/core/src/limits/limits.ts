@@ -6,6 +6,7 @@ export const LIMITS = {
   fontBytes: 20 * MB,
   projectBytes: 500 * MB,
   projectWarnBytes: 400 * MB,
+  exportMegapixels: 50,
 } as const;
 
 export interface AssetCandidate {
@@ -42,4 +43,37 @@ export function checkAssetLimits(asset: AssetCandidate, currentProjectBytes: num
   const total = currentProjectBytes + asset.sizeBytes;
   if (total > LIMITS.projectBytes) return { ok: false, error: { kind: "project_too_large", limitBytes: LIMITS.projectBytes } };
   return total >= LIMITS.projectWarnBytes ? { ok: true, warning: "project_near_limit" } : { ok: true };
+}
+
+export type ExportSizeResult =
+  | { ok: true; megapixels: number }
+  // suggested: mayor tamaño con la misma proporción que cabe en el límite.
+  | { ok: false; error: { kind: "export_too_many_megapixels"; megapixels: number; limitMegapixels: number }; suggested: { widthPx: number; heightPx: number } }
+  | { ok: false; error: { kind: "invalid_size" } };
+
+// Mayor tamaño entero con la proporción dada que no supera el límite de megapíxeles.
+export function fitToExportLimit(widthPx: number, heightPx: number): { widthPx: number; heightPx: number } {
+  const maxPx = LIMITS.exportMegapixels * 1e6;
+  if (widthPx * heightPx <= maxPx) return { widthPx, heightPx };
+  const k = Math.sqrt(maxPx / (widthPx * heightPx));
+  let w = Math.max(1, Math.floor(widthPx * k));
+  let h = Math.max(1, Math.floor(heightPx * k));
+  while (w * h > maxPx && (w > 1 || h > 1)) {
+    if (w >= h) w--; else h--;
+  }
+  return { widthPx: w, heightPx: h };
+}
+
+// Límite de producto de la exportación digital: 50 megapíxeles por imagen (SDD §6).
+export function checkExportSize(widthPx: number, heightPx: number): ExportSizeResult {
+  if (![widthPx, heightPx].every((v) => Number.isInteger(v) && v > 0)) return { ok: false, error: { kind: "invalid_size" } };
+  const megapixels = (widthPx * heightPx) / 1e6;
+  if (megapixels > LIMITS.exportMegapixels) {
+    return {
+      ok: false,
+      error: { kind: "export_too_many_megapixels", megapixels, limitMegapixels: LIMITS.exportMegapixels },
+      suggested: fitToExportLimit(widthPx, heightPx),
+    };
+  }
+  return { ok: true, megapixels };
 }

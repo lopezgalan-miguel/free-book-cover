@@ -108,11 +108,51 @@ export const printSetupSchema = z
   })
   .strict();
 
-// Solo esquema: la lógica de destinos digitales llega en el paso 5.
+// Límite por lado (px) de un destino digital propio.
+export const MAX_TARGET_PX = 30000;
+
+// Ajustes de una variante para un elemento: sustituyen a lo derivado del diseño base.
+// x, y, width y height están en pulgadas del lienzo de la variante.
+export const elementOverrideSchema = z
+  .object({
+    x: finite.optional(),
+    y: finite.optional(),
+    width: finite.nonnegative().optional(),
+    height: finite.nonnegative().optional(),
+    rotation: finite.optional(),
+    visible: z.boolean().optional(),
+    // Multiplicador del tamaño de letra derivado (solo textos).
+    fontScale: finite.positive().optional(),
+    // Solo imágenes.
+    fit: z.enum(["cover", "contain", "fill"]).optional(),
+    crop: z
+      .object({ x: finite.min(0).max(1), y: finite.min(0).max(1), width: finite.positive().max(1), height: finite.positive().max(1) })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export const backgroundOverrideSchema = z.object({ fit: backgroundFitSchema.optional(), pos: backgroundPosSchema.optional() }).strict();
+
+export const layoutOverridesSchema = z
+  .object({
+    background: backgroundOverrideSchema.optional(),
+    elements: z.record(z.string(), elementOverrideSchema).optional(),
+  })
+  .strict();
+
+// Destino digital (variante). presetId + presetVersion + dimensiones resueltas: actualizar el catálogo
+// no cambia una variante guardada. Los campos de identidad y dimensiones son opcionales solo para
+// aceptar documentos que únicamente traían el esquema original; las variantes nuevas los incluyen.
 export const digitalTargetSchema = z
   .object({
+    id: z.string().min(1).optional(),
+    name: z.string().optional(),
     presetId: z.string().min(1),
     presetVersion: z.number().int().nonnegative(),
+    widthPx: z.number().int().positive().max(MAX_TARGET_PX).optional(),
+    heightPx: z.number().int().positive().max(MAX_TARGET_PX).optional(),
+    formats: z.array(z.enum(["png", "jpeg", "webp"])).optional(),
     layoutOverrides: z.record(z.string(), z.unknown()),
   })
   .strict();
@@ -157,6 +197,23 @@ export const projectSchema = z
       if (e.type === "text" && e.texture) needAsset(e.texture.assetId, e.id);
     }
     if (typeof p.canvas.background === "object") needAsset(p.canvas.background.assetId, "canvas");
+    const targetIds = new Set<string>();
+    for (const [i, t] of (p.digitalTargets ?? []).entries()) {
+      if ((t.widthPx === undefined) !== (t.heightPx === undefined)) {
+        ctx.addIssue({ code: "custom", message: `digitalTargets.${i}: widthPx y heightPx van juntos` });
+      }
+      if (t.id === undefined) continue;
+      if (targetIds.has(t.id)) ctx.addIssue({ code: "custom", message: `destino duplicado: ${t.id}` });
+      targetIds.add(t.id);
+      const lo = layoutOverridesSchema.safeParse(t.layoutOverrides);
+      if (!lo.success) {
+        for (const is of lo.error.issues) ctx.addIssue({ code: "custom", message: `digitalTargets.${i}.layoutOverrides.${is.path.join(".")}: ${is.message}` });
+      } else {
+        for (const id of Object.keys(lo.data.elements ?? {})) {
+          if (!elementIds.has(id)) ctx.addIssue({ code: "custom", message: `digitalTargets.${i}: ajuste de un elemento inexistente: ${id}` });
+        }
+      }
+    }
   });
 
 export type Color = z.infer<typeof colorSchema>;
@@ -168,6 +225,10 @@ export type ShapeElement = z.infer<typeof shapeElementSchema>;
 export type Element = z.infer<typeof elementSchema>;
 export type Asset = z.infer<typeof assetSchema>;
 export type Project = z.infer<typeof projectSchema>;
+export type DigitalTarget = z.infer<typeof digitalTargetSchema>;
+export type ElementOverride = z.infer<typeof elementOverrideSchema>;
+export type LayoutOverrides = z.infer<typeof layoutOverridesSchema>;
+export type BackgroundOverride = z.infer<typeof backgroundOverrideSchema>;
 
 // Proyecto vacío válido (modo libre, 6 × 9 in).
 export function createProject(init: { id: string; name?: string; mode?: Project["mode"] }): Project {

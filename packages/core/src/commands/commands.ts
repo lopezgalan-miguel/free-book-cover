@@ -1,5 +1,5 @@
 import { applyResizePolicy, type ResizePolicy, type ResizeTargets } from "../geometry/resize.js";
-import { projectSchema, type Asset, type Element, type ImageElement, type Project, type ShapeElement, type TextElement } from "../schema/project.js";
+import { layoutOverridesSchema, projectSchema, type Asset, type BackgroundOverride, type DigitalTarget, type Element, type ElementOverride, type ImageElement, type Project, type ShapeElement, type TextElement } from "../schema/project.js";
 
 // Campos que un updateElement no puede tocar: identidad, tipo y orden de apilado.
 type Immutable = "id" | "type" | "zIndex";
@@ -22,7 +22,15 @@ export type Command =
   // Cambia el tamaño aplicando la política a los objetivos, en un solo paso atómico (un único deshacer).
   | { type: "resizeCanvas"; widthIn: number; heightIn: number; policy: ResizePolicy; targets: ResizeTargets }
   | { type: "addAsset"; asset: Asset }
-  | { type: "removeAsset"; id: string };
+  | { type: "removeAsset"; id: string }
+  // Variantes digitales (SDD R-08): cada una tiene sus propios ajustes y no toca el base ni a las demás.
+  | { type: "addDigitalTarget"; target: DigitalTarget }
+  | { type: "removeDigitalTarget"; id: string }
+  | { type: "setVariantElement"; targetId: string; elementId: string; props: ElementOverride }
+  | { type: "resetVariantElement"; targetId: string; elementId: string }
+  | { type: "setVariantBackground"; targetId: string; props: BackgroundOverride }
+  // Borra todos los ajustes de la variante (vuelve a la derivación por defecto).
+  | { type: "resetVariant"; targetId: string };
 
 export type CommandError =
   | { kind: "invalid"; issues: string[] }
@@ -45,6 +53,17 @@ function stacking(elements: Element[]): Element[] {
   return elements.map((e, i) => [e, i] as const).sort((a, b) => a[0].zIndex - b[0].zIndex || a[1] - b[1]).map(([e]) => e);
 }
 
+// Sustituye los ajustes de una variante; error si no existe.
+function withTarget(doc: Project, id: string, change: (t: DigitalTarget) => DigitalTarget): Project | CommandResult {
+  const targets = doc.digitalTargets ?? [];
+  if (!targets.some((t) => t.id === id)) return notFound(id);
+  return { ...doc, digitalTargets: targets.map((t) => (t.id === id ? change(t) : t)) };
+}
+function overridesOf(t: DigitalTarget) {
+  const r = layoutOverridesSchema.safeParse(t.layoutOverrides);
+  return r.success ? r.data : {};
+}
+
 // Calcula el documento candidato (sin validar ni numerar la revisión).
 function build(doc: Project, cmd: Command): Project | CommandResult {
   switch (cmd.type) {
@@ -62,7 +81,14 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
     }
     case "removeElement": {
       if (!doc.elements.some((e) => e.id === cmd.id)) return notFound(cmd.id);
-      return { ...doc, elements: doc.elements.filter((e) => e.id !== cmd.id) };
+      // Los ajustes de variantes de un elemento borrado se retiran en el mismo paso atómico.
+      const digitalTargets = doc.digitalTargets?.map((t) => {
+        const ov = overridesOf(t);
+        if (!ov.elements || !(cmd.id in ov.elements)) return t;
+        const { [cmd.id]: _gone, ...elements } = ov.elements;
+        return { ...t, layoutOverrides: { ...ov, elements } };
+      });
+      return { ...doc, elements: doc.elements.filter((e) => e.id !== cmd.id), ...(digitalTargets ? { digitalTargets } : {}) };
     }
     case "reorderElement": {
       if (!doc.elements.some((e) => e.id === cmd.id)) return notFound(cmd.id);
@@ -99,6 +125,34 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
       if (!doc.assets.some((a) => a.id === cmd.id)) return notFound(cmd.id);
       return { ...doc, assets: doc.assets.filter((a) => a.id !== cmd.id) };
     }
+    case "addDigitalTarget":
+      return { ...doc, digitalTargets: [...(doc.digitalTargets ?? []), cmd.target] };
+    case "removeDigitalTarget": {
+      const targets = doc.digitalTargets ?? [];
+      if (!targets.some((t) => t.id === cmd.id)) return notFound(cmd.id);
+      return { ...doc, digitalTargets: targets.filter((t) => t.id !== cmd.id) };
+    }
+    case "setVariantElement": {
+      if (!doc.elements.some((e) => e.id === cmd.elementId)) return notFound(cmd.elementId);
+      return withTarget(doc, cmd.targetId, (t) => {
+        const ov = overridesOf(t);
+        const merged = stripUndefined({ ...(ov.elements?.[cmd.elementId] ?? {}), ...cmd.props });
+        return { ...t, layoutOverrides: { ...ov, elements: { ...ov.elements, [cmd.elementId]: merged } } };
+      });
+    }
+    case "resetVariantElement":
+      return withTarget(doc, cmd.targetId, (t) => {
+        const ov = overridesOf(t);
+        const { [cmd.elementId]: _gone, ...elements } = ov.elements ?? {};
+        return { ...t, layoutOverrides: { ...ov, elements } };
+      });
+    case "setVariantBackground":
+      return withTarget(doc, cmd.targetId, (t) => {
+        const ov = overridesOf(t);
+        return { ...t, layoutOverrides: { ...ov, background: stripUndefined({ ...(ov.background ?? {}), ...cmd.props }) } };
+      });
+    case "resetVariant":
+      return withTarget(doc, cmd.targetId, (t) => ({ ...t, layoutOverrides: {} }));
   }
 }
 
