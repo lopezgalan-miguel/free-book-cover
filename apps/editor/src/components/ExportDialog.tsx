@@ -1,10 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
-  DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, EXPORT_FORMATS, checkExportSize, formatBytes, formatInfo, isResolvedTarget, variantDocument,
+  DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, EXPORT_FORMATS, checkExportSize, formatBytes, formatInfo, isResolvedTarget, printPixelSize, variantDocument,
   type ExportFormat, type ExportReport, type Project, type ResolvedTarget,
 } from "@free-book-cover/core";
 import { useFonts } from "../fonts/fontContext";
 import { useExportServices } from "../export/exportContext";
+import { useCompanion } from "../export/useCompanion";
+import { CompanionConnect, PdfExportPanel } from "./PdfExportPanel";
 import { browserExportDeps, downloadBlob, runExport, type ExportError } from "../export/exportImage";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
@@ -39,6 +41,13 @@ function Dialog({ onClose }: { onClose: () => void }) {
   // Tamaño máximo que cabe en el límite de megapíxeles, ofrecido tras un rechazo (solo diseño base).
   const [reduced, setReduced] = useState<{ widthPx: number; heightPx: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  // PDF de imprenta (Paso 7): solo el diseño base de una cubierta KDP configurada y con el companion conectado.
+  const [pdf, setPdf] = useState(false);
+  const isKdpBase = base.mode === "kdp-paperback" && !!base.printSetup;
+  const companion = useCompanion(isKdpBase);
+  const pdfEligible = isKdpBase && destId === BASE;
+  const pdfEnabled = pdfEligible && companion.status === "connected";
+  const pdfOn = pdf && pdfEnabled;
   const [error, setError] = useState<ExportError | null>(null);
   const [report, setReport] = useState<ExportReport | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -49,10 +58,11 @@ function Dialog({ onClose }: { onClose: () => void }) {
   const effFormat: ExportFormat = allowed.includes(format) ? format : allowed[0]!;
   const destLabel = target ? targetLabel(t, target) : t("variantsBase");
   const size = useMemo(() => {
+    if (pdfOn) return printPixelSize(base.canvas.widthIn, base.canvas.heightIn);
     if (target) return { widthPx: target.widthPx, heightPx: target.heightPx };
     if (reduced) return reduced;
     return { widthPx: Math.max(1, Math.round(base.canvas.widthIn * DEFAULT_PX_PER_IN * scale)), heightPx: Math.max(1, Math.round(base.canvas.heightIn * DEFAULT_PX_PER_IN * scale)) };
-  }, [target, reduced, base.canvas.widthIn, base.canvas.heightIn, scale]);
+  }, [pdfOn, target, reduced, base.canvas.widthIn, base.canvas.heightIn, scale]);
   const limit = checkExportSize(size.widthPx, size.heightPx);
   const lossy = formatInfo(effFormat).lossy;
 
@@ -169,9 +179,9 @@ function Dialog({ onClose }: { onClose: () => void }) {
               const ok = allowed.includes(f.format);
               return (
                 <button
-                  key={f.format} role="radio" aria-checked={effFormat === f.format} disabled={!ok}
+                  key={f.format} role="radio" aria-checked={!pdfOn && effFormat === f.format} disabled={!ok}
                   title={ok ? undefined : t("exFormatNotAllowed")}
-                  onClick={() => setFormat(f.format)}
+                  onClick={() => { setFormat(f.format); setPdf(false); }}
                   className="rounded-[9px] border border-field bg-white px-3 py-2.5 text-left enabled:hover:bg-chip disabled:cursor-not-allowed disabled:opacity-40 aria-checked:border-accent aria-checked:bg-chip-on"
                 >
                   <div className="text-[13.5px] font-semibold">{FORMAT_LABEL[f.format]}</div>
@@ -179,8 +189,24 @@ function Dialog({ onClose }: { onClose: () => void }) {
                 </button>
               );
             })}
+            {isKdpBase && (
+              <button
+                role="radio" aria-checked={pdfOn} disabled={!pdfEnabled} onClick={() => setPdf(true)}
+                className="rounded-[9px] border border-field bg-white px-3 py-2.5 text-left enabled:hover:bg-chip disabled:cursor-not-allowed disabled:opacity-40 aria-checked:border-accent aria-checked:bg-chip-on"
+              >
+                <div className="text-[13.5px] font-semibold">PDF</div>
+                <div className="mt-0.5 text-[11px] leading-tight text-subtle">{t("pdfDesc")}</div>
+              </button>
+            )}
           </div>
-          {lossy && (
+          {isKdpBase && !pdfEnabled && (
+            <p data-testid="pdf-disabled-reason" className="mt-2 text-[11.5px] leading-snug text-subtle">
+              {pdfEligible ? t("pdfNeedsCompanion") : t("pdfNeedsKdp")}
+            </p>
+          )}
+          {isKdpBase && pdfEligible && <CompanionConnect conn={companion} />}
+          {pdfOn && <PdfExportPanel conn={companion} doc={base} />}
+          {!pdfOn && lossy && (
             <div className="mt-4">
               <div className="mb-1.5 flex justify-between text-[11px] text-subtle">
                 <label htmlFor="export-quality">{t("exQ")}</label>
@@ -189,7 +215,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
               <input id="export-quality" type="range" className="w-full accent-accent" min={1} max={100} step={1} value={quality} onChange={(e) => setQuality(Number(e.target.value))} />
             </div>
           )}
-          <p className="mt-4 text-[11.5px] leading-snug text-subtle">{t("exInfo")}</p>
+          {!pdfOn && <p className="mt-4 text-[11.5px] leading-snug text-subtle">{t("exInfo")}</p>}
 
           {limitMsg && (
             <div role="alert" data-testid="export-limit" className="mt-3 rounded-lg border border-danger-line bg-danger-bg px-3 py-2 text-xs text-danger-ink">
@@ -221,12 +247,12 @@ function Dialog({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="flex-none rounded-[9px] border border-field bg-white px-[18px] py-[11px] text-[13px] text-chip-ink hover:bg-chip">
             {report ? t("close") : t("cancel")}
           </button>
-          <button
+          {!pdfOn && <button
             onClick={() => void doExport()} disabled={busy || !limit.ok}
             className="flex-1 rounded-[9px] bg-accent p-[11px] text-[13.5px] font-semibold text-white enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? t("exExporting") : `${t("download")} ${FORMAT_LABEL[effFormat]}`}
-          </button>
+          </button>}
         </div>
       </div>
     </div>

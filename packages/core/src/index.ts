@@ -20,3 +20,4 @@ export * from "./kdp/kdp.js";
 export * from "./kdp/review.js";
 export * from "./kdp/recalc.js";
 export * from "./kdp/guides.js";
+export * from "./kdp/preflight.js";

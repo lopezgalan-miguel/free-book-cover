@@ -24,6 +24,14 @@ if (import.meta.env.DEV) {
   });
 }
 
+// Render de impresión por Worker o por hilo principal, para comparar píxeles en las pruebas e2e.
+if (import.meta.env.DEV) {
+  void Promise.all([import("./export/printRender"), import("./fonts/fontRegistry")]).then(([pr, fr]) => {
+    (window as unknown as { __printRender: unknown }).__printRender = (mode: "main" | "worker", doc: never, size: { widthPx: number; heightPx: number }) =>
+      pr.browserPrintRenderer(fr.getFontRegistry(), () => store.getState().assets, mode).render(doc, size, () => {});
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <I18nProvider>
