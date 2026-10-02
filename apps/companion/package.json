@@ -1,0 +1,27 @@
+{
+  "name": "@free-book-cover/companion",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "spike": "tsx src/preflight/spike.ts",
+    "start": "tsx src/main.ts",
+    "mcp": "tsx src/mcp/main.ts"
+  },
+  "dependencies": {
+    "@free-book-cover/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.35.5",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

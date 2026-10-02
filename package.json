@@ -1,0 +1,13 @@
+{
+  "name": "free-book-cover",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.1.2",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm --filter @free-book-cover/editor dev",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "e2e": "pnpm -r --if-present e2e"
+  }
+}

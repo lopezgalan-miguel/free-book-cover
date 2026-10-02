@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
+apps/companion/test/out/
+test-results/
+playwright-report/
+.superpowers/
+blob-report/
+mockups/

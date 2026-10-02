@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* Tokens del mockup de escritorio. */
+@theme {
+  --color-bg: #efece5;
+  --color-panel: #faf8f4;
+  --color-line: #e7e2d8;
+  --color-line-soft: #eee7db;
+  --color-accent: #a98a5f;
+  --color-accent-dark: #7a6038;  /* mockup #8c6f47: 4,42:1 sobre panel; ajustado a AA */
+  --color-on-accent: #2b2824;
+  --color-ink: #2b2824;
+  --color-muted: #6b6458;  /* mockup #a49b8c: 2,59:1; ajustado a AA */
+  --color-stage: #26231d;
+  --color-stage-stone: #3a362e;
+  --color-stage-linen: #5a5346;
+  --color-chip: #f0e9dc;
+  --color-field: #e0d8c8;
+  --color-dash: #d5cdbb;
+  --color-card: #fbf9f4;
+  --color-faint: #736c5f;  /* mockup #c4bcac: 1,89:1; ajustado a AA */
+  --color-paper: #f4efe6;
+  --color-danger: #b4453a;
+  --color-danger-ink: #7a2e26;
+  --color-danger-bg: #f8e8e5;
+  --color-danger-line: #e3c9c4;
+  --color-ok: #4f6b3a;
+  --color-warn-ink: #8a5a14;
+  --color-warn-bg: #fbf1dc;
+  --color-warn-line: #ecd9ab;
+  --color-subtle: #5e584d;  /* mockup #8c8578: 3,45:1; ajustado a AA */
+  --color-switch-off: #d8d0c0;
+  --color-line-chip: #e6ddcc;
+  --color-chip-on: #f4ecdd;
+  --color-chip-ink: #5c554a;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+button, input { font-family: inherit; }
+
+/* Diseño móvil: objetivos táctiles de al menos 44 × 44 px en todos los controles. */
+[data-layout="mobile"] :is(button, select, textarea, input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"])) {
+  min-height: 44px;
+}
+[data-layout="mobile"] button { min-width: 44px; }
+[data-layout="mobile"] label:has(> input[type="file"]) { display: inline-flex; min-height: 44px; align-items: center; }
+[data-layout="mobile"] input[type="color"] { min-width: 44px; }
