@@ -24,6 +24,8 @@ export const toolErrorSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("conflict"), expectedRevision: z.number(), actualRevision: z.number() }).strict(),
   // Sin companion, sin editor abierto o sin autorización del usuario para este proyecto.
   z.object({ kind: z.literal("editor_disconnected"), reason: z.enum(DISCONNECT_REASONS) }).strict(),
+  // El companion tiene demasiadas llamadas en curso; reintentar más tarde.
+  z.object({ kind: z.literal("busy") }).strict(),
   // Fallo inesperado: sin detalle interno.
   z.object({ kind: z.literal("internal") }).strict(),
 ]);

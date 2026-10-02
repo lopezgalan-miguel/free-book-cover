@@ -2,6 +2,7 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { attachBridge, type Bridge, type BridgeOptions } from "./bridge.js";
 import { runPreflight, type PreflightResult } from "../preflight/pipeline.js";
 
 export const COMPANION_VERSION = "0.1.0";
@@ -9,6 +10,7 @@ export const DEFAULT_PORT = 47321;
 /** Máximo del PNG de entrada (50 MP sin comprimir caben de sobra). */
 export const MAX_BODY_BYTES = 400 * 1024 * 1024;
 const KEEP_RESULTS = 2;
+const MAX_QUEUE = 8;
 
 export interface ServerOptions {
   /** Token por arranque; si falta se genera uno aleatorio. */
@@ -17,10 +19,14 @@ export interface ServerOptions {
   allowedOrigins: readonly string[];
   /** 0 = puerto libre (pruebas). */
   port?: number;
+  /** Trabajos de preimpresión admitidos a la vez (en curso + en cola); el resto recibe 503. */
+  maxQueue?: number;
   /** Límite del cuerpo (pruebas). */
   maxBodyBytes?: number;
   /** Sustituible en pruebas. */
   preflight?: typeof runPreflight;
+  /** Ajustes del canal WebSocket del MCP (pruebas). */
+  bridge?: Partial<Pick<BridgeOptions, "callTimeoutMs" | "helloTimeoutMs" | "maxMessageBytes" | "maxPending">>;
 }
 
 export interface CompanionServer {
@@ -28,6 +34,8 @@ export interface CompanionServer {
   token: string;
   port: number;
   url: string;
+  /** Canal WebSocket editor <-> MCP (Paso 8). */
+  bridge: Bridge;
   close(): Promise<void>;
 }
 
@@ -60,12 +68,14 @@ const dim = (v: string | null): number | null => {
   return v !== null && Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
 };
 
-/** Servidor local mínimo: solo 127.0.0.1, token por arranque, CORS restringido. El Paso 8 añadirá WebSocket/MCP sobre él. */
+/** Servidor local mínimo: solo 127.0.0.1, token por arranque, CORS restringido. El canal WebSocket del MCP (bridge.ts) cuelga del mismo servidor. */
 export async function startServer(opts: ServerOptions): Promise<CompanionServer> {
   const token = opts.token ?? randomBytes(24).toString("base64url");
   const preflight = opts.preflight ?? runPreflight;
   const results = new Map<string, PreflightResult>();
   let queue: Promise<unknown> = Promise.resolve();
+  let queued = 0;
+  const maxQueue = opts.maxQueue ?? MAX_QUEUE;
   let boundPort = 0;
   const maxBody = opts.maxBodyBytes ?? MAX_BODY_BYTES;
 
@@ -109,9 +119,11 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
       const body = await readBody(req, maxBody);
       if (!body) return send(res, 413, { error: "too_large" }, cors);
       if (body.length === 0) return send(res, 400, { error: "empty_body" }, cors);
-      // Un trabajo cada vez: Ghostscript y sharp son pesados.
+      // Un trabajo cada vez: Ghostscript y sharp son pesados. La cola tiene tope.
+      if (queued >= maxQueue) return send(res, 503, { error: "busy" }, cors);
+      queued++;
       const job = queue.then(() => preflight({ image: body, widthIn, heightIn }));
-      queue = job.catch(() => undefined);
+      queue = job.then(() => undefined, () => undefined).finally(() => void queued--);
       let result: PreflightResult;
       try {
         result = await job;
@@ -154,9 +166,11 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
     server.listen(opts.port ?? DEFAULT_PORT, "127.0.0.1", resolve);
   });
   boundPort = (server.address() as AddressInfo).port;
+  const bridge = attachBridge(server, { token, allowedOrigins: opts.allowedOrigins, hostOk, ...opts.bridge });
   return {
-    server, token, port: boundPort, url: `http://127.0.0.1:${boundPort}`,
+    server, token, bridge, port: boundPort, url: `http://127.0.0.1:${boundPort}`,
     async close() {
+      await bridge.close();
       await new Promise<void>((resolve) => {
         server.close(() => resolve());
         server.closeAllConnections();

@@ -42,12 +42,13 @@ describe("contrato MCP", () => {
     expect(MCP_TOOLS.apply_background.input.safeParse({ ...base, assetId: "a", fit: "contain" }).success).toBe(true);
     expect(MCP_TOOLS.apply_background.input.safeParse({ ...base, color: "#000000" }).success).toBe(true);
   });
-  it("los errores tienen cuatro tipos funcionales más internal", () => {
+  it("los errores tienen cuatro tipos funcionales más busy e internal", () => {
     for (const e of [
       { kind: "invalid_params", issues: ["x"] },
       { kind: "not_found", resource: "asset", id: "a" },
       { kind: "conflict", expectedRevision: 1, actualRevision: 2 },
       { kind: "editor_disconnected", reason: "not_authorized" },
+      { kind: "busy" },
       { kind: "internal" },
     ]) expect(toolErrorSchema.safeParse(e).success).toBe(true);
     expect(toolErrorSchema.safeParse({ kind: "internal", message: "ruta/secreta" }).success).toBe(false);
