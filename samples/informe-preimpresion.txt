@@ -1,0 +1,20 @@
+Informe de preimpresión
+portada-kdp-3811x2775.pdf
+12.7004 × 9.25 in · 3811×2775 px · 1.56 MB
+
+LISTO PARA KDP
+
+[Correcto] Cubierta KDP configurada: Lienzo de 12.7 × 9.25 in.
+[Correcto] Resolución de los recursos: Todos los recursos llegan a 300 ppp efectivos.
+[Correcto] Una sola página: 1 página.
+[Correcto] Tamaño exacto: 914.43 × 666 pt, igual a lo calculado.
+[Correcto] Resolución efectiva en el PDF: Mínimo 300 ppp (exigido: 300).
+[Correcto] Color CMYK: La imagen final está en DeviceCMYK.
+[Correcto] Sin transparencias: Sin máscaras, grupos ni modos de fusión.
+[Correcto] Fuentes incrustadas: Sin fuentes externas necesarias.
+[Correcto] Sin cifrado: Archivo sin cifrar.
+[Correcto] Estructura del PDF: qpdf no detecta errores.
+[Correcto] Peso: 1.6 MB (objetivo 40 MB, máximo 200 MB).
+[Correcto] Tinta total: Máximo 287 % (límite 300 %).
+
+«Listo para KDP» significa que el archivo supera las comprobaciones técnicas; no garantiza el color impreso ni la aprobación de KDP.
