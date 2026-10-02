@@ -7,7 +7,8 @@ export const THUMB_MAX_PX = 1024;
 export const thumbId = (assetId: string) => `${assetId}.thumb`;
 
 export type ThumbnailMaker = (file: Blob, maxPx: number) => Promise<Blob | null>;
-export type ImportTarget = "background" | "layer";
+// "asset": solo guarda el recurso (p. ej. una textura de texto); quien llama lo referencia.
+export type ImportTarget = "background" | "layer" | "asset";
 export type ImportResult =
   | { ok: true; assetId: string; elementId?: string }
   | { ok: false; reason: "unsupported" | "limit" | "command" };
@@ -63,6 +64,7 @@ export async function importImage(
   const thumb = await makeThumbnail(file, THUMB_MAX_PX);
   if (thumb) await store.addDerivedBlob(thumbId(asset.id), thumb);
 
+  if (target === "asset") return { ok: true, assetId: asset.id };
   if (target === "background") {
     return store.dispatch({ type: "setBackground", background: { assetId: asset.id } })
       ? { ok: true, assetId: asset.id }

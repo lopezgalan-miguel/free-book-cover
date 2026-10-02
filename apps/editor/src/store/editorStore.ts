@@ -12,6 +12,8 @@ export type EditorError =
   | { kind: "load" }
   | { kind: "storage_unavailable" }
   | { kind: "unsupported_image" }
+  | { kind: "unsupported_font" }
+  | { kind: "font_load_failed"; family: string }
   | { kind: "limit"; error: LimitError }
   | { kind: "command"; error: CommandError };
 
@@ -155,6 +157,10 @@ export function createEditorStore(deps: EditorDeps) {
 
     // Derivado (p. ej. miniatura): se guarda como blob aparte y nunca sustituye al original.
     async addDerivedBlob(id: string, blob: Blob): Promise<boolean> {
+      // También los derivados cuentan para el máximo del proyecto (SDD §6).
+      const replaced = state.assets.find((a) => a.id === id)?.blob.size ?? 0;
+      const limit = checkAssetLimits({ kind: "font", sizeBytes: blob.size }, projectBytes() - replaced);
+      if (!limit.ok && limit.error.kind === "project_too_large") return false;
       const put = await deps.storage.putAsset(doc().id, id, blob);
       if (!put.ok) return false;
       set({ assets: [...state.assets.filter((a) => a.id !== id), { id, blob }] });
