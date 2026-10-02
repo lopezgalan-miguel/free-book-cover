@@ -21,9 +21,9 @@ test("crear proyecto, editar texto, fuente, color, estilo y lienzo, y exportar P
   await expect.poll(async () => (await doc(page)).elements[0]?.runs[0].text).toBe("Portada");
 
   await openTab(page, mobile, "font");
-  await page.getByRole("button", { name: "Cinzel", exact: true }).click();
+  await page.getByRole("button", { name: "Playfair Display", exact: true }).click();
   await closeSheet(page, mobile);
-  await expect.poll(async () => (await doc(page)).elements[0].runs[0].fontFamily).toBe("Cinzel");
+  await expect.poll(async () => (await doc(page)).elements[0].runs[0].fontFamily).toBe("Playfair Display");
 
   await openTab(page, mobile, "color");
   await page.getByLabel("Color hexadecimal").fill("#112233");

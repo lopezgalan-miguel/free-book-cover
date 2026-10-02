@@ -51,7 +51,7 @@ test("muestra de portada KDP con la cadena real y comprobación independiente", 
   await dispatch(page, { type: "addElement", element: text("sinopsis", { x: L.back.x + 0.75, y: 2.4, width: 4.5, height: 3, align: "left", zIndex: 4 }, "Texto de contraportada de prueba para comprobar la zona segura, los márgenes y la legibilidad en el previsualizador de KDP. No es una obra real.", 14, "#f4efe6") });
   if (L.spineTextAllowed) {
     const len = 6.5;
-    await dispatch(page, { type: "addElement", element: text("lomo", { x: sp.x + sp.width / 2 - len / 2, y: sp.y + sp.height / 2 - 0.16, width: len, height: 0.32, rotation: 90, zIndex: 5 }, "LA CASA DE LA MUESTRA · AUTORA DE EJEMPLO", 16, "#f4efe6", 600) });
+    await dispatch(page, { type: "addElement", element: text("lomo", { x: sp.x + sp.width / 2 - len / 2, y: sp.y + sp.height / 2 - 0.16, width: len, height: 0.32, rotation: 90, zIndex: 5 }, "LA CASA DE LA MUESTRA · AUTORA DE EJEMPLO", 16, "#f4efe6", 700) });
   }
 
   // PDF con el companion real (puerto 47399, token fijo del arnés E2E).
