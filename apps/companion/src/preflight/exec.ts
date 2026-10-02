@@ -12,8 +12,15 @@ export const bins = {
   qpdf: process.env.FBC_QPDF_BIN ?? "qpdf",
 };
 
-export async function run(bin: string, args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync(bin, args, { maxBuffer: 256 * 1024 * 1024 });
+/** Tiempo máximo de un binario externo (ms); un gs/qpdf colgado bloquearía la cola única. */
+export const DEFAULT_EXEC_TIMEOUT_MS = Number(process.env.FBC_EXEC_TIMEOUT_MS) > 0 ? Number(process.env.FBC_EXEC_TIMEOUT_MS) : 120_000;
+
+export async function run(bin: string, args: string[], opts: { timeoutMs?: number } = {}): Promise<string> {
+  const { stdout } = await execFileAsync(bin, args, {
+    maxBuffer: 256 * 1024 * 1024,
+    timeout: opts.timeoutMs ?? DEFAULT_EXEC_TIMEOUT_MS,
+    killSignal: "SIGKILL",
+  });
   return stdout;
 }
 

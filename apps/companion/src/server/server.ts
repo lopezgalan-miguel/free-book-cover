@@ -116,12 +116,22 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
       const heightIn = dim(url.searchParams.get("heightIn"));
       if (widthIn === null || heightIn === null) return send(res, 400, { error: "invalid_size" }, cors);
       if (Number(req.headers["content-length"] ?? 0) > maxBody) return send(res, 413, { error: "too_large" }, { ...cors, connection: "close" });
-      const body = await readBody(req, maxBody);
-      if (!body) return send(res, 413, { error: "too_large" }, cors);
-      if (body.length === 0) return send(res, 400, { error: "empty_body" }, cors);
-      // Un trabajo cada vez: Ghostscript y sharp son pesados. La cola tiene tope.
-      if (queued >= maxQueue) return send(res, 503, { error: "busy" }, cors);
+      // El hueco de la cola se reserva antes de leer el cuerpo: así las subidas pendientes también cuentan
+      // y una cola llena rechaza sin descargar hasta 400 MB por conexión.
+      if (queued >= maxQueue) return send(res, 503, { error: "busy" }, { ...cors, connection: "close" });
       queued++;
+      let body: Buffer | null;
+      try {
+        body = await readBody(req, maxBody);
+      } catch (e) {
+        queued--;
+        throw e;
+      }
+      if (!body || body.length === 0) {
+        queued--;
+        return body ? send(res, 400, { error: "empty_body" }, cors) : send(res, 413, { error: "too_large" }, cors);
+      }
+      // Un trabajo cada vez: Ghostscript y sharp son pesados. La cola tiene tope.
       const job = queue.then(() => preflight({ image: body, widthIn, heightIn }));
       queue = job.then(() => undefined, () => undefined).finally(() => void queued--);
       let result: PreflightResult;
