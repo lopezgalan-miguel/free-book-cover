@@ -19,7 +19,8 @@ export type Command =
   // toIndex: posición en la pila de apilado (0 = fondo), acotada a [0, n-1].
   | { type: "reorderElement"; id: string; toIndex: number }
   | { type: "setCanvas"; widthIn: number; heightIn: number }
-  | { type: "setBackground"; background: Project["canvas"]["background"] }
+  // fit/pos opcionales: fijan el encuadre en el mismo paso atómico (un solo comando, una revisión).
+  | { type: "setBackground"; background: Project["canvas"]["background"]; fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number } }
   // Encuadre del fondo: modo de ajuste y/o posición (0..1).
   | { type: "setBackgroundLayout"; fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number } }
   // Cambia el tamaño aplicando la política a los objetivos, en un solo paso atómico (un único deshacer).
@@ -106,7 +107,10 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
     case "setBackground": {
       // El encuadre pertenece al fondo: al cambiarlo vuelve a cover y centrado.
       const { backgroundFit: _f, backgroundPos: _p, ...rest } = doc.canvas;
-      return { ...doc, canvas: { ...rest, background: cmd.background } };
+      return {
+        ...doc,
+        canvas: { ...rest, background: cmd.background, ...(cmd.fit !== undefined ? { backgroundFit: cmd.fit } : {}), ...(cmd.pos !== undefined ? { backgroundPos: cmd.pos } : {}) },
+      };
     }
     case "setBackgroundLayout": {
       const canvas = { ...doc.canvas };
