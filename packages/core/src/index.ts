@@ -22,3 +22,4 @@ export * from "./kdp/recalc.js";
 export * from "./kdp/guides.js";
 export * from "./kdp/preflight.js";
 export * from "./mcp/protocol.js";
+export * from "./assets/usage.js";
