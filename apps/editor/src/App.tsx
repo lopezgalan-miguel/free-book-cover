@@ -14,12 +14,18 @@ import type { McpBridge } from "./mcp/bridge";
 import type { EditorStore } from "./store/editorStore";
 import { useLayout } from "./layout/useLayout";
 import { MobileLayout } from "./components/mobile/MobileLayout";
+import { attachAutosave, attachUnloadGuard } from "./store/lifecycle";
 
 // Layout del mockup: cabecera 56 px, panel izquierdo 264 px, escenario, panel derecho 300 px.
 // `fonts`: registro de fuentes inyectable (pruebas); por defecto el del navegador.
 export function App({ store, fonts, exportServices, mcpBridge }: { store: EditorStore; fonts?: FontRegistry; exportServices?: ExportServices; mcpBridge?: McpBridge }) {
   useEffect(() => {
     void store.init();
+  }, [store]);
+  // Autoguardado y aviso al cerrar con cambios sin guardar (R-06).
+  useEffect(() => {
+    const stops = [attachAutosave(store), attachUnloadGuard(store)];
+    return () => stops.forEach((stop) => stop());
   }, [store]);
 
   return (
