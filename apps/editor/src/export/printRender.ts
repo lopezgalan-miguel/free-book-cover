@@ -29,6 +29,19 @@ export function workerEligible(doc: Project): boolean {
   return true;
 }
 
+type RenderFn = (doc: Project, size: { widthPx: number; heightPx: number }, onStage: (s: RenderStage) => void) => Promise<PrintRenderResult>;
+
+// Si el Worker falla de verdad, se reintenta en el hilo principal (misma ruta que la exportación de imagen).
+export function withMainFallback(worker: RenderFn, main: RenderFn): RenderFn {
+  return async (doc, size, onStage) => {
+    try {
+      return await worker(doc, size, onStage);
+    } catch {
+      return main(doc, size, onStage);
+    }
+  };
+}
+
 const workerSupported = () => typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined";
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -80,7 +93,8 @@ export function browserPrintRenderer(fonts: FontRegistry, getAssets: () => Store
   return {
     render(doc, size, onStage) {
       const useWorker = mode === "worker" || (mode === "auto" && workerSupported() && workerEligible(doc));
-      return (useWorker ? viaWorker : viaMain)(doc, size, onStage);
+      if (!useWorker) return viaMain(doc, size, onStage);
+      return (mode === "worker" ? viaWorker : withMainFallback(viaWorker, viaMain))(doc, size, onStage);
     },
   };
 }

@@ -94,6 +94,37 @@ describe("servidor local del companion", () => {
     expect(j.report.ok).toBe(false);
     expect(disposed).toContain("fail");
   });
+  it("el 500 no filtra rutas ni comandos y conserva las cabeceras CORS", async () => {
+    const boom = await startServer({
+      token: "t", allowedOrigins: [ORIGIN], port: 0,
+      preflight: async () => { throw new Error("Command failed: gs /tmp/fbc-job-x/rgb.pdf"); },
+    });
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const r = await fetch(`${boom.url}/preflight?widthIn=2&heightIn=2`, { method: "POST", body: "x", headers: { origin: ORIGIN, authorization: "Bearer t" } });
+      const text = await r.text();
+      expect(r.status).toBe(500);
+      expect(JSON.parse(text)).toEqual({ error: "preflight_failed" });
+      expect(text).not.toMatch(/tmp|fbc-job|Command failed|gs /);
+      expect(r.headers.get("access-control-allow-origin")).toBe(ORIGIN);
+      expect(log).toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+      await boom.close();
+    }
+  });
+  it("413 anticipado por Content-Length sin llamar al pipeline", async () => {
+    const calls0 = calls.length;
+    const small = await startServer({ token: "t", allowedOrigins: [ORIGIN], port: 0, maxBodyBytes: 10, preflight: async () => { throw new Error("no debe llamarse"); } });
+    try {
+      const r = await fetch(`${small.url}/preflight?widthIn=2&heightIn=2`, { method: "POST", body: "x".repeat(50), headers: { origin: ORIGIN, authorization: "Bearer t" } });
+      expect(r.status).toBe(413);
+      expect(r.headers.get("access-control-allow-origin")).toBe(ORIGIN);
+    } finally {
+      await small.close();
+    }
+    expect(calls.length).toBe(calls0);
+  });
   it("conserva solo los últimos resultados y borra los antiguos", async () => {
     const ids: string[] = [];
     for (let i = 0; i < 3; i++) ids.push((await (await f("/preflight?widthIn=2&heightIn=2", { method: "POST", body: `p${i}` })).json()).id);

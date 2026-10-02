@@ -17,6 +17,8 @@ export interface ServerOptions {
   allowedOrigins: readonly string[];
   /** 0 = puerto libre (pruebas). */
   port?: number;
+  /** Límite del cuerpo (pruebas). */
+  maxBodyBytes?: number;
   /** Sustituible en pruebas. */
   preflight?: typeof runPreflight;
 }
@@ -65,15 +67,12 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
   const results = new Map<string, PreflightResult>();
   let queue: Promise<unknown> = Promise.resolve();
   let boundPort = 0;
+  const maxBody = opts.maxBodyBytes ?? MAX_BODY_BYTES;
 
   const hostOk = (host: string | undefined) => host === `127.0.0.1:${boundPort}` || host === `localhost:${boundPort}`;
 
-  const handler = async (req: IncomingMessage, res: ServerResponse) => {
-    const origin = req.headers.origin;
-    // Protege frente a DNS rebinding: solo se atiende con Host local.
-    if (!hostOk(req.headers.host)) return send(res, 403, { error: "host_forbidden" });
-    if (origin !== undefined && !opts.allowedOrigins.includes(origin)) return send(res, 403, { error: "origin_forbidden" });
-    const cors: Record<string, string> = origin
+  const corsFor = (origin: string | undefined): Record<string, string> =>
+    origin && opts.allowedOrigins.includes(origin)
       ? {
           "access-control-allow-origin": origin, vary: "Origin",
           "access-control-allow-headers": "authorization, content-type",
@@ -82,6 +81,13 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
           "access-control-expose-headers": "content-disposition",
         }
       : {};
+
+  const handler = async (req: IncomingMessage, res: ServerResponse) => {
+    const origin = req.headers.origin;
+    // Protege frente a DNS rebinding: solo se atiende con Host local.
+    if (!hostOk(req.headers.host)) return send(res, 403, { error: "host_forbidden" });
+    if (origin !== undefined && !opts.allowedOrigins.includes(origin)) return send(res, 403, { error: "origin_forbidden" });
+    const cors = corsFor(origin);
     if (req.method === "OPTIONS") {
       res.writeHead(204, cors);
       return void res.end();
@@ -99,7 +105,8 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
       const widthIn = dim(url.searchParams.get("widthIn"));
       const heightIn = dim(url.searchParams.get("heightIn"));
       if (widthIn === null || heightIn === null) return send(res, 400, { error: "invalid_size" }, cors);
-      const body = await readBody(req, MAX_BODY_BYTES);
+      if (Number(req.headers["content-length"] ?? 0) > maxBody) return send(res, 413, { error: "too_large" }, { ...cors, connection: "close" });
+      const body = await readBody(req, maxBody);
       if (!body) return send(res, 413, { error: "too_large" }, cors);
       if (body.length === 0) return send(res, 400, { error: "empty_body" }, cors);
       // Un trabajo cada vez: Ghostscript y sharp son pesados.
@@ -109,7 +116,9 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
       try {
         result = await job;
       } catch (e) {
-        return send(res, 500, { error: "preflight_failed", message: String((e as Error)?.message ?? e) }, cors);
+        // El detalle (rutas temporales, líneas de comando) solo va a la consola del companion.
+        console.error("preflight falló:", e);
+        return send(res, 500, { error: "preflight_failed" }, cors);
       }
       const id = result.pdfPath ? randomUUID() : null;
       if (id) {
@@ -135,7 +144,7 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
 
   const server = createServer((req, res) => {
     handler(req, res).catch(() => {
-      if (!res.headersSent) send(res, 500, { error: "internal" });
+      if (!res.headersSent) send(res, 500, { error: "internal" }, corsFor(req.headers.origin));
       else res.end();
     });
   });

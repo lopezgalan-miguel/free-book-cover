@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { applyCommand, createProject, kdpLayout, type Asset, type CompanionReport, type PrintSetup, type Project } from "@free-book-cover/core";
 import { CompanionError, type CompanionClient } from "../src/export/companionClient";
 import { runPdfExport, type PdfExportDeps, type PdfStage } from "../src/export/exportPdf";
-import { workerEligible } from "../src/export/printRender";
+import { withMainFallback, workerEligible } from "../src/export/printRender";
 import { checkDetail, checkTitle, reportText } from "../src/export/pdfReportText";
 import { ca, es, type DictKey } from "../src/i18n/dictionaries";
 import { translate } from "../src/i18n";
@@ -149,5 +149,21 @@ describe("render en Worker o en el hilo principal", () => {
     expect(workerEligible(kdp({ elements: [text("sans-serif")] }))).toBe(true);
     expect(workerEligible(kdp({ elements: [text("Mi Fuente Subida")] }))).toBe(true);
     expect(workerEligible(kdp())).toBe(true);
+  });
+});
+
+describe("fallback del Worker", () => {
+  const size = { widthPx: 1, heightPx: 1 };
+  it("si el Worker falla se reintenta en el hilo principal", async () => {
+    const main = vi.fn(async () => ({ blob: new Blob(["m"]), via: "main" as const }));
+    const r = await withMainFallback(async () => { throw new Error("worker roto"); }, main)(kdp(), size, () => {});
+    expect(r.via).toBe("main");
+    expect(main).toHaveBeenCalledTimes(1);
+  });
+  it("si el Worker funciona no se usa el hilo principal", async () => {
+    const main = vi.fn();
+    const r = await withMainFallback(async () => ({ blob: new Blob(["w"]), via: "worker" as const }), main)(kdp(), size, () => {});
+    expect(r.via).toBe("worker");
+    expect(main).not.toHaveBeenCalled();
   });
 });

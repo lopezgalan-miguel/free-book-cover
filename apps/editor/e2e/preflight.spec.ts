@@ -43,8 +43,10 @@ async function connect(dialog: ReturnType<Page["getByRole"]>) {
 const sh = (bin: string, args: string[]) => execFileSync(bin, args, { encoding: "utf8" });
 
 test("sin companion conectado la opción PDF está deshabilitada con explicación; con token se habilita", async ({ page }) => {
+  // Puerto cerrado a propósito: no se asume nada sobre el 47321.
+  await page.evaluate(() => sessionStorage.setItem("kdp.companion", JSON.stringify({ baseUrl: "http://127.0.0.1:47398", token: "" })));
   const dialog = await openPdf(page);
-  await expect(dialog.getByTestId("companion-status")).toHaveAttribute("data-status", "offline"); // nada en 47321
+  await expect(dialog.getByTestId("companion-status")).toHaveAttribute("data-status", "offline");
   await expect(dialog.getByRole("radio", { name: /PDF/ })).toBeDisabled();
   await expect(dialog.getByTestId("pdf-disabled-reason")).toContainText("necesita el companion conectado");
   // Un token incorrecto no conecta.
