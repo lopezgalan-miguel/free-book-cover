@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, EXPORT_FORMATS, checkExportSize, formatBytes, formatInfo, isResolvedTarget, printPixelSize, variantDocument,
   type ExportFormat, type ExportReport, type Project, type ResolvedTarget,
@@ -7,6 +7,7 @@ import { useFonts } from "../fonts/fontContext";
 import { useExportServices } from "../export/exportContext";
 import { useCompanion } from "../export/useCompanion";
 import { CompanionConnect, PdfExportPanel } from "./PdfExportPanel";
+import { useModal } from "./useModal";
 import { browserExportDeps, downloadBlob, runExport, type ExportError } from "../export/exportImage";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
@@ -18,7 +19,6 @@ const BASE = "base";
 const SCALES = [1, 0.75, 0.5, 0.25] as const;
 const FORMAT_DESC: Record<ExportFormat, DictKey> = { png: "dPng", jpeg: "dJpeg", webp: "dWebp" };
 const FORMAT_LABEL: Record<ExportFormat, string> = { png: "PNG", jpeg: "JPEG", webp: "WebP" };
-const FOCUSABLE = 'button:not([disabled]), select:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 // Modal de exportación de imagen (PNG/JPEG/WebP) del diseño base o de una variante. Independiente del contenedor.
 export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -50,7 +50,6 @@ function Dialog({ onClose }: { onClose: () => void }) {
   const pdfOn = pdf && pdfEnabled;
   const [error, setError] = useState<ExportError | null>(null);
   const [report, setReport] = useState<ExportReport | null>(null);
-  const root = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
   const target: ResolvedTarget | null = targets.find((x) => x.id === destId) ?? null;
@@ -66,30 +65,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
   const limit = checkExportSize(size.widthPx, size.heightPx);
   const lossy = formatInfo(effFormat).lossy;
 
-  // Foco dentro del diálogo, Escape para cerrar y retorno del foco al botón que lo abrió.
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    root.current?.focus();
-    return () => prev?.focus?.();
-  }, []);
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      onClose();
-    } else if (e.key === "Tab" && root.current) {
-      const items = [...root.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
-      if (!items.length) return;
-      const first = items[0]!;
-      const last = items[items.length - 1]!;
-      if (e.shiftKey && (document.activeElement === first || document.activeElement === root.current)) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  };
+  const { root, onKeyDown } = useModal(onClose);
 
   const docFor = (): Project => (target ? variantDocument(store.getState().history.present, target) : store.getState().history.present);
 

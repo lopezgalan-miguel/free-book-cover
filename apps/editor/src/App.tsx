@@ -12,6 +12,8 @@ import type { FontRegistry } from "./fonts/fontRegistry";
 import { McpBridgeProvider } from "./mcp/context";
 import type { McpBridge } from "./mcp/bridge";
 import type { EditorStore } from "./store/editorStore";
+import { useLayout } from "./layout/useLayout";
+import { MobileLayout } from "./components/mobile/MobileLayout";
 
 // Layout del mockup: cabecera 56 px, panel izquierdo 264 px, escenario, panel derecho 300 px.
 // `fonts`: registro de fuentes inyectable (pruebas); por defecto el del navegador.
@@ -33,9 +35,14 @@ export function App({ store, fonts, exportServices, mcpBridge }: { store: Editor
   );
 }
 
+// El breakpoint solo elige el contenedor; los paneles son los mismos.
 function Layout() {
-  const { t } = useI18n();
   useFontSync();
+  return useLayout() === "mobile" ? <MobileLayout /> : <DesktopLayout />;
+}
+
+function DesktopLayout() {
+  const { t } = useI18n();
   return (
     <>
       <div className="flex h-screen w-full flex-col overflow-hidden bg-bg">

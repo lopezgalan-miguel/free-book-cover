@@ -11,25 +11,30 @@ import { importImage } from "../images/importImage";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";
+import type { TextSection } from "../layout/mobileTabs";
 import { Section, Slider, Switch, fieldCls, toggleBtn } from "./ui";
+
+const ALL_SECTIONS: readonly TextSection[] = ["text", "font", "style", "color", "fx"];
 
 const GROUP_KEY: Record<FontGroupId, DictKey> = { serif: "fontGroupSerif", sans: "fontGroupSans", display: "fontGroupDisplay", system: "fontGroupSystem" };
 const WEIGHTS = [
-  [300, "Light 300"], [400, "Regular 400"], [500, "Medium 500"], [600, "Semibold 600"], [700, "Bold 700"], [800, "Extrabold 800"],
-] as const;
+  [300, "weight300"], [400, "weight400"], [500, "weight500"], [600, "weight600"], [700, "weight700"], [800, "weight800"],
+] as const satisfies ReadonlyArray<readonly [number, DictKey]>;
 const SWATCHES = ["#FFFFFF", "#F4EFE6", "#C2B6A1", "#8C6F47", "#2B2824", "#1A1712", "#B4453A", "#3E5C4B"];
 const HEX = /^[0-9a-fA-F]{6}$/;
 const uploadBtn = "cursor-pointer text-[11px] font-medium text-accent hover:text-accent-dark";
 
 // Panel de tipografía del elemento de texto seleccionado. Independiente del contenedor: solo usa el almacén.
-export function TextPanel() {
+// `sections` permite que el contenedor móvil muestre una parte por pestaña con los mismos controles.
+export function TextPanel({ sections = ALL_SECTIONS }: { sections?: readonly TextSection[] }) {
   const { history, selectedId } = useEditorState();
   const el = history.present.elements.find((e) => e.id === selectedId);
   // key: la selección del textarea pertenece al bloque; al cambiar de bloque se reinicia.
-  return el?.type === "text" ? <TextEditor key={el.id} id={el.id} /> : null;
+  return el?.type === "text" ? <TextEditor key={el.id} id={el.id} sections={sections} /> : null;
 }
 
-function TextEditor({ id }: { id: string }) {
+function TextEditor({ id, sections }: { id: string; sections: readonly TextSection[] }) {
+  const show = (s: TextSection) => sections.includes(s);
   const { t } = useI18n();
   const store = useStore();
   const registry = useFonts();
@@ -96,7 +101,7 @@ function TextEditor({ id }: { id: string }) {
 
   return (
     <div aria-label={t("text")} role="group">
-      <Section title={t("text")}>
+      {show("text") && <Section title={t("text")}>
         <textarea
           ref={area} rows={2} className={`${fieldCls} font-sans text-sm leading-snug`} aria-label={t("textContent")} placeholder={t("textPh")}
           onChange={(e) => {
@@ -109,9 +114,9 @@ function TextEditor({ id }: { id: string }) {
         <p className="mt-1.5 text-[10.5px] leading-snug text-muted" data-testid="style-scope">
           {t("applyTo", { scope: selected > 0 ? t("scopeSelection", { n: selected }) : t("scopeAll") })}
         </p>
-      </Section>
+      </Section>}
 
-      <Section
+      {show("font") && <Section
         title={t("font")}
         action={
           <>
@@ -146,16 +151,16 @@ function TextEditor({ id }: { id: string }) {
           ))}
         </div>
         <p className="mt-1.5 text-[10.5px] leading-snug text-muted">{t("fontUploadHint")}</p>
-      </Section>
+      </Section>}
 
-      <Section title={t("style")}>
+      {show("style") && <Section title={t("style")}>
         <div className="mb-3 flex gap-2">
           <select
             aria-label={t("fontWeight")} className={`${fieldCls} flex-1 font-sans`} value={weight ?? ""}
             onChange={(e) => style({ weight: Number(e.target.value) })}
           >
             {weight === undefined && <option value="" disabled>{t("mixed")}</option>}
-            {WEIGHTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            {WEIGHTS.map(([v, label]) => <option key={v} value={v}>{t(label)}</option>)}
           </select>
         </div>
         <div className="mb-3.5 flex gap-1.5">
@@ -177,9 +182,9 @@ function TextEditor({ id }: { id: string }) {
         <Slider label={t("size")} min={6} max={300} step={1} value={cur.fontSizePt ?? first?.fontSizePt ?? 24} format={(v) => `${v} pt`} onCommit={(v) => style({ fontSizePt: v })} />
         <Slider label={t("lineH")} min={0.8} max={2.4} step={0.05} value={el.lineHeight} format={(v) => v.toFixed(2)} onCommit={(lineHeight) => commit({ lineHeight })} />
         <Slider label={t("letterS")} min={-0.05} max={0.5} step={0.01} value={el.letterSpacing} format={(v) => `${v.toFixed(2)}em`} onCommit={(letterSpacing) => commit({ letterSpacing })} />
-      </Section>
+      </Section>}
 
-      <Section title={t("color")}>
+      {show("color") && <Section title={t("color")}>
         <div className="mb-[11px] flex items-center gap-2.5">
           <input
             type="color" aria-label={t("colorPicker")} value={color} onChange={(e) => style({ color: e.target.value })}
@@ -188,7 +193,7 @@ function TextEditor({ id }: { id: string }) {
           <div className="flex flex-1 items-center rounded-lg border border-field bg-white px-2.5">
             <span className="font-mono text-[13px] text-faint">#</span>
             <input
-              type="text" aria-label={t("hexColor")} maxLength={6}
+              type="text" aria-label={t("hexColor")} maxLength={7}
               className="min-w-0 flex-1 bg-transparent px-1.5 py-[9px] font-mono text-[13px] uppercase text-ink outline-none"
               value={hexDraft ?? color.slice(1).toUpperCase()}
               onChange={(e) => {
@@ -200,17 +205,17 @@ function TextEditor({ id }: { id: string }) {
             />
           </div>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {SWATCHES.map((hex) => (
             <button
               key={hex} type="button" aria-label={t("swatch", { hex })} title={hex} onClick={() => style({ color: hex.toLowerCase() })}
-              className="h-6 w-full cursor-pointer rounded-[5px] border border-black/10" style={{ background: hex }}
+              className="h-6 min-w-6 flex-1 cursor-pointer rounded-[5px] border border-black/10" style={{ background: hex }}
             />
           ))}
         </div>
-      </Section>
+      </Section>}
 
-      <Section title={t("fx")} last>
+      {show("fx") && <Section title={t("fx")} last>
         <Switch label={t("shadow")} checked={el.shadow.on} onChange={(on) => commit({ shadow: { ...el.shadow, on } })} />
         {el.shadow.on && (
           <Slider label={t("shadowIntensity")} min={0} max={100} step={1} value={el.shadow.intensity} onCommit={(intensity) => commit({ shadow: { ...el.shadow, intensity } })} />
@@ -249,7 +254,7 @@ function TextEditor({ id }: { id: string }) {
           />
         </label>
         <Slider label={t("curve")} min={-100} max={100} step={1} value={el.curvature} testId="curve-slider" onCommit={(curvature) => commit({ curvature })} />
-      </Section>
+      </Section>}
     </div>
   );
 }

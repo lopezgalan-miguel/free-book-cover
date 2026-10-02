@@ -39,3 +39,11 @@
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 button, input { font-family: inherit; }
+
+/* Diseño móvil: objetivos táctiles de al menos 44 × 44 px en todos los controles. */
+[data-layout="mobile"] :is(button, select, textarea, input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"])) {
+  min-height: 44px;
+}
+[data-layout="mobile"] button { min-width: 44px; }
+[data-layout="mobile"] label:has(> input[type="file"]) { display: inline-flex; min-height: 44px; align-items: center; }
+[data-layout="mobile"] input[type="color"] { min-width: 44px; }

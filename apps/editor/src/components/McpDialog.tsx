@@ -1,10 +1,9 @@
-import { useEffect, useId, useRef } from "react";
+import { useId } from "react";
 import { useI18n } from "../i18n";
 import { McpPanel } from "./McpPanel";
+import { useModal } from "./useModal";
 
-const FOCUSABLE = 'button:not([disabled]), select:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
-
-// Modal de la conexión MCP (mismo patrón que el de exportación: foco, Escape y retorno del foco).
+// Modal de la conexión MCP (foco, Escape y retorno del foco vía useModal).
 export function McpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
   return <Dialog onClose={onClose} />;
@@ -12,31 +11,8 @@ export function McpDialog({ open, onClose }: { open: boolean; onClose: () => voi
 
 function Dialog({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
-  const root = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    root.current?.focus();
-    return () => prev?.focus?.();
-  }, []);
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      onClose();
-    } else if (e.key === "Tab" && root.current) {
-      const items = [...root.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
-      if (!items.length) return;
-      const first = items[0]!;
-      const last = items[items.length - 1]!;
-      if (e.shiftKey && (document.activeElement === first || document.activeElement === root.current)) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  };
+  const { root, onKeyDown } = useModal(onClose);
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(30,26,20,.5)] backdrop-blur-[2px]" onMouseDown={onClose}>
       <div

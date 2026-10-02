@@ -24,8 +24,32 @@ function Tip({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function Header() {
+// Selector de idioma; lo comparten la cabecera de escritorio y la barra superior móvil.
+export function LangToggle() {
   const { t, lang, setLang } = useI18n();
+  return (
+    <ToggleGroup.Root
+      type="single"
+      value={lang}
+      aria-label={t("langLabel")}
+      onValueChange={(v) => v && setLang(v as Lang)}
+      className="flex gap-0.5 rounded-lg bg-chip p-0.5"
+    >
+      {LANGS.map((l) => (
+        <ToggleGroup.Item
+          key={l}
+          value={l}
+          className="rounded-md px-2.5 py-1 text-xs font-semibold text-accent-dark data-[state=on]:bg-white data-[state=on]:text-ink"
+        >
+          {l.toUpperCase()}
+        </ToggleGroup.Item>
+      ))}
+    </ToggleGroup.Root>
+  );
+}
+
+export function Header() {
+  const { t } = useI18n();
   const store = useStore();
   const state = useEditorState();
   const doc = state.history.present;
@@ -45,23 +69,7 @@ export function Header() {
           <div className="rounded-full border border-line px-[7px] py-0.5 font-mono text-[11px] text-muted">{t("badge")}</div>
         </div>
         <div className="flex items-center gap-3.5">
-          <ToggleGroup.Root
-            type="single"
-            value={lang}
-            aria-label={t("langLabel")}
-            onValueChange={(v) => v && setLang(v as Lang)}
-            className="flex gap-0.5 rounded-lg bg-chip p-0.5"
-          >
-            {LANGS.map((l) => (
-              <ToggleGroup.Item
-                key={l}
-                value={l}
-                className="rounded-md px-2.5 py-1 text-xs font-semibold text-accent-dark data-[state=on]:bg-white data-[state=on]:text-ink"
-              >
-                {l.toUpperCase()}
-              </ToggleGroup.Item>
-            ))}
-          </ToggleGroup.Root>
+          <LangToggle />
           <div className="font-mono text-xs text-muted" data-testid="dims">
             {doc.canvas.widthIn} × {doc.canvas.heightIn} in
           </div>
