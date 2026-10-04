@@ -1,6 +1,7 @@
 import { serverToEditorSchema, type McpToolName, type ToolError, type ToolOutcome } from "@free-book-cover/core";
 import { executeTool, type ExecutorDeps } from "./executor";
 import type { EditorStore } from "../store/editorStore";
+import type { ExecutorPort } from "../store/ports";
 
 export type McpLink = "off" | "connecting" | "connected" | "failed";
 export type McpFailure = "unreachable" | "unauthorized" | "replaced" | "protocol";
@@ -50,7 +51,8 @@ export interface McpBridge {
   dispose(): void;
 }
 
-export interface McpBridgeDeps extends Omit<ExecutorDeps, "authorizedProjectId"> {
+export interface McpBridgeDeps extends Omit<ExecutorDeps, "authorizedProjectId" | "store"> {
+  store: ExecutorPort & Pick<EditorStore, "subscribe" | "getState">;
   createSocket?: (url: string) => SocketLike;
   now?: () => number;
 }
@@ -65,7 +67,7 @@ const wsUrl = (base: string) => `${base.trim().replace(/\/+$/, "").replace(/^htt
  * Las llamadas se ejecutan de una en una, con los comandos de core del store.
  */
 export function createMcpBridge(deps: McpBridgeDeps): McpBridge {
-  const store: EditorStore = deps.store;
+  const store = deps.store;
   const now = deps.now ?? Date.now;
   const make = deps.createSocket ?? ((url: string) => new WebSocket(url) as unknown as SocketLike);
   let snap: McpSnapshot = { link: "off", failure: null, authorizedProjectId: null, mcpClients: 0, activity: [] };

@@ -4,10 +4,10 @@ import {
 } from "@free-book-cover/core";
 import { textHeightIn } from "../canvas/measure";
 import { importImage, type ThumbnailMaker } from "../images/importImage";
-import type { EditorStore } from "../store/editorStore";
+import type { ExecutorPort } from "../store/ports";
 
 export interface ExecutorDeps {
-  store: EditorStore;
+  store: ExecutorPort;
   /** Proyecto que el usuario ha autorizado, o null. */
   authorizedProjectId(): string | null;
   /** Medidor de texto para dimensionar la caja; sin él se estima por el interlineado. */
@@ -53,7 +53,7 @@ function textHeight(deps: ExecutorDeps, el: TextElement): number {
   return Math.max(0.1, (pt * el.lineHeight) / 72);
 }
 
-async function saved(store: EditorStore): Promise<boolean> {
+async function saved(store: Pick<ExecutorPort, "save">): Promise<boolean> {
   try {
     return await store.save();
   } catch {

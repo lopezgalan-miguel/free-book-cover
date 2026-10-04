@@ -1,5 +1,5 @@
 import { FONT_EXTENSIONS, FONT_MIME, catalogGroup, checkAssetLimits, detectFontFormat, documentFontFamilies, familyFromFileName, type Asset } from "@free-book-cover/core";
-import type { EditorStore } from "../store/editorStore";
+import type { FontPort } from "../store/ports";
 import type { FontRegistry } from "./fontRegistry";
 
 export type ImportFontResult =
@@ -14,7 +14,7 @@ function uniqueFamily(base: string, taken: Set<string>): string {
 }
 
 // Sube una fuente: comprueba extensión, peso (20 MB) y firma, la carga con FontFace y SOLO si carga la guarda.
-export async function importFont(store: EditorStore, registry: FontRegistry, file: File | Blob): Promise<ImportFontResult> {
+export async function importFont(store: FontPort, registry: FontRegistry, file: File | Blob): Promise<ImportFontResult> {
   const name = "name" in file && typeof file.name === "string" ? file.name : "fuente";
   if (!FONT_EXTENSIONS.some((x) => name.toLowerCase().endsWith(x))) {
     store.reportError({ kind: "unsupported_font" });

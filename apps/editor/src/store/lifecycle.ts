@@ -1,4 +1,4 @@
-import type { EditorStore } from "./editorStore";
+import type { AutosavePort } from "./ports";
 
 export const AUTOSAVE_DELAY_MS = 2500;
 
@@ -11,7 +11,7 @@ const realTimers: Timers = { set: (fn, ms) => setTimeout(fn, ms), clear: (id) =>
 // Autoguardado con debounce (SDD R-06): se guarda cuando hay una pausa en las ediciones. Cada cambio
 // reinicia la espera; un guardado fallido (cuota, error) no se reintenta solo hasta el siguiente cambio,
 // para no repetir el aviso en bucle. Devuelve la función que lo detiene.
-export function attachAutosave(store: EditorStore, opts: { delayMs?: number; timers?: Timers } = {}): () => void {
+export function attachAutosave(store: AutosavePort, opts: { delayMs?: number; timers?: Timers } = {}): () => void {
   const delay = opts.delayMs ?? AUTOSAVE_DELAY_MS;
   const timers = opts.timers ?? realTimers;
   let timer: unknown = null;
@@ -39,7 +39,7 @@ export function attachAutosave(store: EditorStore, opts: { delayMs?: number; tim
 }
 
 // Avisa al cerrar o recargar con cambios sin guardar y, al ocultarse la pestaña, intenta guardarlos.
-export function attachUnloadGuard(store: EditorStore, win: EventTarget = window, doc: EventTarget & { visibilityState?: string } = document): () => void {
+export function attachUnloadGuard(store: AutosavePort, win: EventTarget = window, doc: EventTarget & { visibilityState?: string } = document): () => void {
   const onBeforeUnload = (e: Event) => {
     if (!store.hasUnsavedChanges()) return;
     e.preventDefault();
