@@ -1,5 +1,6 @@
 import { drawCenter, rectCenter, type ImageDraw, type RenderedDocument } from "@free-book-cover/core";
 import { paintTextItem } from "./paintText";
+import { paintShapeItem } from "./paintShape";
 import type { ImageSources } from "./scene";
 
 // Pintor 2D de una composición: el camino de la futura exportación. Usa exactamente
@@ -19,27 +20,18 @@ export function paintDocument(ctx: CanvasRenderingContext2D, r: RenderedDocument
   ctx.fillRect(0, 0, r.widthPx, r.heightPx);
   if (r.background.kind === "image" && r.background.draw) drawImage(r.background.draw, rectCenter(r.background.draw.dest), 0);
   for (const it of r.items) {
-    if (it.kind === "image" && it.draw) drawImage(it.draw, drawCenter(it, it.draw.dest), it.rotation);
-    else if (it.kind === "text") {
-      const c = rectCenter(it.box);
-      ctx.save();
-      ctx.translate(c.x, c.y);
-      ctx.rotate((it.rotation * Math.PI) / 180);
-      ctx.translate(-it.box.width / 2, -it.box.height / 2);
-      paintTextItem(ctx, it, sources);
-      ctx.restore();
-    } else if (it.kind === "shape") {
-      const c = rectCenter(it.box);
-      ctx.save();
-      ctx.translate(c.x, c.y);
-      ctx.rotate((it.rotation * Math.PI) / 180);
-      ctx.fillStyle = it.element.fill;
-      if (it.element.shape === "ellipse") {
-        ctx.beginPath();
-        ctx.ellipse(0, 0, it.box.width / 2, it.box.height / 2, 0, 0, Math.PI * 2);
-        ctx.fill();
-      } else ctx.fillRect(-it.box.width / 2, -it.box.height / 2, it.box.width, it.box.height);
-      ctx.restore();
+    if (it.kind === "image") {
+      if (it.draw) drawImage(it.draw, drawCenter(it, it.draw.dest), it.rotation);
+      continue;
     }
+    // Texto y formas: origen en la esquina de la caja, girada alrededor de su centro (igual que en Fabric).
+    const c = rectCenter(it.box);
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate((it.rotation * Math.PI) / 180);
+    ctx.translate(-it.box.width / 2, -it.box.height / 2);
+    if (it.kind === "text") paintTextItem(ctx, it, sources);
+    else paintShapeItem(ctx, it);
+    ctx.restore();
   }
 }
