@@ -1,5 +1,5 @@
 import {
-  FONT_CATALOG, MCP_TOOLS, TEXT_STYLE_KEYS, documentFontFamilies, importAssetEditorInput,
+  FONT_CATALOG, MCP_TOOLS, documentFontFamilies, editableKeys, importAssetEditorInput, needsRelayout, styleToPatch,
   type CommandError, type ElementSummary, type Project, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
 } from "@free-book-cover/core";
 import { textHeightIn } from "../canvas/measure";
@@ -120,22 +120,15 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       const el = doc().elements.find((e) => e.id === args.elementId);
       if (!el) return fail({ kind: "not_found", resource: "element", id: args.elementId });
       const style = args.style as Record<string, unknown>;
-      const textOnly = [...TEXT_STYLE_KEYS, "shadow", "outline", "curvature"];
-      const allowed = new Set(["x", "y", "width", "height", "rotation", "visible", ...(el.type === "text" ? textOnly : el.type === "shape" ? ["fill", "stroke"] : ["fit"])]);
+      const allowed = editableKeys(el.type);
       const wrong = Object.keys(style).filter((k) => style[k] !== undefined && !allowed.has(k));
       if (wrong.length) return invalid(...wrong.map((k) => `style.${k}: no aplicable a un elemento de tipo ${el.type}`));
-      let patch: Record<string, unknown> = Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined));
-      if (el.type === "text") {
-        const runKeys = ["fontFamily", "fontSizePt", "weight", "italic", "underline", "uppercase", "color"];
-        const family = style.fontFamily;
-        if (typeof family === "string" && !fontKnown(doc(), family)) return invalid(`style.fontFamily: la fuente «${family}» no está en el catálogo ni en el proyecto`);
-        const runPatch = Object.fromEntries(runKeys.filter((k) => style[k] !== undefined).map((k) => [k, style[k]]));
-        patch = Object.fromEntries(Object.entries(patch).filter(([k]) => !runKeys.includes(k)));
-        if (Object.keys(runPatch).length) patch.runs = el.runs.map((r) => ({ ...r, ...runPatch }));
-        // La caja sigue al texto salvo que el cliente fije la altura.
-        if (style.height === undefined && ["fontFamily", "fontSizePt", "weight", "italic", "uppercase", "lineHeight", "letterSpacing", "width", "curvature"].some((k) => style[k] !== undefined)) {
-          patch.height = textHeight(deps, { ...el, ...patch } as TextElement);
-        }
+      const family = style.fontFamily;
+      if (el.type === "text" && typeof family === "string" && !fontKnown(doc(), family)) return invalid(`style.fontFamily: la fuente «${family}» no está en el catálogo ni en el proyecto`);
+      const patch = styleToPatch(el, style);
+      // La caja sigue al texto salvo que el cliente fije la altura.
+      if (el.type === "text" && style.height === undefined && needsRelayout(style)) {
+        patch.height = textHeight(deps, { ...el, ...patch } as TextElement);
       }
       const r = store.applyRemote({ type: "updateElement", id: el.id, props: patch as never }, args.expectedRevision);
       if (!r.ok) return fail(fromCommand(r.error, "element"));
