@@ -35,24 +35,37 @@ export async function flattenOpaque(image: Buffer): Promise<Buffer> {
   return sharp(image).removeAlpha().png().toBuffer();
 }
 
+/** Pasos de la cadena; sustituibles en pruebas para no depender de sharp, gs ni poppler. */
+export interface PreflightSteps {
+  flatten: (image: Buffer) => Promise<Buffer>;
+  toPdf: typeof toCmykPdf;
+  inspect: typeof inspectPdf;
+  measureInk: typeof measureMaxInk;
+  proof: typeof renderProof;
+}
+
+export const defaultPreflightSteps: PreflightSteps = {
+  flatten: flattenOpaque, toPdf: toCmykPdf, inspect: inspectPdf, measureInk: measureMaxInk, proof: renderProof,
+};
+
 /** Cadena completa: PNG -> PDF CMYK (Flate; JPEG si pasa del objetivo de peso) -> inspección -> tinta -> prueba visual. */
-export async function runPreflight(req: PreflightRequest): Promise<PreflightResult> {
+export async function runPreflight(req: PreflightRequest, steps: PreflightSteps = defaultPreflightSteps): Promise<PreflightResult> {
   const expected = { widthIn: req.widthIn, heightIn: req.heightIn };
   const dir = await mkdtemp(join(tmpdir(), "fbc-job-"));
   const dispose = () => rm(dir, { recursive: true, force: true });
   try {
-    const image = await flattenOpaque(req.image);
+    const image = await steps.flatten(req.image);
     let encoding: ImageEncoding = "flate";
     let pdfPath = join(dir, "cover.pdf");
-    await toCmykPdf({ image, ...expected, outputPath: pdfPath, encoding });
-    let inspection = await inspectPdf(pdfPath);
+    await steps.toPdf({ image, ...expected, outputPath: pdfPath, encoding });
+    let inspection = await steps.inspect(pdfPath);
     if (inspection.fileSizeBytes > WEIGHT_TARGET_BYTES) {
       encoding = "jpeg";
       pdfPath = join(dir, "cover-jpeg.pdf");
-      await toCmykPdf({ image, ...expected, outputPath: pdfPath, encoding });
-      inspection = await inspectPdf(pdfPath);
+      await steps.toPdf({ image, ...expected, outputPath: pdfPath, encoding });
+      inspection = await steps.inspect(pdfPath);
     }
-    const [maxInkPercent, proof] = await Promise.all([measureMaxInk(pdfPath), renderProof(pdfPath)]);
+    const [maxInkPercent, proof] = await Promise.all([steps.measureInk(pdfPath), steps.proof(pdfPath)]);
     return { report: buildReport({ inspection, maxInkPercent, expected, encoding }), pdfPath, proof, dispose };
   } catch (e) {
     if (e instanceof PreflightInputError) return { report: inputFailureReport(expected, e.message), pdfPath: null, proof: null, dispose };
