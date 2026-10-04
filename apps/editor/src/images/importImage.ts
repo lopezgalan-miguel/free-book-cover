@@ -1,5 +1,5 @@
 import { readImageHeader, type Asset, type ImageElement } from "@free-book-cover/core";
-import type { EditorStore } from "../store/editorStore";
+import type { ImagePort } from "../store/ports";
 
 // Se lee solo el principio del archivo: basta para PNG/WebP/GIF y para el SOF de casi todos los JPEG.
 const HEADER_BYTES = 1024 * 1024;
@@ -35,7 +35,7 @@ export const browserThumbnail: ThumbnailMaker = async (file, maxPx) => {
 
 // Importa una imagen: cabecera -> límites (80 Mpx sin decodificar) -> original -> miniatura -> colocación.
 export async function importImage(
-  store: EditorStore,
+  store: ImagePort,
   file: File | Blob,
   target: ImportTarget,
   makeThumbnail: ThumbnailMaker = browserThumbnail,
