@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { assetDims, type Asset } from "@free-book-cover/core";
-import { thumbId } from "../images/importImage";
+import { thumbId } from "../storage/assetIds";
 import type { StoredAsset } from "../storage/projectStorage";
 import type { ImageSource, ImageSources } from "./scene";
 

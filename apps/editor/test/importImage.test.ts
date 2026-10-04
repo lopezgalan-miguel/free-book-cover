@@ -1,7 +1,8 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createEditorStore } from "../src/store/editorStore";
-import { importImage, thumbId } from "../src/images/importImage";
+import { importImage } from "../src/images/importImage";
+import { thumbId } from "../src/storage/assetIds";
 import { openStorage } from "../src/storage/projectStorage";
 
 const be32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
