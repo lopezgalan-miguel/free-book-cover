@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIMITS, checkAssetLimits } from "../src/index.js";
+import { LIMITS, checkAssetLimits, checkProjectBytes } from "../src/index.js";
 
 const MB = 1024 * 1024;
 describe("límites de recursos (SDD §6)", () => {
@@ -27,5 +27,14 @@ describe("límites de recursos (SDD §6)", () => {
     for (const bad of [-1, NaN, Infinity]) expect(checkAssetLimits({ kind: "image", sizeBytes: bad }, 0)).toEqual({ ok: false, error: { kind: "invalid_size" } });
     expect(checkAssetLimits({ kind: "image", sizeBytes: 1 }, -5).ok).toBe(false);
     expect(checkAssetLimits({ kind: "image", sizeBytes: 1, widthPx: NaN, heightPx: 1 }, 0).ok).toBe(false);
+  });
+});
+
+describe("checkProjectBytes", () => {
+  it("solo mira el total del proyecto, sin límites por tipo", () => {
+    expect(checkProjectBytes(LIMITS.fontBytes + 1, 0)).toEqual({ ok: true });
+    expect(checkProjectBytes(10, LIMITS.projectBytes - 5)).toEqual({ ok: false, error: { kind: "project_too_large", limitBytes: LIMITS.projectBytes } });
+    expect(checkProjectBytes(1, LIMITS.projectWarnBytes)).toEqual({ ok: true, warning: "project_near_limit" });
+    expect(checkProjectBytes(-1, 0)).toEqual({ ok: false, error: { kind: "invalid_size" } });
   });
 });

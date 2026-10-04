@@ -1,4 +1,4 @@
-import { LIMITS, checkAssetLimits, createHistory, execute, referencedAssetIds, unusedAssetIds, type Asset, type AssetCandidate, type Command } from "@free-book-cover/core";
+import { LIMITS, checkAssetLimits, checkProjectBytes, createHistory, execute, referencedAssetIds, unusedAssetIds, type Asset, type AssetCandidate, type Command } from "@free-book-cover/core";
 import { baseAssetId } from "../storage/assetIds";
 import type { EditorDeps, EditorState, FreeResult } from "./editorStore";
 import type { StateCell } from "./state";
@@ -51,7 +51,7 @@ export function createAssetActions(
   async function addDerivedBlob(id: string, blob: Blob): Promise<boolean> {
     // También los derivados cuentan para el máximo del proyecto (SDD §6).
     const replaced = cell.get().assets.find((a) => a.id === id)?.blob.size ?? 0;
-    const limit = checkAssetLimits({ kind: "font", sizeBytes: blob.size }, projectBytes() - replaced);
+    const limit = checkProjectBytes(blob.size, projectBytes() - replaced);
     if (!limit.ok && limit.error.kind === "project_too_large") return false;
     pending.add(id);
     try {
