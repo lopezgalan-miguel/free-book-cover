@@ -1,12 +1,12 @@
 import {
   LIMITS, checkAssetLimits, canRedo, endMerge, referencedAssetIds, unusedAssetIds, canUndo, createHistory, createProject, execute, redo as redoHistory, undo as undoHistory,
-  isResolvedTarget, variantDocument,
   type Asset, type AssetCandidate, type Command, type LimitError, type CommandError, type ElementOverride, type History, type Project,
-  type ResolvedTarget,
 } from "@free-book-cover/core";
 import type { ProjectStorage, StoredAsset } from "../storage/projectStorage";
 import { createBackupParts, restoreBackup, type BackupPart } from "../storage/backup";
 import { baseAssetId } from "../images/importImage";
+import { createStateCell } from "./state";
+import { createViewActions, type StageTone } from "./view";
 
 export type EditorError =
   | { kind: "quota" }
@@ -44,9 +44,7 @@ export interface EditorState {
 // Propiedades geométricas que se editan en el base o, con una variante activa, solo en ella.
 export type GeometryEdit = Pick<ElementOverride, "x" | "y" | "width" | "height" | "rotation" | "crop" | "fit">;
 
-export type StageTone = "charcoal" | "stone" | "linen";
-export const ZOOM_MIN = 0.25;
-export const ZOOM_MAX = 4;
+export { ZOOM_MIN, ZOOM_MAX, type StageTone } from "./view";
 
 export interface EditorDeps {
   storage: ProjectStorage;
@@ -66,68 +64,44 @@ export interface FreeResult {
 
 export function createEditorStore(deps: EditorDeps) {
   const fresh = () => createHistory(createProject({ id: deps.newId() }));
-  let state: EditorState = {
-    ready: false, history: fresh(), assets: [], savedRevision: null, status: "idle", error: null, backupParts: null, nearLimit: false,
-    selectedId: null, zoom: 1, stageTone: "charcoal", activeVariantId: null, guidesVisible: true,
-  };
-  const listeners = new Set<() => void>();
-  const set = (patch: Partial<EditorState>) => {
-    state = { ...state, ...patch };
+  const cell = createStateCell<EditorState>(
+    {
+      ready: false, history: fresh(), assets: [], savedRevision: null, status: "idle", error: null, backupParts: null, nearLimit: false,
+      selectedId: null, zoom: 1, stageTone: "charcoal", activeVariantId: null, guidesVisible: true,
+    },
     // Una variante que ya no existe (borrada, deshacer, otro proyecto) deja de estar activa.
-    if (state.activeVariantId && !state.history.present.digitalTargets?.some((t) => t.id === state.activeVariantId)) {
-      state = { ...state, activeVariantId: null };
-    }
-    listeners.forEach((l) => l());
-  };
-  const doc = (): Project => state.history.present;
-  const activeTarget = (): ResolvedTarget | null => {
-    const t = state.history.present.digitalTargets?.find((x) => x.id === state.activeVariantId);
-    return t && isResolvedTarget(t) ? t : null;
-  };
-  let displayCache: { base: Project; target: ResolvedTarget; doc: Project } | null = null;
+    (s) => (s.activeVariantId && !s.history.present.digitalTargets?.some((t) => t.id === s.activeVariantId) ? { ...s, activeVariantId: null } : s),
+  );
+  const set = cell.set;
+  const doc = (): Project => cell.get().history.present;
+  const view = createViewActions(cell);
   let initPromise: Promise<void> | null = null;
   const now = deps.now ?? Date.now;
   // Blobs que se están guardando y aún no figuran en el documento: la limpieza no los toca.
   const pending = new Set<string>();
   const projectBytes = () =>
-    state.assets.reduce((n, a) => n + a.blob.size, 0) + JSON.stringify(doc()).length;
+    cell.get().assets.reduce((n, a) => n + a.blob.size, 0) + JSON.stringify(doc()).length;
 
   return {
-    getState: () => state,
-    subscribe(l: () => void) {
-      listeners.add(l);
-      return () => void listeners.delete(l);
-    },
-    isDirty: () => state.savedRevision !== doc().revision,
+    getState: cell.get,
+    subscribe: cell.subscribe,
+    ...view,
+    isDirty: () => cell.get().savedRevision !== doc().revision,
     // Cambios reales sin guardar: un proyecto recién abierto sin tocar no cuenta.
-    hasUnsavedChanges: () => state.savedRevision !== doc().revision && !(state.savedRevision === null && doc().revision === 0),
+    hasUnsavedChanges: () => cell.get().savedRevision !== doc().revision && !(cell.get().savedRevision === null && doc().revision === 0),
     projectBytes,
-    canUndo: () => canUndo(state.history),
-    canRedo: () => canRedo(state.history),
+    canUndo: () => canUndo(cell.get().history),
+    canRedo: () => canRedo(cell.get().history),
     newId: deps.newId,
 
-    // Documento que se muestra: el base o la variante derivada (memoizado por base y destino).
-    displayDoc(): Project {
-      const target = activeTarget();
-      const base = doc();
-      if (!target) return base;
-      if (displayCache && displayCache.base === base && displayCache.target === target) return displayCache.doc;
-      displayCache = { base, target, doc: variantDocument(base, target) };
-      return displayCache.doc;
-    },
-    setActiveVariant(id: string | null) {
-      if (state.activeVariantId === id) return;
-      if (id !== null && !doc().digitalTargets?.some((t) => t.id === id)) return;
-      set({ activeVariantId: id });
-    },
     // Geometría: con una variante activa solo cambia esa variante; si no, el elemento del base.
     editGeometry(id: string, props: GeometryEdit): boolean {
-      const target = activeTarget();
+      const target = view.activeTarget();
       if (target) return this.dispatch({ type: "setVariantElement", targetId: target.id, elementId: id, props });
       return this.dispatch({ type: "updateElement", id, props: props as never });
     },
     editBackgroundLayout(props: { fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number } }): boolean {
-      const target = activeTarget();
+      const target = view.activeTarget();
       if (target) return this.dispatch({ type: "setVariantBackground", targetId: target.id, props });
       return this.dispatch({ type: "setBackgroundLayout", ...props });
     },
@@ -161,19 +135,6 @@ export function createEditorStore(deps: EditorDeps) {
       }
     },
 
-    select(id: string | null) {
-      if (state.selectedId !== id) set({ selectedId: id });
-    },
-    setZoom(zoom: number) {
-      const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
-      if (Number.isFinite(z) && z !== state.zoom) set({ zoom: z });
-    },
-    setGuidesVisible(guidesVisible: boolean) {
-      if (state.guidesVisible !== guidesVisible) set({ guidesVisible });
-    },
-    setStageTone(stageTone: StageTone) {
-      set({ stageTone });
-    },
     reportError(error: EditorError) {
       set({ error });
     },
@@ -181,32 +142,32 @@ export function createEditorStore(deps: EditorDeps) {
     // Única entrada de mutación de la UI: siempre pasa por los comandos de core.
     // mergeKey: los cambios consecutivos con la misma clave (teclas, selector de color) forman un solo paso.
     dispatch(cmd: Command, opts: { mergeKey?: string } = {}): boolean {
-      const r = execute(state.history, cmd, doc().revision, opts.mergeKey ? { key: opts.mergeKey, at: now() } : undefined);
+      const r = execute(cell.get().history, cmd, doc().revision, opts.mergeKey ? { key: opts.mergeKey, at: now() } : undefined);
       if (!r.ok) {
         set({ error: { kind: "command", error: r.error } });
         return false;
       }
-      set({ history: r.history, error: state.error?.kind === "command" ? null : state.error, status: "idle" });
+      set({ history: r.history, error: cell.get().error?.kind === "command" ? null : cell.get().error, status: "idle" });
       return true;
     },
     // Cierra el gesto en curso (soltar, perder el foco): el siguiente cambio abre un paso nuevo.
     endGesture() {
-      if (state.history.merge) set({ history: endMerge(state.history) });
+      if (cell.get().history.merge) set({ history: endMerge(cell.get().history) });
     },
     // Mutación pedida desde fuera (MCP): misma vía de comandos, pero con la revisión que el cliente leyó
     // y sin tocar el aviso de error de la interfaz. Un conflicto o un fallo no cambia nada.
     applyRemote(cmd: Command, expectedRevision: number): { ok: true; revision: number } | { ok: false; error: CommandError } {
-      const r = execute(state.history, cmd, expectedRevision);
+      const r = execute(cell.get().history, cmd, expectedRevision);
       if (!r.ok) return r;
       set({ history: r.history, status: "idle" });
       return { ok: true, revision: r.history.present.revision };
     },
     undo() {
-      const r = undoHistory(state.history, doc().revision);
+      const r = undoHistory(cell.get().history, doc().revision);
       if (r.ok) set({ history: r.history, status: "idle" });
     },
     redo() {
-      const r = redoHistory(state.history, doc().revision);
+      const r = redoHistory(cell.get().history, doc().revision);
       if (r.ok) set({ history: r.history, status: "idle" });
     },
 
@@ -230,7 +191,7 @@ export function createEditorStore(deps: EditorDeps) {
           set({ error: { kind: put.kind === "quota" ? "quota" : "save" } });
           return false;
         }
-        const previous = state.assets;
+        const previous = cell.get().assets;
         set({ assets: [...previous.filter((a) => a.id !== asset.id), { id: asset.id, blob }], nearLimit: limit.warning === "project_near_limit" });
         // Con revisión esperada (MCP) el comando falla si el documento cambió durante la importación.
         if (expectedRevision !== undefined ? this.applyRemote({ type: "addAsset", asset }, expectedRevision).ok : this.dispatch({ type: "addAsset", asset })) return true;
@@ -246,14 +207,14 @@ export function createEditorStore(deps: EditorDeps) {
     // Derivado (p. ej. miniatura): se guarda como blob aparte y nunca sustituye al original.
     async addDerivedBlob(id: string, blob: Blob): Promise<boolean> {
       // También los derivados cuentan para el máximo del proyecto (SDD §6).
-      const replaced = state.assets.find((a) => a.id === id)?.blob.size ?? 0;
+      const replaced = cell.get().assets.find((a) => a.id === id)?.blob.size ?? 0;
       const limit = checkAssetLimits({ kind: "font", sizeBytes: blob.size }, projectBytes() - replaced);
       if (!limit.ok && limit.error.kind === "project_too_large") return false;
       pending.add(id);
       try {
         const put = await deps.storage.putAsset(doc().id, id, blob);
         if (!put.ok) return false;
-        set({ assets: [...state.assets.filter((a) => a.id !== id), { id, blob }] });
+        set({ assets: [...cell.get().assets.filter((a) => a.id !== id), { id, blob }] });
         return true;
       } finally {
         pending.delete(id);
@@ -263,12 +224,12 @@ export function createEditorStore(deps: EditorDeps) {
     // Borra los blobs que ningún documento del historial (pasado, presente o rehacer) referencia: no rompe
     // deshacer ni rehacer. Las miniaturas siguen a su recurso. El contador de tamaño se recalcula.
     async purgeOrphans(): Promise<FreeResult> {
-      const h = state.history;
+      const h = cell.get().history;
       const refs = referencedAssetIds([...h.past, h.present, ...h.future]);
-      const orphan = state.assets.filter((a) => !refs.has(baseAssetId(a.id)) && !pending.has(a.id) && !pending.has(baseAssetId(a.id)));
+      const orphan = cell.get().assets.filter((a) => !refs.has(baseAssetId(a.id)) && !pending.has(a.id) && !pending.has(baseAssetId(a.id)));
       if (orphan.length === 0) return { removed: 0, bytes: 0 };
       const gone = new Set(orphan.map((a) => a.id));
-      const assets = state.assets.filter((a) => !gone.has(a.id));
+      const assets = cell.get().assets.filter((a) => !gone.has(a.id));
       set({ assets });
       set({ nearLimit: projectBytes() >= LIMITS.projectWarnBytes });
       await Promise.all(orphan.map((a) => deps.storage.deleteAsset(doc().id, a.id).catch(() => undefined)));
@@ -278,7 +239,7 @@ export function createEditorStore(deps: EditorDeps) {
     unusedAssets(): { ids: string[]; bytes: number } {
       const ids = unusedAssetIds(doc());
       const set_ = new Set(ids);
-      const bytes = state.assets.filter((a) => set_.has(baseAssetId(a.id))).reduce((n, a) => n + a.blob.size, 0);
+      const bytes = cell.get().assets.filter((a) => set_.has(baseAssetId(a.id))).reduce((n, a) => n + a.blob.size, 0);
       return { ids, bytes };
     },
     // Acción del usuario «liberar espacio»: quita del documento los recursos sin uso y borra sus blobs.
@@ -287,7 +248,7 @@ export function createEditorStore(deps: EditorDeps) {
       const before = projectBytes();
       const { ids } = this.unusedAssets();
       if (ids.length > 0) {
-        let h = state.history;
+        let h = cell.get().history;
         for (const id of ids) {
           const r = execute(h, { type: "removeAsset", id }, h.present.revision);
           if (!r.ok) {
@@ -361,7 +322,7 @@ export function createEditorStore(deps: EditorDeps) {
     },
     // Cambia el documento abierto; el estado de vista (selección, variante) no se arrastra.
     openLoaded(project: Project, assets: StoredAsset[], savedRevision: number | null) {
-      displayCache = null;
+      view.resetDisplayCache();
       set({
         history: createHistory(project), assets, savedRevision, status: "idle", error: null, backupParts: null,
         selectedId: null, activeVariantId: null, ready: true,
@@ -407,7 +368,7 @@ export function createEditorStore(deps: EditorDeps) {
     },
 
     async downloadBackup(): Promise<number> {
-      const parts = await createBackupParts(doc(), state.assets, deps.maxBackupPartBytes);
+      const parts = await createBackupParts(doc(), cell.get().assets, deps.maxBackupPartBytes);
       deps.downloadParts(parts);
       set({ backupParts: parts.length });
       return parts.length;
