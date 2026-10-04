@@ -1,5 +1,6 @@
-import { Canvas, Ellipse, FabricImage, FabricObject, Line, Rect as FRect } from "fabric";
+import { Canvas, FabricImage, FabricObject, Line, Rect as FRect } from "fabric";
 import { paintTextItem, type TextItem } from "./paintText";
+import { paintShapeItem, type ShapeItem } from "./paintShape";
 import {
   BACKGROUND_FALLBACK, assetDims, drawCenter, panPosition, placeImage, rectCenter,
   type GuideShape, type ImageDraw, type Point, type Project, type Rect, type RenderItem, type RenderedDocument,
@@ -31,6 +32,18 @@ class TextBlock extends FabricObject {
     ctx.save();
     ctx.translate(-this.width / 2, -this.height / 2);
     paintTextItem(ctx, this.textItem, this.textSources);
+    ctx.restore();
+  }
+}
+// Forma en Fabric: misma idea que TextBlock; el dibujo es el del pintor compartido.
+class ShapeBlock extends FabricObject {
+  constructor(private readonly shapeItem: ShapeItem) {
+    super({ width: shapeItem.box.width, height: shapeItem.box.height, objectCaching: false, strokeWidth: 0, fill: "transparent" });
+  }
+  override _render(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    ctx.translate(-this.width / 2, -this.height / 2);
+    paintShapeItem(ctx, this.shapeItem);
     ctx.restore();
   }
 }
@@ -238,11 +251,9 @@ export class CoverScene {
       return new FRect({ ...common, width: it.box.width, height: it.box.height, fill: "rgba(255,255,255,.08)", stroke: "rgba(255,255,255,.4)", strokeDashArray: [6, 4] });
     }
     if (it.kind === "shape") {
-      const e = it.element;
-      const stroke = e.stroke ? { stroke: e.stroke.color, strokeWidth: e.stroke.width * (it.box.width / Math.max(e.width, 1e-9)) } : {};
-      return e.shape === "ellipse"
-        ? new Ellipse({ ...common, rx: it.box.width / 2, ry: it.box.height / 2, fill: e.fill, ...stroke })
-        : new FRect({ ...common, width: it.box.width, height: it.box.height, fill: e.fill, ...stroke });
+      const block = new ShapeBlock(it);
+      block.set({ ...common });
+      return block;
     }
     // Texto: pinta el mismo código que la exportación (paintTextItem).
     const block = new TextBlock(it, sources);

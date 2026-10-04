@@ -24,6 +24,32 @@ async function uploadBackground(page: Page, buf: Buffer) {
   await page.getByLabel("Subir imagen", { exact: true }).setInputFiles({ name: "fondo.png", mimeType: "image/png", buffer: buf });
 }
 
+// Diferencia media por canal (0..255) entre el lienzo Fabric y el pintor de exportación.
+const previewVsExport = (page: Page) =>
+  page.evaluate(async () => {
+    const modulePath = "/src/canvas/paint.ts"; // servido por vite dev
+    const { paintDocument } = await import(/* @vite-ignore */ modulePath);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sc = (window as any).__coverScene;
+    const r = sc.lastRender;
+    const out = document.createElement("canvas");
+    out.width = Math.round(r.widthPx);
+    out.height = Math.round(r.heightPx);
+    const octx = out.getContext("2d")!;
+    paintDocument(octx, r, sc.lastSources);
+    const low = document.querySelector<HTMLCanvasElement>("[data-testid=cover-canvas] canvas.lower-canvas")!;
+    const cmp = document.createElement("canvas");
+    cmp.width = out.width;
+    cmp.height = out.height;
+    const cctx = cmp.getContext("2d")!;
+    cctx.drawImage(low, 0, 0, out.width, out.height);
+    const a = octx.getImageData(0, 0, out.width, out.height).data;
+    const b = cctx.getImageData(0, 0, out.width, out.height).data;
+    let sum = 0;
+    for (let i = 0; i < a.length; i += 4) sum += Math.abs(a[i]! - b[i]!) + Math.abs(a[i + 1]! - b[i + 1]!) + Math.abs(a[i + 2]! - b[i + 2]!);
+    return sum / (a.length / 4) / 3;
+  });
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => indexedDB.databases().then((dbs) => Promise.all(dbs.map((d) => indexedDB.deleteDatabase(d.name!)))));
@@ -43,30 +69,7 @@ test("el lienzo Fabric pinta el color base y el fondo recién importado", async 
 test("la vista previa y el pintor de exportación dan el mismo encuadre con cada política", async ({ page }) => {
   await uploadBackground(page, quadrants(900, 600));
   await expect.poll(async () => (await doc(page)).canvas.background).toEqual({ assetId: expect.any(String) });
-  const diff = () =>
-    page.evaluate(async () => {
-      const modulePath = "/src/canvas/paint.ts"; // servido por vite dev
-      const { paintDocument } = await import(/* @vite-ignore */ modulePath);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sc = (window as any).__coverScene;
-      const r = sc.lastRender;
-      const out = document.createElement("canvas");
-      out.width = Math.round(r.widthPx);
-      out.height = Math.round(r.heightPx);
-      const octx = out.getContext("2d")!;
-      paintDocument(octx, r, sc.lastSources);
-      const low = document.querySelector<HTMLCanvasElement>("[data-testid=cover-canvas] canvas.lower-canvas")!;
-      const cmp = document.createElement("canvas");
-      cmp.width = out.width;
-      cmp.height = out.height;
-      const cctx = cmp.getContext("2d")!;
-      cctx.drawImage(low, 0, 0, out.width, out.height);
-      const a = octx.getImageData(0, 0, out.width, out.height).data;
-      const b = cctx.getImageData(0, 0, out.width, out.height).data;
-      let sum = 0;
-      for (let i = 0; i < a.length; i += 4) sum += Math.abs(a[i]! - b[i]!) + Math.abs(a[i + 1]! - b[i + 1]!) + Math.abs(a[i + 2]! - b[i + 2]!);
-      return sum / (a.length / 4) / 3;
-    });
+  const diff = () => previewVsExport(page);
   const fits: string[] = [];
   for (const policy of ["Recortar", "Ajustar", "Estirar"]) {
     await page.getByRole("radio", { name: policy }).check({ force: true });
@@ -166,4 +169,20 @@ test("un solo gesto de clic y arrastre sobre un elemento no seleccionado lo sele
   expect(after.x - before.x).toBeCloseTo(50 / ppi, 1);
   expect(after.y - before.y).toBeCloseTo(20 / ppi, 1);
   expect(await page.evaluate(() => (window as any).__editorStore.getState().selectedId)).toBe(after.id);
+});
+
+test("una forma girada con borde se ve igual en la vista previa y en la exportación", async ({ page }) => {
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const store = (window as any).__editorStore;
+    store.dispatch({
+      type: "addElement",
+      element: {
+        id: "forma-e2e", type: "shape", shape: "ellipse", x: 1, y: 2, width: 3, height: 2, rotation: 20, zIndex: 0, visible: true,
+        fill: "#1e1ec8", stroke: { color: "#dc1e1e", width: 0.15 },
+      },
+    });
+  });
+  await expect.poll(async () => (await doc(page)).elements.length).toBe(1);
+  await expect.poll(() => previewVsExport(page)).toBeLessThan(4);
 });
