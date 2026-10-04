@@ -26,6 +26,14 @@ export type LimitError =
 
 export type LimitResult = { ok: true; warning?: "project_near_limit" } | { ok: false; error: LimitError };
 
+// Solo el máximo del proyecto: para blobs derivados (miniaturas), que no tienen límite propio.
+export function checkProjectBytes(sizeBytes: number, currentProjectBytes: number): LimitResult {
+  if (![sizeBytes, currentProjectBytes].every((v) => Number.isFinite(v) && v >= 0)) return { ok: false, error: { kind: "invalid_size" } };
+  const total = currentProjectBytes + sizeBytes;
+  if (total > LIMITS.projectBytes) return { ok: false, error: { kind: "project_too_large", limitBytes: LIMITS.projectBytes } };
+  return total >= LIMITS.projectWarnBytes ? { ok: true, warning: "project_near_limit" } : { ok: true };
+}
+
 // currentProjectBytes: originales + fuentes + documento ya guardados.
 export function checkAssetLimits(asset: AssetCandidate, currentProjectBytes: number): LimitResult {
   const dims = [asset.widthPx, asset.heightPx].filter((v): v is number => v !== undefined);
@@ -40,9 +48,7 @@ export function checkAssetLimits(asset: AssetCandidate, currentProjectBytes: num
   } else if (asset.sizeBytes > LIMITS.fontBytes) {
     return { ok: false, error: { kind: "font_too_large", limitBytes: LIMITS.fontBytes } };
   }
-  const total = currentProjectBytes + asset.sizeBytes;
-  if (total > LIMITS.projectBytes) return { ok: false, error: { kind: "project_too_large", limitBytes: LIMITS.projectBytes } };
-  return total >= LIMITS.projectWarnBytes ? { ok: true, warning: "project_near_limit" } : { ok: true };
+  return checkProjectBytes(asset.sizeBytes, currentProjectBytes);
 }
 
 export type ExportSizeResult =
