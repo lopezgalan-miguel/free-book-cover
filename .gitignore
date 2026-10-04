@@ -9,3 +9,7 @@ playwright-report/
 .superpowers/
 blob-report/
 mockups/
+
+# Planes de implementación (locales); el SDD sí se versiona
+Plan/*
+!Plan/kdp-cover-creator-sdd.md
