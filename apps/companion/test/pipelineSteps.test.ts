@@ -43,8 +43,12 @@ describe("runPreflight con pasos sustituidos", () => {
     const s = steps([]);
     s.flatten = vi.fn(async () => { throw new PreflightInputError("La imagen tiene transparencias"); });
     const r = await runPreflight(req, s);
-    expect(r.pdfPath).toBeNull();
-    expect(r.report.ok).toBe(false);
-    await r.dispose();
+    try {
+      expect(r.pdfPath).toBeNull();
+      expect(r.report.ok).toBe(false);
+      expect(s.toPdf).not.toHaveBeenCalled();
+    } finally {
+      await r.dispose();
+    }
   });
 });

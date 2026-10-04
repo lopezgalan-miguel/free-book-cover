@@ -1,5 +1,6 @@
 import { checkAssetLimits, loadProject, serializeProject, type LimitError, type LoadError, type Project } from "@free-book-cover/core";
 import type { StoredAsset } from "./projectStorage";
+import { baseAssetId } from "./assetIds";
 
 // Copia de seguridad en JSON, dividida en partes de tamaño acotado (SDD R-06).
 // Parte 1: documento y lista de recursos. Partes 2..N: trozos de recursos en
@@ -159,7 +160,10 @@ export async function restoreBackup(blobs: Blob[]): Promise<RestoreResult> {
   if (!loaded.ok) return loaded;
   const kinds = new Map(loaded.project.assets.map((a) => [a.id, a]));
   // Las miniaturas `<id>.thumb` de una imagen del documento también viajan en la copia.
-  const isThumb = (id: string) => id.endsWith(".thumb") && kinds.get(id.slice(0, -".thumb".length))?.kind === "image";
+  const isThumb = (id: string) => {
+    const base = baseAssetId(id);
+    return base !== id && kinds.get(base)?.kind === "image";
+  };
   const pieces = new Map<string, Array<Uint8Array | undefined>>();
   for (const a of first.assets) {
     if ((!kinds.has(a.id) && !isThumb(a.id)) || pieces.has(a.id)) return bad(`recurso desconocido: ${a.id}`);
