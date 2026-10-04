@@ -26,3 +26,23 @@ describe("estado de vista", () => {
     expect(s.canUndo()).toBe(false);
   });
 });
+
+it("abrir otro proyecto vacía la variante activa y la caché del documento mostrado", async () => {
+  const storage = await openStorage(`view-switch-${Date.now()}`);
+  let i = 0;
+  const s = createEditorStore({ storage, newId: () => `id${++i}`, downloadParts: () => {} });
+  await s.init();
+  const first = s.getState().history.present.id;
+  expect(
+    s.dispatch({
+      type: "addDigitalTarget",
+      target: { id: "v1", presetId: "instagram-feed-portrait", presetVersion: 1, widthPx: 1080, heightPx: 1350, layoutOverrides: {} },
+    }),
+  ).toBe(true);
+  s.setActiveVariant("v1");
+  const shown = s.displayDoc();
+  await s.newProject("Otro");
+  expect(s.getState().activeVariantId).toBeNull();
+  expect(s.displayDoc()).not.toBe(shown);
+  expect(s.displayDoc().id).not.toBe(first);
+});
