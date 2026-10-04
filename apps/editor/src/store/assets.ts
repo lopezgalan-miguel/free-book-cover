@@ -1,5 +1,5 @@
 import { LIMITS, checkAssetLimits, createHistory, execute, referencedAssetIds, unusedAssetIds, type Asset, type AssetCandidate, type Command } from "@free-book-cover/core";
-import { baseAssetId } from "../images/importImage";
+import { baseAssetId } from "../storage/assetIds";
 import type { EditorDeps, EditorState, FreeResult } from "./editorStore";
 import type { StateCell } from "./state";
 

@@ -1,12 +1,10 @@
 import { readImageHeader, type Asset, type ImageElement } from "@free-book-cover/core";
 import type { ImagePort } from "../store/ports";
+import { thumbId } from "../storage/assetIds";
 
 // Se lee solo el principio del archivo: basta para PNG/WebP/GIF y para el SOF de casi todos los JPEG.
 const HEADER_BYTES = 1024 * 1024;
 export const THUMB_MAX_PX = 1024;
-export const thumbId = (assetId: string) => `${assetId}.thumb`;
-// Recurso al que pertenece un blob guardado (el original o su miniatura derivada).
-export const baseAssetId = (blobId: string) => (blobId.endsWith(".thumb") ? blobId.slice(0, -".thumb".length) : blobId);
 
 export type ThumbnailMaker = (file: Blob, maxPx: number) => Promise<Blob | null>;
 // "asset": solo guarda el recurso (p. ej. una textura de texto); quien llama lo referencia.
