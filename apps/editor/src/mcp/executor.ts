@@ -1,5 +1,5 @@
 import {
-  FONT_CATALOG, MCP_TOOLS, documentFontFamilies, editableKeys, importAssetEditorInput, needsRelayout, styleToPatch,
+  FONT_CATALOG, MCP_TOOLS, defaultTextElement, documentFontFamilies, editableKeys, importAssetEditorInput, needsRelayout, styleToPatch,
   type CommandError, type ElementSummary, type Project, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
 } from "@free-book-cover/core";
 import { textHeightIn } from "../canvas/measure";
@@ -99,17 +99,10 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       const d = doc();
       const family = args.fontFamily ?? "Lora";
       if (!fontKnown(d, family)) return invalid(`fontFamily: la fuente «${family}» no está en el catálogo ni en el proyecto`);
-      const width = args.width ?? d.canvas.widthIn / 2;
-      const draft: TextElement = {
-        id: store.newId(), type: "text", x: args.x ?? (d.canvas.widthIn - width) / 2, y: args.y ?? d.canvas.heightIn * 0.65, width, height: 1,
-        rotation: 0, zIndex: 0, visible: true,
-        runs: [{
-          text: args.text, fontFamily: family, fontSizePt: args.fontSizePt ?? 36, weight: args.weight ?? 500, italic: args.italic ?? false,
-          underline: args.underline ?? false, uppercase: args.uppercase ?? false, color: args.color ?? "#f4efe6",
-        }],
-        align: args.align ?? "center", lineHeight: args.lineHeight ?? 1.2, letterSpacing: args.letterSpacing ?? 0.02,
-        shadow: { on: false, intensity: 40 }, outline: { on: false, width: 3, color: "#1a1712" }, curvature: 0,
-      };
+      const draft = defaultTextElement({
+        id: store.newId(), text: args.text, canvas: d.canvas, x: args.x, y: args.y, width: args.width,
+        style: { ...args, fontFamily: family },
+      });
       const r = store.applyRemote({ type: "addElement", element: { ...draft, height: textHeight(deps, draft) } }, args.expectedRevision);
       if (!r.ok) return fail(fromCommand(r.error, "element"));
       return { ok: true, data: { elementId: draft.id, revision: r.revision, saved: await saved(store) } };
