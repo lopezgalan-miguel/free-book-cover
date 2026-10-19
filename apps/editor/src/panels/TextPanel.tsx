@@ -7,6 +7,7 @@ import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { useAssetUrl } from "../canvas/useImageSources";
 import { useFontVersion, useFonts } from "../fonts/fontContext";
 import { importFont } from "../fonts/importFont";
+import { useFontAxes } from "../fonts/useFontAxes";
 import { importImage } from "../images/importImage";
 import { generateTextureAsset } from "../images/generateTexture";
 import { useI18n } from "../i18n";
@@ -102,6 +103,10 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
   const faceOk = (w: number, it: boolean) => !known || hasFace(family, w, it, own);
   const canItalic = !known || (availableFaces(family, own) ?? []).some((f) => f.italic) || italic === true;
   const canBold = faceOk(700, italic ?? false) || (weight ?? 0) >= 700;
+  // Fuente variable subida: grosor y anchura continuos dentro de sus ejes (el grosor, acotado a 100..900).
+  const axes = useFontAxes(doc, assets, family);
+  const wght = axes?.find((a) => a.tag === "wght");
+  const wdth = axes?.find((a) => a.tag === "wdth");
 
   const pickFont = (name: string) => {
     // Si la familia nueva no tiene el peso o la cursiva actuales se pasa a la cara más próxima, a la vista.
@@ -192,7 +197,20 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
       </Section>}
 
       {show("style") && <Section title={t("style")}>
-        <div className="mb-3 flex gap-2">
+        {wght && (
+          <Slider
+            label={t("fontWeightAxis")} min={Math.max(100, Math.ceil(wght.min))} max={Math.min(900, Math.floor(wght.max))} step={1}
+            value={weight ?? Math.round(wght.def)} onCommit={(v) => style({ weight: v })}
+          />
+        )}
+        {wdth && (
+          <Slider
+            label={t("fontWidthAxis")} min={Math.max(25, Math.ceil(wdth.min))} max={Math.min(200, Math.floor(wdth.max))} step={1}
+            value={cur.stretch ?? Math.round(wdth.def)} format={(v) => `${v} %`}
+            onCommit={(v) => style({ stretch: v === Math.round(wdth.def) ? undefined : v })}
+          />
+        )}
+        <div className={`mb-3 flex gap-2 ${wght ? "hidden" : ""}`}>
           <select
             aria-label={t("fontWeight")} className={`${fieldCls} flex-1 font-sans`} value={weight ?? ""}
             onChange={(e) => style({ weight: Number(e.target.value) })}

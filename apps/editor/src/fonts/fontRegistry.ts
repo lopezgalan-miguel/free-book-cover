@@ -1,12 +1,13 @@
 import {
-  catalogGroup, checkFontsReady, hasFace, usedFamilies, type Asset, type FontState, type FontsReport, type Project, type TextElement,
+  catalogGroup, checkFontsReady, fontFamilyFor, hasFace, usedFamilies, usedStretches, type Asset, type FontState, type FontsReport, type Project, type TextElement,
 } from "@free-book-cover/core";
 import type { StoredAsset } from "../storage/projectStorage";
 
 // Entorno de fuentes del navegador, inyectable para poder probar sin DOM.
 export interface FontEnv {
-  // Registra una fuente subida (FontFace) y espera a que cargue. Lanza si no se puede.
-  addFace(family: string, data: ArrayBuffer): Promise<void>;
+  // Registra una fuente subida (FontFace) y espera a que cargue. Lanza si no se puede. Los descriptores
+  // (weight, stretch) sustituyen a los de por defecto: así se registra un alias con la anchura fija.
+  addFace(family: string, data: ArrayBuffer, descriptors?: { weight?: string; stretch?: string }): Promise<void>;
   // Pide una fuente del catálogo; true si hay una cara definida y cargada.
   loadCatalog(family: string, weight: number, italic: boolean): Promise<boolean>;
   removeFace?(family: string): void;
@@ -27,8 +28,8 @@ export function browserFontEnv(): FontEnv | null {
   if (typeof FontFace === "undefined" || typeof document === "undefined" || !document.fonts) return null;
   const faces = new Map<string, FontFace>();
   return {
-    async addFace(family, data) {
-      const face = new FontFace(family, data, { weight: "100 900", style: "normal" });
+    async addFace(family, data, descriptors) {
+      const face = new FontFace(family, data, { weight: "100 900", style: "normal", ...descriptors });
       await withTimeout(face.load(), LOAD_TIMEOUT_MS);
       document.fonts.add(face);
       faces.set(family, face);
@@ -53,6 +54,9 @@ interface Entry {
 // Estado de carga de cada familia (catálogo y subidas). Las del sistema no pasan por aquí.
 export class FontRegistry {
   private upload = new Map<string, Entry>();
+  // Archivo de cada fuente subida (para registrar sus anchuras) y anchuras pedidas antes de tenerlo.
+  private data = new Map<string, ArrayBuffer>();
+  private pending = new Map<string, Set<number>>();
   private catalog = new Map<string, Map<string, Entry>>();
   private listeners = new Set<() => void>();
   private _version = 0;
@@ -89,12 +93,50 @@ export class FontRegistry {
     return this.upload.has(family);
   }
 
-  // Pide las fuentes del catálogo que usa el documento (por familia, peso y cursiva).
+  // Pide las fuentes del catálogo que usa el documento (por familia, peso y cursiva) y las anchuras de las subidas.
   ensureDoc(doc: Project): void {
     for (const e of doc.elements) {
       if (e.type !== "text" || !e.visible) continue;
       for (const r of e.runs) if (r.text !== "") this.ensureCatalog(r.fontFamily, r.weight, r.italic);
     }
+    for (const [family, widths] of usedStretches(doc)) if (catalogGroup(family) === null) for (const w of widths) this.ensureStretch(family, w);
+  }
+
+  // Anchura (eje wdth) de una fuente subida: alias registrado aparte con font-stretch fijo (ver fontFamilyFor).
+  // Si el archivo aún no está, queda pendiente y se registra en cuanto carga.
+  ensureStretch(family: string, stretch: number): void {
+    const alias = fontFamilyFor(family, stretch);
+    if (this.upload.has(alias)) return;
+    const data = this.data.get(family);
+    if (!data) {
+      const set = this.pending.get(family) ?? new Set<number>();
+      set.add(stretch);
+      this.pending.set(family, set);
+      return;
+    }
+    this.loadAlias(family, stretch, data);
+  }
+  private loadAlias(family: string, stretch: number, data: ArrayBuffer): void {
+    const alias = fontFamilyFor(family, stretch);
+    if (!this.env) {
+      this.upload.set(alias, { state: "failed", message: "unsupported" });
+      this.bump();
+      return;
+    }
+    this.upload.set(alias, { state: "loading" });
+    this.bump();
+    this.env.addFace(alias, data, { weight: "100 900", stretch: `${stretch}%` }).then(
+      () => this.settle(this.upload, alias, { state: "loaded" }),
+      (e) => this.settle(this.upload, alias, { state: "failed", message: String((e as Error)?.message ?? e) }),
+    );
+  }
+  // Guarda el archivo de una subida y arranca las anchuras pendientes ANTES de marcarla cargada: quien espera a
+  // que no quede nada "loading" no ve un hueco en el que la anchura aún no se ha pedido.
+  private keepData(family: string, data: ArrayBuffer): void {
+    this.data.set(family, data);
+    const widths = this.pending.get(family);
+    this.pending.delete(family);
+    for (const w of widths ?? []) this.loadAlias(family, w, data);
   }
   // Para la lista de fuentes: pide una muestra del catálogo.
   ensureCatalog(family: string, weight = 400, italic = false): void {
@@ -129,6 +171,7 @@ export class FontRegistry {
     this.bump();
     try {
       await this.env.addFace(family, data);
+      this.keepData(family, data);
       this.upload.set(family, { state: "loaded" });
       this.bump();
       return { ok: true };
@@ -166,7 +209,9 @@ export class FontRegistry {
         this.upload.set(family, { state: "loading" });
         this.bump();
         try {
-          await this.env.addFace(family, await readBlob(blob));
+          const data = await readBlob(blob);
+          await this.env.addFace(family, data);
+          this.keepData(family, data);
           this.upload.set(family, { state: "loaded" });
         } catch (e) {
           this.upload.set(family, { state: "failed", message: String((e as Error)?.message ?? e) });

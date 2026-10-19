@@ -3,9 +3,12 @@ import type { TextRun } from "../schema/project.js";
 export type RunStyle = Omit<TextRun, "text">;
 export type RunStylePatch = Partial<RunStyle>;
 
-const STYLE_KEYS = ["fontFamily", "fontSizePt", "weight", "italic", "underline", "uppercase", "color"] as const;
+const STYLE_KEYS = ["fontFamily", "fontSizePt", "weight", "italic", "underline", "uppercase", "color", "stretch"] as const;
 
-const styleOf = (r: TextRun): RunStyle => ({ fontFamily: r.fontFamily, fontSizePt: r.fontSizePt, weight: r.weight, italic: r.italic, underline: r.underline, uppercase: r.uppercase, color: r.color });
+const styleOf = (r: TextRun): RunStyle => ({
+  fontFamily: r.fontFamily, fontSizePt: r.fontSizePt, weight: r.weight, italic: r.italic, underline: r.underline, uppercase: r.uppercase, color: r.color,
+  ...(r.stretch !== undefined ? { stretch: r.stretch } : {}),
+});
 const sameStyle = (a: RunStyle, b: RunStyle) => STYLE_KEYS.every((k) => a[k] === b[k]);
 
 export const runsToText = (runs: readonly TextRun[]): string => runs.map((r) => r.text).join("");

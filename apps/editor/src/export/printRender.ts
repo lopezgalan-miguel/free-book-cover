@@ -1,4 +1,4 @@
-import { catalogGroup, usedFamilies, type Project } from "@free-book-cover/core";
+import { catalogGroup, usedFamilies, usedStretches, type Project } from "@free-book-cover/core";
 import type { StoredAsset } from "../storage/projectStorage";
 import type { FontRegistry } from "../fonts/fontRegistry";
 import { browserExportDeps } from "./exportImage";
@@ -64,10 +64,11 @@ export function browserPrintRenderer(fonts: FontRegistry, getAssets: () => Store
       return blob ? [{ id, blob }] : [];
     });
     const families = new Set(usedFamilies(doc).keys());
+    const stretches = usedStretches(doc);
     const fontFiles = doc.assets.flatMap((a) => {
       const family = a.kind === "font" ? a.metadata.family : undefined;
       const blob = stored.find((s) => s.id === a.id)?.blob;
-      return typeof family === "string" && families.has(family) && blob ? [{ family, blob }] : [];
+      return typeof family === "string" && families.has(family) && blob ? [{ family, blob, stretches: stretches.get(family) ?? [] }] : [];
     });
     const worker = new Worker(new URL("./printRender.worker.ts", import.meta.url), { type: "module" });
     return new Promise<PrintRenderResult>((resolve, reject) => {

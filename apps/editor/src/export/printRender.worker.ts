@@ -1,4 +1,4 @@
-import { assetDims, renderDocument, type Project } from "@free-book-cover/core";
+import { assetDims, fontFamilyFor, renderDocument, type Project } from "@free-book-cover/core";
 import { paintDocument } from "../canvas/paint";
 import type { ImageSources } from "../canvas/scene";
 import { usedImageAssets } from "./usedAssets";
@@ -9,8 +9,9 @@ export interface WorkerRequest {
   heightPx: number;
   // Originales de imagen usados por el documento.
   images: Array<{ id: string; blob: Blob }>;
-  // Fuentes subidas que usa el texto (las del catálogo no llegan al Worker: ver printRender.ts).
-  fonts: Array<{ family: string; blob: Blob }>;
+  // Fuentes subidas que usa el texto (las del catálogo no llegan al Worker: ver printRender.ts), con las
+  // anchuras (eje wdth) pedidas, que se registran como alias igual que en el editor.
+  fonts: Array<{ family: string; blob: Blob; stretches?: number[] }>;
 }
 export type WorkerMessage =
   | { type: "stage"; stage: "fonts" | "images" | "paint" | "encode" }
@@ -26,9 +27,13 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
   try {
     post({ type: "stage", stage: "fonts" });
     for (const f of fonts) {
-      const face = new FontFace(f.family, await f.blob.arrayBuffer(), { weight: "100 900", style: "normal" });
-      await face.load();
-      (self as unknown as { fonts: FontFaceSet }).fonts.add(face);
+      const data = await f.blob.arrayBuffer();
+      const faces = [new FontFace(f.family, data, { weight: "100 900", style: "normal" })];
+      for (const s of f.stretches ?? []) faces.push(new FontFace(fontFamilyFor(f.family, s), data, { weight: "100 900", style: "normal", stretch: `${s}%` }));
+      for (const face of faces) {
+        await face.load();
+        (self as unknown as { fonts: FontFaceSet }).fonts.add(face);
+      }
     }
     post({ type: "stage", stage: "images" });
     const sources: ImageSources = new Map();
