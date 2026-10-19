@@ -124,7 +124,7 @@ describe("servidor MCP: llamadas", () => {
 
 describe("servidor MCP: fuentes y exportación", () => {
   it("import_font lee la fuente local y entrega sus bytes y nombre al editor", async () => {
-    outcome = { ok: true, data: { assetId: "f1", family: "f", revision: 2, sizeBytes: 8, saved: true } };
+    outcome = { ok: true, data: { assetId: "f1", family: "f", revision: 2, sizeBytes: 8, axes: null, saved: true } };
     const r: any = await client.callTool({ name: "import_font", arguments: { projectId: "p", path: join(dir, "f.ttf") } });
     expect(r.isError).toBeFalsy();
     expect(calls[0]).toEqual({ tool: "import_font", args: { projectId: "p", name: "f.ttf", dataBase64: Buffer.from([0, 1, 0, 0, 1, 2, 3, 4]).toString("base64") } });
