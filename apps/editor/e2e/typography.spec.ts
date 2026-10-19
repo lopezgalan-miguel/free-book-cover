@@ -132,7 +132,7 @@ test("un bloque curvado y con textura se ve igual en la vista previa y en la exp
   expect(curved.sameScale).toBeLessThan(1.5);
   expect(curved.at300).toBeLessThan(6);
 
-  await page.getByRole("switch", { name: "Sombra" }).click();
+  await page.getByRole("switch", { name: "Sombra", exact: true }).click();
   await page.getByRole("switch", { name: "Contorno" }).click();
   await expect.poll(async () => (await doc(page)).elements[0].outline.on).toBe(true);
   await expect.poll(async () => (await previewVsExport(page)).sameScale).toBeLessThan(1.5);
