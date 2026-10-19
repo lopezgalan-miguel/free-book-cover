@@ -89,7 +89,13 @@ function deriveElement(e: Element, m: CoverMap, ov: ElementOverride | undefined)
   };
   if (e.type === "text") {
     const k = s * (ov?.fontScale ?? 1);
-    return { ...e, ...geo, runs: e.runs.map((r) => ({ ...r, fontSizePt: r.fontSizePt * k })) };
+    // Las teselas (pulgadas) escalan con la geometría para que el grano relativo a la letra no cambie.
+    const tile = <T extends { tileIn?: number | undefined }>(t: T): T => (t.tileIn === undefined ? t : { ...t, tileIn: t.tileIn * s });
+    return {
+      ...e, ...geo, runs: e.runs.map((r) => ({ ...r, fontSizePt: r.fontSizePt * k })),
+      ...(e.texture ? { texture: tile(e.texture) } : {}),
+      ...(e.mask ? { mask: tile(e.mask) } : {}),
+    };
   }
   if (e.type === "image") {
     return { ...e, ...geo, ...(ov?.fit ? { fit: ov.fit } : {}), ...(ov?.crop ? { crop: ov.crop } : {}) };

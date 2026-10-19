@@ -25,7 +25,19 @@ const elementBase = {
   rotation: finite,
   zIndex: z.number().int(),
   visible: z.boolean(),
+  // Opacidad de la capa entera (0..1); sin valor, opaca.
+  opacity: finite.min(0).max(1).optional(),
 };
+
+// Filtros de imagen (fondo y capas de imagen). blur 0..100: radio = blur/100 · 5 % del lado mayor de lo
+// pintado; brillo y saturación en %, 100 = sin cambio.
+export const imageFiltersSchema = z
+  .object({
+    blur: finite.min(0).max(100).optional(),
+    brightness: finite.min(0).max(200).optional(),
+    saturation: finite.min(0).max(200).optional(),
+  })
+  .strict();
 
 export const textRunSchema = z
   .object({
@@ -37,6 +49,8 @@ export const textRunSchema = z
     underline: z.boolean(),
     uppercase: z.boolean(),
     color: colorSchema,
+    // Anchura (eje wdth, %) de una fuente variable subida; sin valor, la de la fuente.
+    stretch: finite.min(25).max(200).optional(),
   })
   .strict();
 
@@ -52,6 +66,22 @@ export const textTextureSchema = z
   })
   .strict();
 
+// Máscara de recorte: una imagen colocada como la textura cuyas zonas oscuras, claras o transparentes
+// (según mode, por debajo de threshold y con rampa softness) borran la letra: grietas huecas y bordes rotos.
+export const textMaskSchema = textTextureSchema
+  .extend({
+    mode: z.enum(["dark", "light", "alpha"]),
+    threshold: finite.min(0).max(1),
+    softness: finite.min(0).max(1).optional(),
+  })
+  .strict();
+
+// Distancias y desenfoques de sombra en em (fracción del cuerpo base); ángulo en grados (90 = hacia abajo).
+const em = finite.min(0).max(1);
+export const innerShadowSchema = z
+  .object({ on: z.boolean(), color: colorSchema, opacity: finite.min(0).max(1), angle: finite, distance: em, blur: em })
+  .strict();
+
 export const textElementSchema = z
   .object({
     ...elementBase,
@@ -60,12 +90,24 @@ export const textElementSchema = z
     align: z.enum(["left", "center", "right", "justify"]),
     lineHeight: finite.positive(),
     letterSpacing: finite,
-    shadow: z.object({ on: z.boolean(), intensity: finite.min(0).max(100) }).strict(),
+    // color, opacity, angle y distance son opcionales: sin ellos, negro al 60 % hacia abajo a 0,05 em.
+    shadow: z
+      .object({
+        on: z.boolean(),
+        intensity: finite.min(0).max(100),
+        color: colorSchema.optional(),
+        opacity: finite.min(0).max(1).optional(),
+        angle: finite.optional(),
+        distance: em.optional(),
+      })
+      .strict(),
+    innerShadow: innerShadowSchema.optional(),
     outline: z.object({ on: z.boolean(), width: finite.min(0), color: colorSchema }).strict(),
     curvature: finite.min(-100).max(100),
     // Anchura de las letras (escala horizontal); sin valor, 1. No afecta al espaciado ni a la altura.
     scaleX: finite.min(0.5).max(1.5).optional(),
     texture: textTextureSchema.optional(),
+    mask: textMaskSchema.optional(),
   })
   .strict();
 
@@ -84,6 +126,7 @@ export const imageElementSchema = z
       })
       .strict(),
     fit: z.enum(["cover", "contain", "fill"]),
+    filters: imageFiltersSchema.optional(),
   })
   .strict();
 
@@ -194,6 +237,7 @@ export const projectSchema = z
         // Opcionales para no invalidar proyectos guardados; por defecto cover y centrado.
         backgroundFit: backgroundFitSchema.optional(),
         backgroundPos: backgroundPosSchema.optional(),
+        backgroundFilters: imageFiltersSchema.optional(),
         // Solo en documentos derivados de una variante: caja (pulgadas) respecto a la que se encuadra el fondo.
         backgroundFrame: z.object({ x: finite, y: finite, width: finite.positive(), height: finite.positive() }).strict().optional(),
       })
@@ -219,6 +263,7 @@ export const projectSchema = z
       elementIds.add(e.id);
       if (e.type === "image") needAsset(e.assetRef.assetId, e.id);
       if (e.type === "text" && e.texture) needAsset(e.texture.assetId, e.id);
+      if (e.type === "text" && e.mask) needAsset(e.mask.assetId, e.id);
     }
     if (typeof p.canvas.background === "object") needAsset(p.canvas.background.assetId, "canvas");
     const targetIds = new Set<string>();
@@ -244,6 +289,9 @@ export type Color = z.infer<typeof colorSchema>;
 export type AssetRef = z.infer<typeof assetRefSchema>;
 export type TextRun = z.infer<typeof textRunSchema>;
 export type TextTexture = z.infer<typeof textTextureSchema>;
+export type TextMask = z.infer<typeof textMaskSchema>;
+export type InnerShadow = z.infer<typeof innerShadowSchema>;
+export type ImageFilters = z.infer<typeof imageFiltersSchema>;
 export type TextElement = z.infer<typeof textElementSchema>;
 export type ImageElement = z.infer<typeof imageElementSchema>;
 export type ShapeElement = z.infer<typeof shapeElementSchema>;

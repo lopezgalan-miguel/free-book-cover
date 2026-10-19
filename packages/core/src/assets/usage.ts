@@ -10,6 +10,7 @@ export function unusedAssetIds(doc: Project): string[] {
     if (e.type === "image") used.add(e.assetRef.assetId);
     if (e.type === "text") {
       if (e.texture) used.add(e.texture.assetId);
+      if (e.mask) used.add(e.mask.assetId);
       for (const r of e.runs) families.add(r.fontFamily);
     }
   }
