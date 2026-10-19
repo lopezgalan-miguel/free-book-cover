@@ -74,6 +74,17 @@ describe("maquetación", () => {
     expect(l.heightPx).toBe(144);
     expect(l.lines[1]!.top).toBe(72);
   });
+  it("la anchura (scaleX) estrecha las letras sin tocar el espaciado ni la altura", () => {
+    // 4 in a 72 ppi = 288 px; al 50 % cada letra mide 18 px, así que "hola mundo" (10 caracteres) cabe en una línea.
+    const l = layoutText(el({ width: 4, scaleX: 0.5 }), 72, measure);
+    expect(l.lines).toHaveLength(1);
+    expect(l.lines[0]!.width).toBe(180);
+    expect(l.heightPx).toBe(72);
+    // El espaciado entre letras (em del cuerpo) no se estrecha.
+    const sp = layoutText(el({ width: 10, scaleX: 0.5, letterSpacing: 0.1, runs: [run("ab")] }), 72, measure);
+    expect(sp.lines[0]!.width).toBeCloseTo(2 * 18 + 2 * 7.2, 9);
+    expect(layoutText(el({ width: 10, scaleX: 1 }), 72, measure)).toEqual(layoutText(el({ width: 10 }), 72, measure));
+  });
   it("respeta saltos de línea explícitos y líneas vacías", () => {
     const l = layoutText(el({ runs: [run("a\n\nb")] }), 72, measure);
     expect(l.lines).toHaveLength(3);
@@ -160,6 +171,32 @@ describe("efectos y renderDocument", () => {
     // caja 300x100 sobre imagen 600x300: cubrir recorta la altura de origen a 200
     expect(full.texture).toMatchObject({ assetId: "tx", dest: { x: 0, y: 0, width: 300, height: 100 }, src: { width: 600, height: 200 } });
     expect(dpiReport(doc).find((d) => d.id === "t")).toMatchObject({ dpi: 200, lowDpi: true });
+  });
+  it("textura en mosaico: tesela de tamaño fijo en pulgadas, igual en cajas distintas, con desplazamiento", () => {
+    const tex = { assetId: "tx", fit: "tile" as const, tileIn: 2, pos: { x: 0.25, y: 0.5 } };
+    const doc: Project = {
+      ...baseProject(),
+      assets: [{ id: "tx", kind: "image", mimeType: "image/png", metadata: { widthPx: 600, heightPx: 300 } }],
+      elements: [textEl("a", { width: 3, height: 1, texture: tex }), textEl("b", { width: 5, height: 0.4, texture: tex })],
+    };
+    const [a, b] = renderDocument(doc, { pxPerInch: 100 }).items;
+    if (a?.kind !== "text" || b?.kind !== "text") throw new Error("texto");
+    // 2 in a 100 ppp = 200 px de ancho; la altura sigue la proporción de la imagen (600×300 → 100 px).
+    const expected = { assetId: "tx", repeat: true, src: { x: 0, y: 0, width: 600, height: 300 }, dest: { x: -50, y: -50, width: 200, height: 100 } };
+    expect(a.texture).toMatchObject(expected);
+    expect(b.texture).toMatchObject(expected);
+    // Los ppp efectivos dependen de la tesela, no de la caja: 600 px en 2 in.
+    expect(dpiReport(doc).filter((d) => d.id === "a" || d.id === "b").map((d) => d.dpi)).toEqual([300, 300]);
+  });
+  it("sin modo, la textura sigue cubriendo la caja y no se repite", () => {
+    const doc: Project = {
+      ...baseProject(),
+      assets: [{ id: "tx", kind: "image", mimeType: "image/png", metadata: { widthPx: 600, heightPx: 300 } }],
+      elements: [textEl("t", { width: 3, height: 1, texture: { assetId: "tx" } })],
+    };
+    const it0 = renderDocument(doc, { pxPerInch: 100 }).items[0]!;
+    if (it0.kind !== "text") throw new Error("texto");
+    expect(it0.texture).toMatchObject({ repeat: false, dest: { width: 300, height: 100 } });
   });
   it("la maquetación es determinista (misma entrada, mismo resultado)", () => {
     const doc: Project = { ...baseProject(), elements: [textEl("t", { runs: [run("uno dos tres"), run(" cuatro", { italic: true })], curvature: 30 })] };

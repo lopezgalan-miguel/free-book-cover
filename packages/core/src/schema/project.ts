@@ -40,6 +40,18 @@ export const textRunSchema = z
   })
   .strict();
 
+// Textura del relleno del texto. Sin fit (o "cover") cubre la caja; "tile" repite una tesela de tileIn
+// pulgadas de ancho (alto proporcional) para que el grano no dependa del tamaño de la caja.
+// pos desplaza la textura: en cubrir, como background-position; en mosaico, fracción de la tesela.
+export const textTextureSchema = z
+  .object({
+    assetId: z.string().min(1),
+    fit: z.enum(["cover", "tile"]).optional(),
+    tileIn: finite.positive().max(MAX_CANVAS_IN).optional(),
+    pos: backgroundPosSchema.optional(),
+  })
+  .strict();
+
 export const textElementSchema = z
   .object({
     ...elementBase,
@@ -51,7 +63,9 @@ export const textElementSchema = z
     shadow: z.object({ on: z.boolean(), intensity: finite.min(0).max(100) }).strict(),
     outline: z.object({ on: z.boolean(), width: finite.min(0), color: colorSchema }).strict(),
     curvature: finite.min(-100).max(100),
-    texture: assetRefSchema.optional(),
+    // Anchura de las letras (escala horizontal); sin valor, 1. No afecta al espaciado ni a la altura.
+    scaleX: finite.min(0.5).max(1.5).optional(),
+    texture: textTextureSchema.optional(),
   })
   .strict();
 
@@ -134,8 +148,16 @@ export const elementOverrideSchema = z
 
 export const backgroundOverrideSchema = z.object({ fit: backgroundFitSchema.optional(), pos: backgroundPosSchema.optional() }).strict();
 
+// Encuadre de una variante: qué parte del diseño base se ve. x, y como background-position (0,5 = centrado)
+// y zoom multiplica la escala de "cubrir". Mueve a la vez fondo y elementos derivados.
+export const MAX_VARIANT_ZOOM = 8;
+export const viewOverrideSchema = z
+  .object({ x: finite.min(0).max(1).optional(), y: finite.min(0).max(1).optional(), zoom: finite.min(1).max(MAX_VARIANT_ZOOM).optional() })
+  .strict();
+
 export const layoutOverridesSchema = z
   .object({
+    view: viewOverrideSchema.optional(),
     background: backgroundOverrideSchema.optional(),
     elements: z.record(z.string(), elementOverrideSchema).optional(),
   })
@@ -221,6 +243,7 @@ export const projectSchema = z
 export type Color = z.infer<typeof colorSchema>;
 export type AssetRef = z.infer<typeof assetRefSchema>;
 export type TextRun = z.infer<typeof textRunSchema>;
+export type TextTexture = z.infer<typeof textTextureSchema>;
 export type TextElement = z.infer<typeof textElementSchema>;
 export type ImageElement = z.infer<typeof imageElementSchema>;
 export type ShapeElement = z.infer<typeof shapeElementSchema>;
@@ -231,6 +254,7 @@ export type DigitalTarget = z.infer<typeof digitalTargetSchema>;
 export type ElementOverride = z.infer<typeof elementOverrideSchema>;
 export type LayoutOverrides = z.infer<typeof layoutOverridesSchema>;
 export type BackgroundOverride = z.infer<typeof backgroundOverrideSchema>;
+export type ViewOverride = z.infer<typeof viewOverrideSchema>;
 
 // Proyecto vacío válido (modo libre, 6 × 9 in).
 export function createProject(init: { id: string; name?: string; mode?: Project["mode"] }): Project {

@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readImportFile } from "../src/mcp/files.js";
+import { readImportFile, writeExportFile } from "../src/mcp/files.js";
 
 // PNG mínimo de 1x1.
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const TTF = Buffer.from([0, 1, 0, 0, 1, 2, 3, 4]);
 let root: string;
 let allowed: string;
 let outside: string;
@@ -21,6 +22,7 @@ beforeAll(async () => {
   await writeFile(join(allowed, "texto.png"), "no soy una imagen");
   await writeFile(join(allowed, "grande.png"), Buffer.concat([PNG, Buffer.alloc(5000)]));
   await writeFile(join(outside, "secreto.png"), PNG);
+  await writeFile(join(allowed, "f.ttf"), TTF);
   await symlink(join(outside, "secreto.png"), join(allowed, "enlace.png"));
 });
 afterAll(() => rm(root, { recursive: true, force: true }));
@@ -60,5 +62,34 @@ describe("readImportFile", () => {
   it("sin directorios permitidos válidos no se importa nada", async () => {
     expect((await readImportFile(join(allowed, "a.png"), { allowedDirs: [join(root, "no-existe")], maxBytes: 4000 })).ok).toBe(false);
     expect((await readImportFile(join(allowed, "a.png"), { allowedDirs: [], maxBytes: 4000 })).ok).toBe(false);
+  });
+});
+
+describe("readImportFile: fuentes", () => {
+  it("con kind font acepta la firma de una fuente y rechaza una imagen", async () => {
+    const r = await readImportFile(join(allowed, "f.ttf"), limits(), "font");
+    expect(r).toMatchObject({ ok: true, name: "f.ttf" });
+    expect((await readImportFile(join(allowed, "a.png"), limits(), "font")).ok).toBe(false);
+    expect((await readImportFile(join(allowed, "f.ttf"), limits())).ok).toBe(false);
+  });
+});
+
+describe("writeExportFile", () => {
+  it("escribe en el directorio de exportación sin pisar archivos y sin salirse de él", async () => {
+    const dir = join(root, "exportes");
+    await mkdir(dir);
+    const a = await writeExportFile(dir, "portada.png", PNG);
+    const b = await writeExportFile(dir, "portada.png", PNG);
+    if (!a.ok || !b.ok) throw new Error("no escrito");
+    expect(a.path).toBe(join(dir, "portada.png"));
+    expect(b.path).toBe(join(dir, "portada-2.png"));
+    expect(await readFile(b.path)).toEqual(PNG);
+    // Un nombre con ruta se reduce a su nombre de archivo.
+    const c = await writeExportFile(dir, "../../fuera.png", PNG);
+    expect(c.ok && c.path).toBe(join(dir, "fuera.png"));
+    expect((await readdir(dir)).sort()).toEqual(["fuera.png", "portada-2.png", "portada.png"]);
+  });
+  it("sin directorio de exportación configurado no escribe nada", async () => {
+    expect(await writeExportFile(null, "a.png", PNG)).toMatchObject({ ok: false, error: { kind: "invalid_params" } });
   });
 });

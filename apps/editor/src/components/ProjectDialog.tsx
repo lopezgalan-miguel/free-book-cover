@@ -23,7 +23,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
         <div className="border-b border-line-soft px-[22px] pb-4 pt-5">
           <h2 id={titleId} className="text-base font-semibold">{t("projectTitle")}</h2>
         </div>
-        <ProjectPanel />
+        <ProjectPanel onOpened={onClose} />
         <div className="flex justify-end border-t border-line-soft px-[22px] py-3">
           <button type="button" className="rounded-lg border border-line bg-white px-4 py-2 text-[13px] hover:bg-chip" onClick={onClose}>{t("projectClose")}</button>
         </div>

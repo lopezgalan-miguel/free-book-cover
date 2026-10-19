@@ -126,6 +126,57 @@ describe("variantDocument", () => {
     expect(r.background.kind === "image" && r.background.draw?.fit).toBe("contain");
     expect(doc.canvas.backgroundFit).toBeUndefined();
   });
+  it("encuadre de la variante: la zona visible se desplaza y fondo y elementos se mueven juntos", () => {
+    let doc = run(base(), { type: "addDigitalTarget", target: ig() });
+    doc = run(doc, { type: "setVariantView", targetId: "v1", view: { y: 0 } });
+    expect(overridesOf(doc.digitalTargets![0]!).view).toEqual({ y: 0 });
+    const t = doc.digitalTargets![0] as never;
+    // 4:5 sobre 6×9: k = 0,6 y se ven 7,5 in de alto; con y = 0 se ve desde arriba del base.
+    expect(visibleArea(doc, t).rect).toMatchObject({ x: 0, y: 0, width: 6 });
+    const v = variantDocument(doc, t);
+    expect(v.elements.find((e) => e.id === "s1")!.y).toBeCloseTo(2 * 0.6, 9);
+    expect(v.canvas.backgroundFrame).toMatchObject({ x: 0, y: 0 });
+    expect(v.canvas.backgroundFrame!.height).toBeCloseTo(9 * 0.6, 9);
+  });
+  it("encuadre con zoom: la escala se multiplica y el área visible se reduce", () => {
+    let doc = run(base(), { type: "addDigitalTarget", target: ig() });
+    doc = run(doc, { type: "setVariantView", targetId: "v1", view: { zoom: 2, x: 0.5, y: 0.5 } });
+    const t = doc.digitalTargets![0] as never;
+    const a = visibleArea(doc, t).rect;
+    expect(a.width).toBeCloseTo(3, 9);
+    expect(a.height).toBeCloseTo(3.75, 9);
+    expect(a.x).toBeCloseTo(1.5, 9);
+    const v = variantDocument(doc, t);
+    const s1 = v.elements.find((e) => e.id === "s1")!;
+    expect(s1.x).toBeCloseTo((1 - 1.5) * 1.2, 9);
+    expect(s1.width).toBeCloseTo(2 * 1.2, 9);
+    const t1 = v.elements.find((e) => e.id === "t1")!;
+    expect(t1.type === "text" && t1.runs[0]!.fontSizePt).toBeCloseTo(24 * 1.2, 9);
+    // Los ajustes por elemento siguen siendo absolutos en la variante.
+    doc = run(doc, { type: "setVariantElement", targetId: "v1", elementId: "s1", props: { x: 0.1 } });
+    expect(variantDocument(doc, doc.digitalTargets![0] as never).elements.find((e) => e.id === "s1")!.x).toBe(0.1);
+    // Restablecer la variante quita también el encuadre.
+    doc = run(doc, { type: "resetVariant", targetId: "v1" });
+    expect(overridesOf(doc.digitalTargets![0]!).view).toBeUndefined();
+  });
+  it("updateVariant fusiona encuadre, fondo y ajustes de varios elementos en un solo paso", () => {
+    let doc = run(base(), { type: "addDigitalTarget", target: ig() });
+    doc = run(doc, { type: "setVariantElement", targetId: "v1", elementId: "s1", props: { x: 0.5 } });
+    const before = doc.revision;
+    doc = run(doc, { type: "updateVariant", targetId: "v1", view: { y: 0 }, background: { fit: "contain" }, elements: { s1: { y: 1 }, t1: { fontScale: 0.8 } } });
+    expect(doc.revision).toBe(before + 1);
+    expect(overridesOf(doc.digitalTargets![0]!)).toEqual({ view: { y: 0 }, background: { fit: "contain" }, elements: { s1: { x: 0.5, y: 1 }, t1: { fontScale: 0.8 } } });
+    // Un elemento inexistente no cambia nada.
+    expect(applyCommand(doc, { type: "updateVariant", targetId: "v1", elements: { nope: { x: 1 } } }, doc.revision).ok).toBe(false);
+    expect(applyCommand(doc, { type: "updateVariant", targetId: "nope", view: { x: 0 } }, doc.revision).ok).toBe(false);
+  });
+  it("el encuadre valida rangos y rechaza variantes inexistentes", () => {
+    const doc = run(base(), { type: "addDigitalTarget", target: ig() });
+    for (const view of [{ x: 1.5 }, { y: -0.1 }, { zoom: 0.5 }, { zoom: 9 }, { foo: 1 }]) {
+      expect(applyCommand(doc, { type: "setVariantView", targetId: "v1", view } as never, doc.revision).ok).toBe(false);
+    }
+    expect(applyCommand(doc, { type: "setVariantView", targetId: "nope", view: { y: 0 } }, doc.revision).ok).toBe(false);
+  });
   it("clasifica elementos dentro, cortados y fuera del lienzo de la variante", () => {
     let doc = run(base(), { type: "addDigitalTarget", target: story() });
     doc = run(doc, { type: "setVariantElement", targetId: "v2", elementId: "s1", props: { x: 100, y: 0 } });
@@ -289,6 +340,19 @@ describe("fondo de la variante alineado con los elementos", () => {
     expect(doc.canvas.backgroundFrame).toBeUndefined();
   }
   it("cover con proporción distinta del lienzo base", () => check("cover", { x: 0.5, y: 0.5 }, { w: 900, h: 600 }, ig()));
+  it("con encuadre propio el fondo sigue el mismo mapa que los elementos", () => {
+    let doc = run(base(), { type: "addDigitalTarget", target: ig() });
+    doc = run(doc, { type: "setVariantView", targetId: "v1", view: { x: 0.2, y: 0.1, zoom: 1.5 } });
+    const t = doc.digitalTargets![0] as never;
+    const area = visibleArea(doc, t).rect;
+    const s = 0.6 * 1.5;
+    const rb = renderDocument(doc, { pxPerInch: 300 });
+    const rv = renderDocument(variantDocument(doc, t), { pxPerInch: 300 });
+    if (rb.background.kind !== "image" || rv.background.kind !== "image" || !rb.background.draw || !rv.background.draw) throw new Error("sin fondo");
+    expect(rv.background.draw.dest.x).toBeCloseTo((rb.background.draw.dest.x - area.x * 300) * s, 6);
+    expect(rv.background.draw.dest.y).toBeCloseTo((rb.background.draw.dest.y - area.y * 300) * s, 6);
+    expect(rv.background.draw.dest.width).toBeCloseTo(rb.background.draw.dest.width * s, 6);
+  });
   it("cover con posición no centrada", () => check("cover", { x: 0, y: 1 }, { w: 900, h: 600 }, story()));
   it("contain (con espacio libre) y fill", () => {
     check("contain", { x: 0.2, y: 0.8 }, { w: 900, h: 600 }, ig());

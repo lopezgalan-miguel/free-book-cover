@@ -90,6 +90,31 @@ export function createProjectSession(
     // Pasa a ser el último proyecto abierto.
     return save();
   }
+  // Copia el proyecto abierto (documento y blobs, también miniaturas) con otro id y abre la copia.
+  // Si algo no se puede guardar, se retira lo escrito y el proyecto original sigue abierto.
+  async function duplicateProject(name?: string): Promise<boolean> {
+    // También un proyecto nuevo sin tocar se guarda: tras duplicar deben existir el original y la copia.
+    if (!(await save())) return false;
+    const src = cell.get().history.present;
+    const assets = cell.get().assets;
+    const copy: Project = { ...src, id: deps.newId(), name: name ?? (src.name ? `${src.name} (copia)` : "") };
+    const written: string[] = [];
+    const fail = async (kind: "quota" | "incompatible" | "error") => {
+      await Promise.all(written.map((id) => deps.storage.deleteAsset(copy.id, id).catch(() => undefined)));
+      cell.set({ error: { kind: kind === "quota" ? "quota" : "save" } });
+      return false;
+    };
+    for (const a of assets) {
+      const put = await deps.storage.putAsset(copy.id, a.id, a.blob).catch(() => ({ ok: false as const, kind: "error" as const, message: "" }));
+      if (!put.ok) return fail(put.kind);
+      written.push(a.id);
+    }
+    const saved = await deps.storage.saveProject(copy).catch(() => ({ ok: false as const, kind: "error" as const, message: "" }));
+    if (!saved.ok) return fail(saved.kind);
+    openLoaded(copy, assets, copy.revision);
+    cell.set({ status: "saved" });
+    return true;
+  }
   async function deleteProject(id: string): Promise<boolean> {
     if (id === cell.get().history.present.id) return false;
     try {
@@ -154,5 +179,5 @@ export function createProjectSession(
     return parts.length;
   }
 
-  return { init, save, isDirty, hasUnsavedChanges, listProjects, flushBeforeSwitch, newProject, openProject, deleteProject, importBackup, downloadBackup };
+  return { init, save, isDirty, hasUnsavedChanges, listProjects, flushBeforeSwitch, newProject, openProject, duplicateProject, deleteProject, importBackup, downloadBackup };
 }

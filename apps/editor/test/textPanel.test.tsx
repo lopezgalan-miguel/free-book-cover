@@ -125,7 +125,8 @@ describe("panel de texto: controles", () => {
     fireEvent.change(screen.getByLabelText("Interlineado"), { target: { value: "1.5" } });
     fireEvent.change(screen.getByLabelText("Espaciado letras"), { target: { value: "0.2" } });
     fireEvent.change(screen.getByLabelText("Tamaño"), { target: { value: "60" } });
-    expect(textOf(store)).toMatchObject({ lineHeight: 1.5, letterSpacing: 0.2 });
+    fireEvent.change(screen.getByLabelText("Anchura de letra"), { target: { value: "0.75" } });
+    expect(textOf(store)).toMatchObject({ lineHeight: 1.5, letterSpacing: 0.2, scaleX: 0.75 });
     expect(textOf(store).runs[0]!.fontSizePt).toBe(60);
     await user.click(screen.getByRole("switch", { name: "Sombra" }));
     expect(textOf(store).shadow.on).toBe(false);
@@ -140,6 +141,28 @@ describe("panel de texto: controles", () => {
     expect(store.getState().history.present.assets.find((a) => a.id === "id3")).toMatchObject({ kind: "image", metadata: { widthPx: 400 } });
     await user.click(screen.getByRole("button", { name: "Quitar" }));
     expect(textOf(store).texture).toBeUndefined();
+  });
+
+  it("textura en mosaico: tamaño de tesela y desplazamiento, y vuelta a rellenar", async () => {
+    const user = userEvent.setup();
+    const { store } = await mount();
+    await addAndWrite(user, store, "Grano");
+    await user.upload(screen.getByLabelText("Subir textura"), png(400, 400));
+    await waitFor(() => expect(textOf(store).texture).toEqual({ assetId: "id3" }));
+    const fit = () => within(screen.getByRole("group", { name: "Encaje de la textura" }));
+    expect(fit().getByRole("button", { name: "Rellenar" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByLabelText("Tamaño de tesela")).toBeNull();
+    await user.click(fit().getByRole("button", { name: "Mosaico" }));
+    expect(textOf(store).texture).toEqual({ assetId: "id3", fit: "tile", tileIn: 1 });
+    fireEvent.change(screen.getByLabelText("Tamaño de tesela"), { target: { value: "0.5" } });
+    fireEvent.change(screen.getByLabelText("Desplazamiento horizontal"), { target: { value: "0.25" } });
+    expect(textOf(store).texture).toEqual({ assetId: "id3", fit: "tile", tileIn: 0.5, pos: { x: 0.25, y: 0 } });
+    // Sustituir la imagen conserva el encuadre elegido.
+    await user.upload(screen.getByLabelText("Subir textura"), png(200, 200));
+    await waitFor(() => expect(textOf(store).texture?.assetId).toBe("id4"));
+    expect(textOf(store).texture).toMatchObject({ fit: "tile", tileIn: 0.5 });
+    await user.click(fit().getByRole("button", { name: "Rellenar" }));
+    expect(textOf(store).texture).toMatchObject({ assetId: "id4", fit: "cover" });
   });
 
   it("cada cambio de peso o tamaño es un único paso de historial", async () => {

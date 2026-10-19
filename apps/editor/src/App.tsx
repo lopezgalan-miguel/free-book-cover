@@ -4,7 +4,7 @@ import { LeftPanel } from "./components/LeftPanel";
 import { Stage } from "./components/Stage";
 import { RightPanel } from "./components/RightPanel";
 import { Notices } from "./components/Notices";
-import { StoreProvider } from "./store/react";
+import { StoreProvider, useStore } from "./store/react";
 import { useI18n } from "./i18n";
 import { FontsProvider, useFontSync } from "./fonts/fontContext";
 import { ExportServicesProvider, type ExportServices } from "./export/exportContext";
@@ -44,7 +44,24 @@ export function App({ store, fonts, exportServices, mcpBridge }: { store: Editor
 // El breakpoint solo elige el contenedor; los paneles son los mismos.
 function Layout() {
   useFontSync();
+  useEscapeDeselects();
   return useLayout() === "mobile" ? <MobileLayout /> : <DesktopLayout />;
+}
+
+// Escape fuera de un campo y sin un diálogo abierto quita la selección (el diálogo usa Escape para cerrarse).
+function useEscapeDeselects() {
+  const store = useStore();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      if (store.getState().selectedId !== null) store.select(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [store]);
 }
 
 function DesktopLayout() {
@@ -55,11 +72,12 @@ function DesktopLayout() {
         <Header />
         <Notices />
         <div className="flex min-h-0 flex-1">
-          <aside className="w-[264px] flex-none overflow-y-auto border-r border-line bg-panel" aria-label={t("layers")}>
+          {/* relative: los <input> ocultos (sr-only, absolutos) quedan dentro del panel y no alargan la página. */}
+          <aside className="relative w-[264px] flex-none overflow-y-auto border-r border-line bg-panel" aria-label={t("layers")}>
             <LeftPanel />
           </aside>
           <Stage />
-          <aside className="w-[300px] flex-none overflow-y-auto border-l border-line bg-panel" aria-label={t("style")}>
+          <aside className="relative w-[300px] flex-none overflow-y-auto border-l border-line bg-panel" aria-label={t("style")}>
             <RightPanel />
           </aside>
         </div>

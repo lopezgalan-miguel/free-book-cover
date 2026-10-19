@@ -1,8 +1,13 @@
 import {
-  FONT_CATALOG, MCP_TOOLS, defaultTextElement, documentFontFamilies, editableKeys, importAssetEditorInput, needsRelayout, styleToPatch,
-  type CommandError, type ElementSummary, type Project, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
+  DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, FONT_CATALOG, availableFaces, availableWeights, hasFace, MAX_EXPORT_BYTES, MCP_TOOLS, assetDims, customTarget, defaultTextElement, documentFontFamilies,
+  editableKeys, elementVisibility, findPreset, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, needsRelayout, overridesOf,
+  styleToPatch, targetFromPreset, variantDocument, visibleArea,
+  type CommandError, type ElementSummary, type Project, type ResolvedTarget, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
 } from "@free-book-cover/core";
 import { textHeightIn } from "../canvas/measure";
+import { runExport, type ExportDeps } from "../export/exportImage";
+import type { FontRegistry } from "../fonts/fontRegistry";
+import { importFont } from "../fonts/importFont";
 import { importImage, type ThumbnailMaker } from "../images/importImage";
 import type { ExecutorPort } from "../store/ports";
 
@@ -13,6 +18,10 @@ export interface ExecutorDeps {
   /** Medidor de texto para dimensionar la caja; sin él se estima por el interlineado. */
   measure(): TextMeasure | null;
   makeThumbnail?: ThumbnailMaker;
+  /** Registro de fuentes del editor (import_font). */
+  fonts?: FontRegistry;
+  /** Dependencias de exportación del navegador (export_image). */
+  exportDeps?: () => ExportDeps;
 }
 
 const fail = (error: ToolError): ToolOutcome => ({ ok: false, error });
@@ -41,9 +50,37 @@ export function summarize(doc: Project): ElementSummary[] {
   });
 }
 
+// Una cara que la familia no publica fallaría al exportar (no se sintetiza): se rechaza al crearla.
+function missingFace(doc: Project, el: TextElement): string | null {
+  const own = documentFontFamilies(doc);
+  for (const r of el.runs) {
+    if (r.text === "" || hasFace(r.fontFamily, r.weight, r.italic, own)) continue;
+    const faces = (availableFaces(r.fontFamily, own) ?? []).map((f) => `${f.weight}${f.italic ? " cursiva" : ""}`).join(", ");
+    return `la fuente «${r.fontFamily}» no tiene la cara ${r.weight}${r.italic ? " cursiva" : ""} (disponibles: ${faces || "ninguna"})`;
+  }
+  return null;
+}
+
+const DEFAULT_WEIGHT = 500;
+function nearestWeight(doc: Project, family: string, italic: boolean): number {
+  const ws = availableWeights(family, italic, documentFontFamilies(doc));
+  return ws.length ? ws.reduce((b, w) => (Math.abs(w - DEFAULT_WEIGHT) < Math.abs(b - DEFAULT_WEIGHT) ? w : b)) : DEFAULT_WEIGHT;
+}
+
 const fontKnown = (doc: Project, family: string) => FONT_CATALOG.some((g) => g.names.includes(family)) || documentFontFamilies(doc).has(family);
 
 const bytesFromBase64 = (b64: string): Uint8Array => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
+async function base64FromBlob(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+const conflict = (expected: number, actual: number): ToolOutcome => fail({ kind: "conflict", expectedRevision: expected, actualRevision: actual });
+const variantOf = (d: Project, id: string): ResolvedTarget | undefined => d.digitalTargets?.find((t): t is ResolvedTarget => isResolvedTarget(t) && t.id === id);
+const imageAsset = (d: Project, id: string) => d.assets.find((a) => a.id === id && a.kind === "image");
 
 // Altura de la caja de un texto: la maquetación real si hay medidor; si no, una estimación por interlineado.
 function textHeight(deps: ExecutorDeps, el: TextElement): number {
@@ -69,7 +106,7 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
   const { store } = deps;
   const authorized = deps.authorizedProjectId();
   const doc = () => store.getState().history.present;
-  const schema = tool === "import_asset" ? importAssetEditorInput : MCP_TOOLS[tool].input;
+  const schema = tool === "import_asset" ? importAssetEditorInput : tool === "import_font" ? importFontEditorInput : MCP_TOOLS[tool].input;
   const parsed = schema.safeParse(rawArgs);
   if (!parsed.success) return invalid(...issuesOf(parsed.error));
   const args = parsed.data as Record<string, any>;
@@ -84,13 +121,18 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         ...(typeof a.metadata.widthPx === "number" ? { widthPx: a.metadata.widthPx } : {}),
         ...(typeof a.metadata.heightPx === "number" ? { heightPx: a.metadata.heightPx } : {}),
         ...(typeof a.metadata.sizeBytes === "number" ? { sizeBytes: a.metadata.sizeBytes } : {}),
+        ...(a.kind === "font" && typeof a.metadata.family === "string" ? { family: a.metadata.family } : {}),
       }));
+      const variants = (d.digitalTargets ?? []).filter(isResolvedTarget).map((t) => ({ id: t.id, name: t.name ?? t.presetId, presetId: t.presetId, widthPx: t.widthPx, heightPx: t.heightPx }));
+      const p = d.printSetup;
       return {
         ok: true,
         data: {
           projectId: d.id, name: d.name, mode: d.mode, revision: d.revision,
           canvas: { widthIn: d.canvas.widthIn, heightIn: d.canvas.heightIn, background: d.canvas.background, fit: d.canvas.backgroundFit ?? "cover" },
           elements: summarize(d), assets,
+          ...(p ? { printSetup: { trimWidthIn: p.trimWidthIn, trimHeightIn: p.trimHeightIn, pageCount: p.pageCount, paperAndInk: p.paperAndInk } } : {}),
+          ...(variants.length ? { variants } : {}),
         },
       };
     }
@@ -101,8 +143,11 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       if (!fontKnown(d, family)) return invalid(`fontFamily: la fuente «${family}» no está en el catálogo ni en el proyecto`);
       const draft = defaultTextElement({
         id: store.newId(), text: args.text, canvas: d.canvas, x: args.x, y: args.y, width: args.width,
-        style: { ...args, fontFamily: family },
+        // Sin peso: el publicado más próximo al de por defecto, en el estilo pedido.
+        style: { ...args, fontFamily: family, weight: args.weight ?? nearestWeight(d, family, args.italic ?? false) },
       });
+      const face = missingFace(d, draft);
+      if (face) return invalid(face);
       const r = store.applyRemote({ type: "addElement", element: { ...draft, height: textHeight(deps, draft) } }, args.expectedRevision);
       if (!r.ok) return fail(fromCommand(r.error, "element"));
       return { ok: true, data: { elementId: draft.id, revision: r.revision, saved: await saved(store) } };
@@ -118,7 +163,16 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       if (wrong.length) return invalid(...wrong.map((k) => `style.${k}: no aplicable a un elemento de tipo ${el.type}`));
       const family = style.fontFamily;
       if (el.type === "text" && typeof family === "string" && !fontKnown(doc(), family)) return invalid(`style.fontFamily: la fuente «${family}» no está en el catálogo ni en el proyecto`);
+      if (style.texture && !imageAsset(doc(), (style.texture as { assetId: string }).assetId)) {
+        return fail({ kind: "not_found", resource: "asset", id: (style.texture as { assetId: string }).assetId });
+      }
       const patch = styleToPatch(el, style);
+      // null quita la textura: updateElement elimina las claves con valor undefined.
+      if (style.texture === null) patch.texture = undefined;
+      if (el.type === "text") {
+        const face = missingFace(doc(), { ...el, ...patch } as TextElement);
+        if (face) return invalid(`style: ${face}`);
+      }
       // La caja sigue al texto salvo que el cliente fije la altura.
       if (el.type === "text" && style.height === undefined && needsRelayout(style)) {
         patch.height = textHeight(deps, { ...el, ...patch } as TextElement);
@@ -178,6 +232,128 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       if (!r.ok) return fail(fromCommand(r.error, "asset"));
       const now = doc();
       return { ok: true, data: { revision: r.revision, background: now.canvas.background, fit: now.canvas.backgroundFit ?? "cover", saved: await saved(store) } };
+    }
+
+    case "import_font": {
+      if (!deps.fonts) return fail({ kind: "internal" });
+      if (args.expectedRevision !== undefined && args.expectedRevision !== doc().revision) return conflict(args.expectedRevision, doc().revision);
+      let bytes: Uint8Array;
+      try {
+        bytes = bytesFromBase64(args.dataBase64);
+      } catch {
+        return invalid("dataBase64: no es base64 válido");
+      }
+      const r = await importFont(store, deps.fonts, new File([bytes as BlobPart], args.name, {}));
+      if (!r.ok) {
+        if (r.reason === "unsupported") return invalid("formato de fuente no admitido (.ttf, .otf o .woff2)");
+        if (r.reason === "load") return invalid("el navegador no pudo cargar la fuente");
+        if (r.reason === "limit") return invalid("la fuente supera un límite del proyecto");
+        return fail({ kind: "internal" });
+      }
+      return { ok: true, data: { assetId: r.assetId, family: r.family, revision: doc().revision, sizeBytes: bytes.length, saved: await saved(store) } };
+    }
+
+    case "add_image_element": {
+      const d = doc();
+      if (args.expectedRevision !== d.revision) return conflict(args.expectedRevision, d.revision);
+      const asset = imageAsset(d, args.assetId);
+      const dims = assetDims(asset);
+      if (!asset || !dims) return fail({ kind: "not_found", resource: "asset", id: args.assetId });
+      // Sin caja: la proporción de la imagen, hasta el 80 % del lienzo y centrada (como al subirla en Capas).
+      const k = Math.min((d.canvas.widthIn * 0.8) / dims.widthPx, (d.canvas.heightIn * 0.8) / dims.heightPx);
+      const width = args.width ?? dims.widthPx * k;
+      const height = args.height ?? dims.heightPx * k;
+      const element = {
+        id: store.newId(), type: "image" as const, x: args.x ?? (d.canvas.widthIn - width) / 2, y: args.y ?? (d.canvas.heightIn - height) / 2, width, height,
+        rotation: args.rotation ?? 0, zIndex: 0, visible: true, assetRef: { assetId: asset.id },
+        crop: args.crop ?? { x: 0, y: 0, width: 1, height: 1 }, fit: args.fit ?? "cover",
+      };
+      const r = store.applyRemote({ type: "addElement", element }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "element"));
+      return { ok: true, data: { elementId: element.id, revision: r.revision, saved: await saved(store) } };
+    }
+
+    case "add_shape_element": {
+      const element = {
+        id: store.newId(), type: "shape" as const, shape: args.shape, x: args.x, y: args.y, width: args.width, height: args.height,
+        rotation: args.rotation ?? 0, zIndex: 0, visible: true, fill: args.fill, ...(args.stroke ? { stroke: args.stroke } : {}),
+      };
+      const r = store.applyRemote({ type: "addElement", element }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "element"));
+      return { ok: true, data: { elementId: element.id, revision: r.revision, saved: await saved(store) } };
+    }
+
+    case "add_variant": {
+      const id = store.newId();
+      let target: ResolvedTarget;
+      if (args.presetId === "custom") {
+        const c = customTarget(id, args.widthPx, args.heightPx, args.name);
+        if (!c.ok) return invalid("widthPx/heightPx: tamaño no válido");
+        target = c.target;
+      } else {
+        target = { ...targetFromPreset(findPreset(args.presetId)!, id), ...(args.name ? { name: args.name } : {}) };
+      }
+      const r = store.applyRemote({ type: "addDigitalTarget", target }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "element"));
+      return { ok: true, data: { targetId: id, widthPx: target.widthPx, heightPx: target.heightPx, revision: r.revision, saved: await saved(store) } };
+    }
+
+    case "update_variant": {
+      const d = doc();
+      if (args.expectedRevision !== d.revision) return conflict(args.expectedRevision, d.revision);
+      if (!variantOf(d, args.targetId)) return fail({ kind: "not_found", resource: "variant", id: args.targetId });
+      const r = store.applyRemote({ type: "updateVariant", targetId: args.targetId, view: args.view, background: args.background, elements: args.elements }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "element"));
+      const now = doc();
+      const t = variantOf(now, args.targetId)!;
+      const notInside = elementVisibility(variantDocument(now, t)).filter((v) => v.visibility !== "inside");
+      return { ok: true, data: { targetId: t.id, visibleArea: visibleArea(now, t).rect, notInside, revision: r.revision, saved: await saved(store) } };
+    }
+
+    case "set_canvas": {
+      if (doc().mode === "kdp-paperback") return invalid("en una cubierta KDP el tamaño del lienzo lo fija set_print_setup");
+      const r = store.applyRemote({ type: "setCanvas", widthIn: args.widthIn, heightIn: args.heightIn }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "element"));
+      const c = doc().canvas;
+      return { ok: true, data: { revision: r.revision, canvas: { widthIn: c.widthIn, heightIn: c.heightIn }, saved: await saved(store) } };
+    }
+
+    case "set_print_setup": {
+      const printSetup = { trimWidthIn: args.trimWidthIn, trimHeightIn: args.trimHeightIn, pageCount: args.pageCount, paperAndInk: args.paperAndInk, readingDirection: "ltr" as const };
+      const r = store.applyRemote({ type: "setPrintSetup", printSetup }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "element"));
+      const l = kdpLayout(printSetup);
+      return {
+        ok: true,
+        data: {
+          revision: r.revision, canvas: { widthIn: l.widthIn, heightIn: l.heightIn }, spineIn: l.spineIn, back: l.back, spine: l.spine, front: l.front,
+          safeFront: l.safe.front, safeBack: l.safe.back, spineSafe: l.spineSafe, barcode: l.barcode, saved: await saved(store),
+        },
+      };
+    }
+
+    case "export_image": {
+      if (!deps.exportDeps) return fail({ kind: "internal" });
+      const d = doc();
+      const target = args.target !== undefined ? variantOf(d, args.target) : undefined;
+      if (args.target !== undefined && !target) return fail({ kind: "not_found", resource: "variant", id: args.target });
+      const exportDoc = target ? variantDocument(d, target) : d;
+      const widthPx = target ? target.widthPx : Math.round(d.canvas.widthIn * DEFAULT_PX_PER_IN);
+      const heightPx = target ? target.heightPx : Math.round(d.canvas.heightIn * DEFAULT_PX_PER_IN);
+      const out = await runExport({
+        doc: exportDoc, widthPx, heightPx, format: args.format, quality: args.quality ?? DEFAULT_EXPORT_QUALITY,
+        destination: target ? (target.name ?? target.presetId) : "diseño base", projectName: d.name, ...(target?.formats ? { allowedFormats: target.formats } : {}),
+      }, deps.exportDeps());
+      if (!out.ok) {
+        const e = out.error;
+        if (e.kind === "render_failed" || e.kind === "encode_failed") return fail({ kind: "internal" });
+        return invalid(`exportación: ${e.kind}${e.kind === "fonts" ? ` (${e.problems.map((p) => `${p.family}: ${p.reason}`).join(", ")})` : ""}`);
+      }
+      if (out.blob.size > MAX_EXPORT_BYTES) return invalid(`el archivo (${out.blob.size} bytes) supera el máximo del canal MCP (${MAX_EXPORT_BYTES}); usa JPEG o una variante más pequeña`);
+      return {
+        ok: true,
+        data: { fileName: out.report.fileName, format: args.format, mimeType: out.report.mimeType, widthPx, heightPx, bytes: out.blob.size, dataBase64: await base64FromBlob(out.blob) },
+      };
     }
   }
 }

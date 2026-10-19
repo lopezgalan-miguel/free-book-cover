@@ -4,6 +4,8 @@ export function recordingContext(): { ctx: CanvasRenderingContext2D; calls: Arra
   const calls: Array<[string, ...unknown[]]> = [];
   const props: Record<string, unknown> = {};
   const ctx = new Proxy({} as Record<string, unknown>, {
+    // Como un contexto moderno: cualquier propiedad existe (p. ej. letterSpacing).
+    has: () => true,
     get: (_t, k: string) => (k in props ? props[k] : (...args: unknown[]) => void calls.push([k, ...args])),
     set: (_t, k: string, v: unknown) => {
       props[k] = v;

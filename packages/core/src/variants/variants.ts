@@ -3,7 +3,7 @@ import { DEFAULT_PX_PER_IN } from "../canvas/presets.js";
 import { rotatePoint, type Rect } from "../geometry/fit.js";
 import {
   MAX_TARGET_PX, layoutOverridesSchema,
-  type DigitalTarget, type Element, type ElementOverride, type LayoutOverrides, type Project,
+  type DigitalTarget, type Element, type ElementOverride, type LayoutOverrides, type Project, type ViewOverride,
 } from "../schema/project.js";
 
 // Las variantes se definen en píxeles; el documento derivado usa pulgadas a 300 ppp (D-04),
@@ -55,28 +55,27 @@ interface CoverMap {
 
 // Derivación por defecto: el diseño base se escala de forma uniforme hasta cubrir la variante y se
 // centra. Se pierde lo que queda fuera (el usuario lo ve como área visible y puede reajustarlo).
-function coverMap(base: Project, vw: number, vh: number): CoverMap {
+// El encuadre de la variante (view) desplaza esa zona visible y multiplica la escala.
+function coverMap(base: Project, vw: number, vh: number, view: ViewOverride = {}): CoverMap {
   const bw = base.canvas.widthIn;
   const bh = base.canvas.heightIn;
-  const scale = Math.max(vw / bw, vh / bh);
+  const scale = Math.max(vw / bw, vh / bh) * (view.zoom ?? 1);
   const width = vw / scale;
   const height = vh / scale;
-  return { scale, visible: { x: (bw - width) / 2, y: (bh - height) / 2, width, height } };
+  return { scale, visible: { x: (bw - width) * (view.x ?? 0.5), y: (bh - height) * (view.y ?? 0.5), width, height } };
 }
 
 // Área del diseño base que muestra la variante por defecto y su proporción del lienzo base.
 export function visibleArea(base: Project, target: ResolvedTarget): { rect: Rect; coverage: number } {
-  const m = coverMap(base, target.widthPx / VARIANT_PX_PER_IN, target.heightPx / VARIANT_PX_PER_IN);
+  const m = coverMap(base, target.widthPx / VARIANT_PX_PER_IN, target.heightPx / VARIANT_PX_PER_IN, overridesOf(target).view);
   return { rect: m.visible, coverage: (m.visible.width * m.visible.height) / (base.canvas.widthIn * base.canvas.heightIn) };
 }
 
-function deriveElement(e: Element, m: CoverMap, base: Project, vw: number, vh: number, ov: ElementOverride | undefined): Element {
+function deriveElement(e: Element, m: CoverMap, ov: ElementOverride | undefined): Element {
   const s = m.scale;
-  const bw = base.canvas.widthIn;
-  const bh = base.canvas.heightIn;
   const derived = {
-    x: (e.x - bw / 2) * s + vw / 2,
-    y: (e.y - bh / 2) * s + vh / 2,
+    x: (e.x - m.visible.x) * s,
+    y: (e.y - m.visible.y) * s,
     width: e.width * s,
     height: e.height * s,
   };
@@ -103,15 +102,15 @@ function deriveElement(e: Element, m: CoverMap, base: Project, vw: number, vh: n
 export function variantDocument(base: Project, target: ResolvedTarget): Project {
   const vw = target.widthPx / VARIANT_PX_PER_IN;
   const vh = target.heightPx / VARIANT_PX_PER_IN;
-  const m = coverMap(base, vw, vh);
   const ov = overridesOf(target);
+  const m = coverMap(base, vw, vh, ov.view);
   const { printSetup: _p, digitalTargets: _d, ...rest } = base;
   // El fondo se encuadra respecto al lienzo base escalado con el mismo mapa que los elementos, de modo
   // que fondo y elementos siguen alineados aunque el fondo sea "ajustar", no esté centrado o la
   // proporción de la variante difiera de la del base.
   const bw = base.canvas.widthIn * m.scale;
   const bh = base.canvas.heightIn * m.scale;
-  const canvas = { ...base.canvas, widthIn: vw, heightIn: vh, backgroundFrame: { x: (vw - bw) / 2, y: (vh - bh) / 2, width: bw, height: bh } };
+  const canvas = { ...base.canvas, widthIn: vw, heightIn: vh, backgroundFrame: { x: (0 - m.visible.x) * m.scale, y: (0 - m.visible.y) * m.scale, width: bw, height: bh } };
   if (ov.background?.fit) canvas.backgroundFit = ov.background.fit;
   if (ov.background?.pos) canvas.backgroundPos = ov.background.pos;
   return {
@@ -119,7 +118,7 @@ export function variantDocument(base: Project, target: ResolvedTarget): Project 
     id: `${base.id}#${target.id}`,
     mode: "digital",
     canvas,
-    elements: base.elements.map((e) => deriveElement(e, m, base, vw, vh, ov.elements?.[e.id])),
+    elements: base.elements.map((e) => deriveElement(e, m, ov.elements?.[e.id])),
   };
 }
 

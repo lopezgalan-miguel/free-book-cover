@@ -168,7 +168,10 @@ function breakLines(tokens: Token[], maxWidth: number, measure: TextMeasure): Ra
 
 // Maquetación pura: envuelve el texto al ancho de la caja y coloca los fragmentos. Con curvatura
 // además reparte las letras sobre un arco. Todas las medidas son px a la escala `ppi`.
-export function layoutText(el: TextElement, ppi: number, measure: TextMeasure): TextLayout {
+export function layoutText(el: TextElement, ppi: number, rawMeasure: TextMeasure): TextLayout {
+  // La anchura de las letras escala lo medido; el espaciado se suma aparte y no cambia.
+  const sx = el.scaleX ?? 1;
+  const measure: TextMeasure = sx === 1 ? rawMeasure : (text, css) => rawMeasure(text, css) * sx;
   const boxW = Math.max(1, el.width * ppi);
   const fallbackPx = px(el.runs[0]?.fontSizePt ?? 12, ppi);
   const curved = el.curvature !== 0;

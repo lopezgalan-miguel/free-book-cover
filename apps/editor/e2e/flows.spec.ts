@@ -26,7 +26,7 @@ test("crear proyecto, editar texto, fuente, color, estilo y lienzo, y exportar P
   await expect.poll(async () => (await doc(page)).elements[0].runs[0].fontFamily).toBe("Playfair Display");
 
   await openTab(page, mobile, "color");
-  await page.getByLabel("Color hexadecimal").fill("#112233");
+  await page.getByLabel("Color hexadecimal", { exact: true }).fill("#112233");
   await closeSheet(page, mobile);
   await expect.poll(async () => (await doc(page)).elements[0].runs[0].color).toBe("#112233");
 

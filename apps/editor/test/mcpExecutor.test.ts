@@ -1,6 +1,8 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MCP_TOOLS, toolErrorSchema, type ToolOutcome } from "@free-book-cover/core";
+import { MAX_EXPORT_BYTES, MCP_TOOLS, exportImageEditorOutput, toolErrorSchema, type TextElement, type ToolOutcome } from "@free-book-cover/core";
+import type { ExportDeps } from "../src/export/exportImage";
+import { FontRegistry } from "../src/fonts/fontRegistry";
 import { executeTool, type ExecutorDeps } from "../src/mcp/executor";
 import { createEditorStore, type EditorStore } from "../src/store/editorStore";
 import { openStorage, type ProjectStorage } from "../src/storage/projectStorage";
@@ -224,5 +226,173 @@ describe("las mutaciones pasan por el historial", () => {
     expect(doc().revision).toBeGreaterThan(rev);
     const e = err(await run("add_text_element", { projectId: doc().id, expectedRevision: rev, text: "viejo" }));
     expect(e.kind).toBe("conflict");
+  });
+});
+
+// ---------------------------------------------------------------- herramientas de portada (fase 1)
+
+const TTF_B64 = btoa(String.fromCharCode(0, 1, 0, 0, 1, 2, 3, 4));
+const withFonts = () => {
+  const fonts = new FontRegistry({ addFace: async () => undefined, loadCatalog: async () => true });
+  deps = { ...deps, fonts };
+  return fonts;
+};
+const importPng = async () => ok(await run("import_asset", { projectId: doc().id, kind: "image", dataBase64: PNG_B64 })).assetId as string;
+const mut = (extra: object) => ({ projectId: doc().id, expectedRevision: doc().revision, ...extra });
+
+describe("caras de fuente inexistentes", () => {
+  it("add_text_element y update_element_style rechazan una cara que la familia no publica", async () => {
+    // EB Garamond solo tiene cursiva 400: pedir 500 cursiva explícitamente se rechaza.
+    const e = err(await run("add_text_element", mut({ text: "x", fontFamily: "EB Garamond", italic: true, weight: 500 })));
+    expect(e.kind).toBe("invalid_params");
+    expect(JSON.stringify(e)).toContain("EB Garamond");
+    expect(doc().elements).toHaveLength(0);
+    // Sin peso se usa la cara publicada más próxima al peso por defecto.
+    ok(await run("add_text_element", mut({ text: "x", fontFamily: "EB Garamond", italic: true })));
+    expect((doc().elements[0] as TextElement).runs[0]).toMatchObject({ weight: 400, italic: true });
+    ok(await run("add_text_element", mut({ text: "y", fontFamily: "Georgia" })));
+    expect((doc().elements[1] as TextElement).runs[0]!.weight).toBe(400);
+    const id = doc().elements[0]!.id;
+    expect(err(await run("update_element_style", mut({ elementId: id, style: { weight: 700 } }))).kind).toBe("invalid_params");
+    // Las fuentes subidas no tienen cursiva, pero cubren cualquier peso.
+    withFonts();
+    ok(await run("import_font", { projectId: doc().id, name: "Mía.ttf", dataBase64: TTF_B64 }));
+    ok(await run("update_element_style", mut({ elementId: id, style: { fontFamily: "Mía", italic: false, weight: 900 } })));
+  });
+});
+
+describe("update_element_style: anchura, textura y recorte", () => {
+  it("aplica anchura y textura en mosaico; null quita la textura", async () => {
+    const tex = await importPng();
+    const { elementId } = await add();
+    ok(await run("update_element_style", mut({ elementId, style: { scaleX: 0.8, texture: { assetId: tex, fit: "tile", tileIn: 1.5 } } })));
+    expect(doc().elements[0]).toMatchObject({ scaleX: 0.8, texture: { assetId: tex, fit: "tile", tileIn: 1.5 } });
+    ok(await run("update_element_style", mut({ elementId, style: { texture: null } })));
+    expect("texture" in doc().elements[0]!).toBe(false);
+  });
+  it("una textura con recurso inexistente o que no es imagen no cambia nada", async () => {
+    withFonts();
+    const { elementId } = await add();
+    const before = doc();
+    expect(err(await run("update_element_style", mut({ elementId, style: { texture: { assetId: "nope" } } })))).toEqual({ kind: "not_found", resource: "asset", id: "nope" });
+    const font = ok(await run("import_font", { projectId: doc().id, name: "F.ttf", dataBase64: TTF_B64 })).assetId;
+    expect(err(await run("update_element_style", mut({ elementId, style: { texture: { assetId: font } } }))).kind).toBe("not_found");
+    expect(doc().elements).toEqual(before.elements);
+  });
+});
+
+describe("import_font", () => {
+  it("registra la fuente, la guarda como recurso y se puede usar en fontFamily", async () => {
+    withFonts();
+    const out = ok(await run("import_font", { projectId: doc().id, name: "Mi Fuente.ttf", dataBase64: TTF_B64 }));
+    MCP_TOOLS.import_font.output.parse(out);
+    expect(out).toMatchObject({ family: "Mi Fuente", saved: true });
+    expect(doc().assets.find((a) => a.id === out.assetId)).toMatchObject({ kind: "font", metadata: { family: "Mi Fuente" } });
+    await add({ fontFamily: "Mi Fuente" });
+    expect((doc().elements[0] as TextElement).runs[0]!.fontFamily).toBe("Mi Fuente");
+  });
+  it("formato no admitido, revisión obsoleta o sin registro de fuentes: error y sin recurso", async () => {
+    expect(err(await run("import_font", { projectId: doc().id, name: "F.ttf", dataBase64: TTF_B64 })).kind).toBe("internal");
+    withFonts();
+    expect(err(await run("import_font", { projectId: doc().id, name: "F.ttf", dataBase64: btoa("no es una fuente") })).kind).toBe("invalid_params");
+    expect(err(await run("import_font", { projectId: doc().id, expectedRevision: 7, name: "F.ttf", dataBase64: TTF_B64 })).kind).toBe("conflict");
+    expect(doc().assets).toHaveLength(0);
+  });
+});
+
+describe("add_image_element y add_shape_element", () => {
+  it("añade una capa de imagen con caja por defecto o la indicada", async () => {
+    const a = await importPng();
+    const first = ok(await run("add_image_element", mut({ assetId: a })));
+    MCP_TOOLS.add_image_element.output.parse(first);
+    // PNG 1×1 en lienzo 6×9: cuadrado al 80 % del ancho, centrado.
+    const img = doc().elements.find((e) => e.id === first.elementId)!;
+    expect(img).toMatchObject({ type: "image", fit: "cover" });
+    expect([img.x, img.y, img.width, img.height].map((v) => +v.toFixed(9))).toEqual([0.6, 2.1, 4.8, 4.8]);
+    const second = ok(await run("add_image_element", mut({ assetId: a, x: 0, y: 0, width: 6, height: 9, fit: "contain", crop: { x: 0, y: 0, width: 1, height: 0.5 } })));
+    expect(doc().elements.find((e) => e.id === second.elementId)).toMatchObject({ x: 0, y: 0, width: 6, height: 9, fit: "contain", crop: { height: 0.5 } });
+    expect(err(await run("add_image_element", mut({ assetId: "nope" })))).toEqual({ kind: "not_found", resource: "asset", id: "nope" });
+  });
+  it("añade una forma", async () => {
+    const out = ok(await run("add_shape_element", mut({ shape: "rect", x: 1, y: 0, width: 0.3, height: 9, fill: "#0b0203" })));
+    expect(doc().elements.find((e) => e.id === out.elementId)).toMatchObject({ type: "shape", shape: "rect", fill: "#0b0203", width: 0.3 });
+  });
+});
+
+describe("variantes por MCP", () => {
+  it("añade una variante de preajuste y la ajusta en un solo paso", async () => {
+    const { elementId } = await add({ y: 0 });
+    const v = ok(await run("add_variant", mut({ presetId: "instagram-feed-portrait" })));
+    MCP_TOOLS.add_variant.output.parse(v);
+    expect(v).toMatchObject({ widthPx: 1080, heightPx: 1350 });
+    const rev = doc().revision;
+    const u = ok(await run("update_variant", mut({ targetId: v.targetId, view: { y: 0 }, elements: { [elementId]: { fontScale: 0.9 } } })));
+    MCP_TOOLS.update_variant.output.parse(u);
+    expect(doc().revision).toBe(rev + 1);
+    expect(u.visibleArea).toMatchObject({ y: 0, width: 6 });
+    expect(err(await run("update_variant", mut({ targetId: "nope", view: { y: 0 } })))).toEqual({ kind: "not_found", resource: "variant", id: "nope" });
+  });
+  it("tamaño propio", async () => {
+    const v = ok(await run("add_variant", mut({ presetId: "custom", widthPx: 1000, heightPx: 1000, name: "Cuadrado" })));
+    expect(doc().digitalTargets!.find((t) => t.id === v.targetId)).toMatchObject({ name: "Cuadrado", widthPx: 1000, heightPx: 1000 });
+  });
+});
+
+describe("set_canvas", () => {
+  it("cambia el tamaño del lienzo libre en un solo paso", async () => {
+    const rev = doc().revision;
+    const out = ok(await run("set_canvas", mut({ widthIn: 1600 / 300, heightIn: 2560 / 300 })));
+    MCP_TOOLS.set_canvas.output.parse(out);
+    expect(doc().canvas).toMatchObject({ widthIn: 1600 / 300, heightIn: 2560 / 300 });
+    expect(doc().revision).toBe(rev + 1);
+  });
+  it("en una cubierta KDP el tamaño lo fija la configuración de impresión", async () => {
+    ok(await run("set_print_setup", mut({ trimWidthIn: 5, trimHeightIn: 8, pageCount: 132, paperAndInk: "bw-white" })));
+    expect(err(await run("set_canvas", mut({ widthIn: 5, heightIn: 8 }))).kind).toBe("invalid_params");
+  });
+});
+
+describe("set_print_setup", () => {
+  it("configura la cubierta KDP y devuelve la geometría", async () => {
+    const out = ok(await run("set_print_setup", mut({ trimWidthIn: 5, trimHeightIn: 8, pageCount: 132, paperAndInk: "bw-white" })));
+    MCP_TOOLS.set_print_setup.output.parse(out);
+    expect(doc().mode).toBe("kdp-paperback");
+    expect(out.spineIn).toBeCloseTo(0.297264, 6);
+    expect(out.canvas.widthIn).toBeCloseTo(10.547264, 6);
+    expect(out.front.x).toBeCloseTo(5.422264, 6);
+  });
+  it("un corte no admitido es invalid_params y no cambia nada", async () => {
+    const before = doc();
+    expect(err(await run("set_print_setup", mut({ trimWidthIn: 5.5, trimHeightIn: 8.5, pageCount: 116, paperAndInk: "bw-white" }))).kind).toBe("invalid_params");
+    expect(doc()).toBe(before);
+  });
+});
+
+describe("export_image", () => {
+  const exportDeps = (bytes = 10): ExportDeps => ({
+    fonts: { ensureDoc: () => undefined, whenSettled: async () => undefined, checkFontsReady: () => ({ ok: true }) },
+    missingAssets: () => [],
+    render: async (_d, size) => size,
+    encode: async (_c, mimeType) => new Blob([new Uint8Array(bytes)], { type: mimeType }),
+  });
+  it("exporta el base a 300 ppp y devuelve los bytes y el nombre", async () => {
+    deps = { ...deps, exportDeps: () => exportDeps() };
+    const out = ok(await run("export_image", { projectId: doc().id, format: "png" }));
+    expect(exportImageEditorOutput.parse(out)).toMatchObject({ format: "png", widthPx: 1800, heightPx: 2700, bytes: 10 });
+    expect(out.fileName).toMatch(/1800x2700\.png$/);
+    expect(atob(out.dataBase64)).toHaveLength(10);
+  });
+  it("exporta una variante con sus píxeles; destino inexistente o sin exportador da error", async () => {
+    expect(err(await run("export_image", { projectId: doc().id, format: "png" })).kind).toBe("internal");
+    deps = { ...deps, exportDeps: () => exportDeps() };
+    const v = ok(await run("add_variant", mut({ presetId: "instagram-feed-square" })));
+    expect(ok(await run("export_image", { projectId: doc().id, format: "jpeg", target: v.targetId }))).toMatchObject({ widthPx: 1080, heightPx: 1080, format: "jpeg" });
+    expect(err(await run("export_image", { projectId: doc().id, format: "png", target: "nope" }))).toEqual({ kind: "not_found", resource: "variant", id: "nope" });
+    // Un formato que el destino no admite (WebP en Instagram) se rechaza.
+    expect(err(await run("export_image", { projectId: doc().id, format: "webp", target: v.targetId })).kind).toBe("invalid_params");
+  });
+  it("un archivo mayor que el límite del canal se rechaza con un motivo", async () => {
+    deps = { ...deps, exportDeps: () => exportDeps(MAX_EXPORT_BYTES + 1) };
+    expect(err(await run("export_image", { projectId: doc().id, format: "png" })).kind).toBe("invalid_params");
   });
 });

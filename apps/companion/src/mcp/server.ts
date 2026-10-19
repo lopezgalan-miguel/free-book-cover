@@ -1,14 +1,17 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
-  MCP_TOOLS, MCP_TOOL_NAMES, toolJsonSchema, type McpToolName, type ToolError, type ToolOutcome,
+  MCP_TOOLS, MCP_TOOL_NAMES, exportImageEditorOutput, toolJsonSchema, type McpToolName, type ToolError, type ToolOutcome,
 } from "@free-book-cover/core";
+import { basename } from "node:path";
 import { COMPANION_VERSION } from "../version.js";
-import { readImportFile, type ImportLimits } from "./files.js";
+import { readImportFile, writeExportFile, type ImportLimits } from "./files.js";
 
 export interface McpServerOptions {
   relay: { call(tool: McpToolName, args: unknown): Promise<ToolOutcome> };
   imports: ImportLimits;
+  /** Directorio donde export_image escribe los archivos (FBC_EXPORT_DIR); sin él, export_image da error. */
+  exportDir?: string | null;
 }
 
 const isTool = (n: string): n is McpToolName => (MCP_TOOL_NAMES as readonly string[]).includes(n);
@@ -55,8 +58,27 @@ export function createMcpServer(opts: McpServerOptions): Server {
         ...(input.expectedRevision !== undefined ? { expectedRevision: input.expectedRevision } : {}),
       };
     }
+    if (name === "import_font") {
+      const input = parsed.data as { projectId: string; expectedRevision?: number; path: string };
+      const file = await readImportFile(input.path, opts.imports, "font");
+      if (!file.ok) return errorResult(file.error);
+      payload = {
+        projectId: input.projectId, name: file.name, dataBase64: file.bytes.toString("base64"),
+        ...(input.expectedRevision !== undefined ? { expectedRevision: input.expectedRevision } : {}),
+      };
+    }
     const out = await opts.relay.call(name, payload);
     if (!out.ok) return errorResult(out.error);
+    if (name === "export_image") {
+      // El editor entrega los bytes; aquí se escriben y el cliente solo recibe la ruta.
+      const file = exportImageEditorOutput.safeParse(out.data);
+      if (!file.success) return errorResult({ kind: "internal" });
+      const { dataBase64, mimeType: _m, ...meta } = file.data;
+      const written = await writeExportFile(opts.exportDir ?? null, meta.fileName, Buffer.from(dataBase64, "base64"));
+      if (!written.ok) return errorResult(written.error);
+      const result = { path: written.path, ...meta, fileName: basename(written.path) };
+      return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
+    }
     const data = def.output.safeParse(out.data);
     if (!data.success) {
       console.error(`respuesta del editor no válida para ${name}`);

@@ -73,7 +73,7 @@ export function Header() {
         <div className="flex items-center gap-3.5">
           <LangToggle />
           <div className="font-mono text-xs text-muted" data-testid="dims">
-            {doc.canvas.widthIn} × {doc.canvas.heightIn} in
+            {Number(doc.canvas.widthIn.toFixed(3))} × {Number(doc.canvas.heightIn.toFixed(3))} in
           </div>
           <Tip label={t("undo")}>
             <button className={iconBtn} aria-label={t("undo")} disabled={!store.canUndo()} onClick={() => store.undo()}>↶</button>

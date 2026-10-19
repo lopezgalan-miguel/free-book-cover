@@ -31,13 +31,22 @@ export function Notices() {
   const fonts = useFonts();
   const doc = history.present;
   const fontProblems = useFontProblems();
-  // Aviso de ppp efectivos < 300 con el elemento afectado (SDD R-03).
-  const low = dpiReport(doc).filter((d) => d.lowDpi).map((d) => {
+  // Aviso de ppp efectivos < 300 con el recurso afectado (SDD R-03), en una sola franja: el mismo recurso
+  // con los mismos ppp en varias capas se cuenta («× 3») en vez de repetirse.
+  const lowItems = new Map<string, { name: string; dpi: number; count: number }>();
+  for (const d of dpiReport(doc).filter((x) => x.lowDpi)) {
     const el = doc.elements.find((e) => e.id === d.id);
     const asset = doc.assets.find((a) => a.id === (el?.type === "image" ? el.assetRef.assetId : el?.type === "text" ? (el.texture?.assetId ?? "") : typeof doc.canvas.background === "object" ? doc.canvas.background.assetId : ""));
     const name = d.id === "background" ? t("backgroundName") : typeof asset?.metadata.name === "string" ? asset.metadata.name : t("imageLayer");
-    return { id: d.id, text: t("dpiLow", { name, dpi: Math.round(d.dpi) }) };
-  });
+    const dpi = Math.round(d.dpi);
+    const key = `${name}|${dpi}`;
+    const prev = lowItems.get(key);
+    lowItems.set(key, { name, dpi, count: (prev?.count ?? 0) + 1 });
+  }
+  const lowList = [...lowItems.values()];
+  const lowText = lowList.length === 1 && lowList[0]!.count === 1
+    ? t("dpiLow", { name: lowList[0]!.name, dpi: lowList[0]!.dpi })
+    : t("dpiLowMany", { list: lowList.map((l) => `${l.name} (${l.dpi} ppp${l.count > 1 ? ` × ${l.count}` : ""})`).join(", ") });
   const warning = (
     <>
       {nearLimit && <div role="status" className="border-b border-line bg-chip px-[18px] py-2 text-[13px]">{t("projectNearLimit")}</div>}
@@ -51,9 +60,9 @@ export function Notices() {
           )}
         </div>
       ))}
-      {low.map((l) => (
-        <div key={l.id} role="status" data-testid="dpi-warning" className="border-b border-warn-line bg-warn-bg px-[18px] py-2 text-[13px] text-warn-ink">{l.text}</div>
-      ))}
+      {lowList.length > 0 && (
+        <div role="status" data-testid="dpi-warning" className="border-b border-warn-line bg-warn-bg px-[18px] py-2 text-[13px] text-warn-ink">{lowText}</div>
+      )}
     </>
   );
   if (!error || error.kind === "command") return warning;

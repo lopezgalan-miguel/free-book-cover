@@ -119,6 +119,26 @@ describe("panel de variantes", () => {
     expect(store.getState().history.present.digitalTargets![0]!.layoutOverrides).toEqual({});
   });
 
+  it("encuadre de la variante: desplazar la zona visible y ampliar, solo en esa variante", async () => {
+    const user = userEvent.setup();
+    const { store } = await mount();
+    store.dispatch({ type: "addElement", element: rect("s1", { x: 0, y: 0, width: 0.5, height: 0.5 }) });
+    await addVariant(user, "instagram-feed-portrait");
+    const ov = () => overridesOf(store.getState().history.present.digitalTargets![0]!);
+    // Con el encuadre arriba (0 %), el cuadro de la esquina superior deja de quedar fuera.
+    expect(screen.getAllByTestId("variant-outside").length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText("Encuadre vertical"), { target: { value: "0" } });
+    expect(ov().view).toEqual({ y: 0 });
+    expect(screen.queryAllByTestId("variant-outside")).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText("Zoom del encuadre"), { target: { value: "1.5" } });
+    fireEvent.change(screen.getByLabelText("Encuadre horizontal"), { target: { value: "0.2" } });
+    expect(ov().view).toEqual({ y: 0, zoom: 1.5, x: 0.2 });
+    expect(store.getState().history.present.canvas.backgroundFrame).toBeUndefined();
+    // Restablecer la variante también quita el encuadre.
+    await user.click(screen.getByRole("button", { name: "Restablecer variante" }));
+    expect(ov().view).toBeUndefined();
+  });
+
   it("guardar y reabrir conserva variantes y ajustes", async () => {
     const user = userEvent.setup();
     const { store } = await mount();
