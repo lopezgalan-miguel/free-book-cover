@@ -22,7 +22,8 @@ export type Command =
   | { type: "setName"; name: string }
   | { type: "setCanvas"; widthIn: number; heightIn: number }
   // fit/pos opcionales: fijan el encuadre en el mismo paso atómico (un solo comando, una revisión).
-  | { type: "setBackground"; background: Project["canvas"]["background"]; fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number } }
+  // filters: null los quita; sin indicar se conservan (son del lienzo, no de la imagen).
+  | { type: "setBackground"; background: Project["canvas"]["background"]; fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number }; filters?: ImageFilters | null }
   // Encuadre del fondo: modo de ajuste y/o posición (0..1).
   | { type: "setBackgroundLayout"; fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number } }
   // Desenfoque, brillo y saturación del fondo; null los quita. Se conservan al cambiar la imagen.
@@ -118,10 +119,15 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
       return { ...doc, canvas: { ...doc.canvas, widthIn: cmd.widthIn, heightIn: cmd.heightIn } };
     case "setBackground": {
       // El encuadre pertenece al fondo: al cambiarlo vuelve a cover y centrado.
-      const { backgroundFit: _f, backgroundPos: _p, ...rest } = doc.canvas;
+      const { backgroundFit: _f, backgroundPos: _p, ...kept } = doc.canvas;
+      const { backgroundFilters: _old, ...rest } = kept;
+      const filters = cmd.filters === undefined ? doc.canvas.backgroundFilters : (cmd.filters ?? undefined);
       return {
         ...doc,
-        canvas: { ...rest, background: cmd.background, ...(cmd.fit !== undefined ? { backgroundFit: cmd.fit } : {}), ...(cmd.pos !== undefined ? { backgroundPos: cmd.pos } : {}) },
+        canvas: {
+          ...rest, background: cmd.background, ...(cmd.fit !== undefined ? { backgroundFit: cmd.fit } : {}), ...(cmd.pos !== undefined ? { backgroundPos: cmd.pos } : {}),
+          ...(filters ? { backgroundFilters: filters } : {}),
+        },
       };
     }
     case "setBackgroundLayout": {
