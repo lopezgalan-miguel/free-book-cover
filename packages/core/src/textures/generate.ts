@@ -14,8 +14,10 @@ export interface TextureOptions {
   scale?: number;
   // Color base #rrggbb. Por defecto según el tipo.
   color?: string;
-  // Solo mármol: grietas transparentes (se ve lo que hay detrás) o líneas oscuras opacas.
+  // Solo mármol: grietas transparentes (se ve lo que hay detrás) o líneas opacas del color crackColor.
   cracks?: "holes" | "lines";
+  // Solo mármol con líneas: color de las grietas. Por defecto rojo muy oscuro.
+  crackColor?: string;
 }
 
 export interface GeneratedTexture {
@@ -25,7 +27,7 @@ export interface GeneratedTexture {
 }
 
 const DEFAULTS: Record<TextureKind, { scale: number; color: string }> = {
-  "cracked-marble": { scale: 6, color: "#e8d9c4" },
+  "cracked-marble": { scale: 10, color: "#f4cfb3" },
   stone: { scale: 4, color: "#9a948a" },
   paper: { scale: 8, color: "#efe6d2" },
 };
@@ -85,7 +87,7 @@ function fbm(rand: () => number, base: number, octaves: number, stretchX = 1, st
   };
 }
 
-// Voronoi en el toro: g × g celdas con un punto cada una. Devuelve F1, F2 (en celdas) y el índice de la más próxima.
+// Voronoi en el toro: g × g celdas con un punto cada una. Devuelve F1, F2, F3 (en celdas) y el índice de la más próxima.
 function voronoi(g: number, rand: () => number) {
   const pts = new Float32Array(g * g * 2);
   for (let i = 0; i < g * g; i++) {
@@ -99,6 +101,7 @@ function voronoi(g: number, rand: () => number) {
     const cy = Math.floor(y);
     let f1 = Infinity;
     let f2 = Infinity;
+    let f3 = Infinity;
     let id = 0;
     for (let j = -1; j <= 1; j++) {
       for (let i = -1; i <= 1; i++) {
@@ -109,13 +112,17 @@ function voronoi(g: number, rand: () => number) {
         const dy = iy + pts[k * 2 + 1]! - y;
         const d = Math.hypot(dx, dy);
         if (d < f1) {
+          f3 = f2;
           f2 = f1;
           f1 = d;
           id = k;
-        } else if (d < f2) f2 = d;
+        } else if (d < f2) {
+          f3 = f2;
+          f2 = d;
+        } else if (d < f3) f3 = d;
       }
     }
-    return { f1, f2, id };
+    return { f1, f2, f3, id };
   };
 }
 
@@ -146,44 +153,57 @@ export function textureSampler(o: TextureOptions): { size: number; sample: Textu
 
   if (o.kind === "cracked-marble") {
     const plates = voronoi(scale, rand);
-    const fine = voronoi(scale * 3, rand);
-    const vein = fbm(rand, 4, 5);
+    const fine = voronoi(scale * 2, rand);
     // Deformación del dominio a dos escalas: grietas quebradas y cantos dentados, no polígonos rectos.
     const warpA = fbm(rand, 6, 3);
     const warpB = fbm(rand, 6, 3);
     const jag = fbm(rand, 48, 2);
     const width = fbm(rand, 10, 2);
+    // Grietas discontinuas (tramos y cuentas), manchas de la piedra, grano y motas claras.
+    const beads = fbm(rand, scale * 6, 2);
+    const hairArea = fbm(rand, 3, 3);
+    const blotch = fbm(rand, scale * 3, 4);
+    const pits = new PeriodicNoise(Math.round(size / 6), Math.round(size / 6), rand);
     const grain = new PeriodicNoise(Math.round(size / 2), Math.round(size / 2), rand);
     const speck = new PeriodicNoise(Math.round(size / 3), Math.round(size / 3), rand);
-    const tint = Float32Array.from({ length: scale * scale }, () => 0.93 + 0.12 * rand());
+    const tint = Float32Array.from({ length: scale * scale }, () => 0.96 + 0.06 * rand());
     const holes = (o.cracks ?? "holes") === "holes";
+    const [cr, cg, cb] = parseColor(o.crackColor ?? "#460808");
+    const crack = (data: Uint8ClampedArray | number[], i: number) => {
+      if (holes) return tone(data, i, 0, 0);
+      data[i] = cr;
+      data[i + 1] = cg;
+      data[i + 2] = cb;
+      data[i + 3] = 255;
+    };
     const warp = (0.06 * 6) / scale;
     return {
       size,
       sample(x, y, data, i) {
         const u = x / size;
         const v = y / size;
-        const j = (jag.at(u, v) - 0.5) * 0.012;
+        const j = (jag.at(u, v) - 0.5) * 0.01;
         const wu = u + (warpA.at(u, v) - 0.5) * warp + j;
         const wv = v + (warpB.at(u, v) - 0.5) * warp + j;
-        // Grieta principal: franja entre placas de ancho irregular; secundarias: finas y solo en parte de las placas.
         const p = plates(wu, wv);
         const edge = p.f2 - p.f1;
-        const w = 0.012 + 0.03 * width.at(u, v) ** 2;
+        const w = 0.02 + 0.035 * width.at(u, v) ** 2;
+        // Nudo en los cruces (tres celdas casi a la misma distancia), más ancho que la grieta.
+        const node = p.f3 - p.f1 < w * 2.2;
         const f = fine(wu, wv);
-        if (edge < w || (f.f2 - f.f1 < 0.03 && vein.at(v, u) > 0.6)) {
-          if (holes) tone(data, i, 0, 0);
-          else {
-            data[i] = 70;
-            data[i + 1] = 8;
-            data[i + 2] = 8;
-            data[i + 3] = 255;
-          }
-          return;
+        const hair = f.f2 - f.f1 < 0.025 && hairArea.at(v, u) > 0.62;
+        const broken = beads.at(u, v) < 0.3;
+        if (node || (edge < w && !broken) || (hair && !broken)) {
+          // Motas blancas en algunos nudos: canto astillado que brilla.
+          if (node && speck.at(u, v) > 0.75) return tone(data, i, 1.25);
+          return crack(data, i);
         }
-        // Placa: veteado suave, grano, tono por placa y motas claras (más junto a la grieta: canto astillado).
-        let k = (0.8 + 0.28 * vein.at(u, v)) * tint[p.id]! * (0.9 + 0.2 * grain.at(u, v));
-        if (speck.at(u, v) > (edge < w * 2.5 ? 0.66 : 0.8)) k = Math.min(1.3, k + 0.22);
+        // Poros sueltos en la placa (cuentas de la misma grieta).
+        if (pits.at(u, v) > 0.95) return crack(data, i);
+        // Placa: manchas contrastadas, grano, tono por placa y motas claras junto a la grieta.
+        const b = blotch.at(u, v);
+        let k = (0.88 + 0.16 * smooth(Math.min(1, Math.max(0, (b - 0.25) * 2)))) * tint[p.id]! * (0.97 + 0.06 * grain.at(u, v));
+        if (edge < w * 2.2 && speck.at(u, v) > 0.8) k = Math.min(1.3, k + 0.2);
         tone(data, i, Math.min(1.3, k));
       },
     };

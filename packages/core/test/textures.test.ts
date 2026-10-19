@@ -42,6 +42,12 @@ describe("generateTexture", () => {
     expect(transparent(generateTexture({ kind: "cracked-marble", seed: 1, sizePx: SIZE, cracks: "lines" }).data)).toBe(0);
     expect(transparent(generateTexture({ kind: "stone", seed: 1, sizePx: SIZE }).data)).toBe(0);
   });
+  it("con líneas, las grietas toman el color pedido", () => {
+    const t = generateTexture({ kind: "cracked-marble", seed: 1, sizePx: 128, cracks: "lines", crackColor: "#b4141e" });
+    let n = 0;
+    for (let i = 0; i < t.data.length; i += 4) if (t.data[i] === 0xb4 && t.data[i + 1] === 0x14 && t.data[i + 2] === 0x1e) n++;
+    expect(n / (t.data.length / 4)).toBeGreaterThan(0.02);
+  });
   it("rechaza tamaños fuera de 64..2048 y tipos desconocidos", () => {
     expect(() => generateTexture({ kind: "stone", seed: 1, sizePx: 32 })).toThrow(RangeError);
     expect(() => generateTexture({ kind: "stone", seed: 1, sizePx: 4096 })).toThrow(RangeError);

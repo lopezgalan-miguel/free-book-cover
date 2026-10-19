@@ -268,7 +268,8 @@ export const generateTextureInput = z
     sizePx: z.number().int().min(64).max(2048).optional().describe("Lado de la tesela cuadrada (por defecto 1024)."),
     scale: z.number().int().min(1).max(32).optional().describe("Placas o granos a lo ancho de la tesela."),
     color: colorSchema.optional().describe("Color base."),
-    cracks: z.enum(["holes", "lines"]).optional().describe("Solo mármol: grietas transparentes (por defecto) o líneas oscuras."),
+    cracks: z.enum(["holes", "lines"]).optional().describe("Solo mármol: grietas transparentes (por defecto) o líneas opacas."),
+    crackColor: colorSchema.optional().describe("Solo mármol con cracks lines: color de las grietas (por defecto #460808)."),
   })
   .strict();
 
