@@ -363,7 +363,7 @@ describe("set_print_setup", () => {
   });
   it("un corte no admitido es invalid_params y no cambia nada", async () => {
     const before = doc();
-    expect(err(await run("set_print_setup", mut({ trimWidthIn: 5.5, trimHeightIn: 8.5, pageCount: 116, paperAndInk: "bw-white" }))).kind).toBe("invalid_params");
+    expect(err(await run("set_print_setup", mut({ trimWidthIn: 7, trimHeightIn: 9, pageCount: 116, paperAndInk: "bw-white" }))).kind).toBe("invalid_params");
     expect(doc()).toBe(before);
   });
 });
