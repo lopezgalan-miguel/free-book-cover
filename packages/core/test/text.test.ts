@@ -155,7 +155,7 @@ describe("efectos y renderDocument", () => {
     const fx = textEffects(e, 72);
     expect(fx.shadow).toMatchObject({ dx: 0, dy: 3.6, blur: 11.52 });
     expect(fx.outline).toEqual({ width: 7.2, color: "#112233" });
-    expect(textEffects(el(), 72)).toEqual({ shadow: null, outline: null });
+    expect(textEffects(el(), 72)).toEqual({ shadow: null, outline: null, innerShadow: null });
   });
   it("renderDocument incluye maquetación solo con medidor, y la textura cubre la caja", () => {
     const doc: Project = {

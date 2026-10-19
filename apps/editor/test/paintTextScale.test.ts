@@ -4,7 +4,7 @@ import { recordingContext } from "./helpers/recordingContext";
 
 const style = { font: "400 40px Lora", fontPx: 40, color: "#ffffff", underline: true, spacingPx: 4 };
 const item = (scaleX?: number): TextItem => ({
-  id: "t", zIndex: 0, kind: "text", rotation: 0, box: { x: 0, y: 0, width: 300, height: 100 },
+  id: "t", zIndex: 0, kind: "text", rotation: 0, opacity: 1, box: { x: 0, y: 0, width: 300, height: 100 },
   element: {
     id: "t", type: "text", x: 0, y: 0, width: 1, height: 1, rotation: 0, zIndex: 0, visible: true,
     runs: [{ text: "Hola", fontFamily: "Lora", fontSizePt: 10, weight: 400, italic: false, underline: true, uppercase: false, color: "#ffffff" }],
@@ -13,8 +13,9 @@ const item = (scaleX?: number): TextItem => ({
   },
   // La maquetación ya viene estrechada: 4 letras de 10 px + 4 × 4 px de espaciado.
   layout: { heightPx: 40, glyphs: null, lines: [{ top: 0, height: 40, baseline: 32, width: 56, pieces: [{ text: "Hola", x: 10, width: 56, style }] }] },
-  effects: { shadow: null, outline: null },
+  effects: { shadow: null, outline: null, innerShadow: null },
   texture: null,
+  mask: null,
 });
 
 describe("paintTextItem: anchura de las letras", () => {

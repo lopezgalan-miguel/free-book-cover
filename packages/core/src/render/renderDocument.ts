@@ -1,4 +1,4 @@
-import type { Asset, Element, Project, TextTexture } from "../schema/project.js";
+import type { Asset, Element, ImageFilters, Project, TextMask, TextTexture } from "../schema/project.js";
 import { CENTER, placeImage, rectCenter, rotatePoint, type FitMode, type Placement, type Point, type Rect } from "../geometry/fit.js";
 import { effectiveDpi, isLowDpi } from "../images/dpi.js";
 import { layoutText, textEffects, type TextEffects, type TextLayout, type TextMeasure } from "../text/layout.js";
@@ -25,19 +25,39 @@ export interface TextureDraw extends ImageDraw {
   repeat: boolean;
 }
 
+export interface MaskDraw extends TextureDraw {
+  mode: TextMask["mode"];
+  threshold: number;
+  softness: number;
+}
+
+// Filtros que cambian algo; null si todos son neutros (sin filtro, se pinta como siempre).
+export function activeFilters(f: ImageFilters | undefined): ImageFilters | null {
+  if (!f) return null;
+  const out: ImageFilters = {};
+  if (f.blur !== undefined && f.blur > 0) out.blur = f.blur;
+  if (f.brightness !== undefined && f.brightness !== 100) out.brightness = f.brightness;
+  if (f.saturation !== undefined && f.saturation !== 100) out.saturation = f.saturation;
+  return Object.keys(out).length ? out : null;
+}
+
+// Suavizado por defecto del borde de la máscara (fracción de la escala 0..1 del umbral).
+export const DEFAULT_MASK_SOFTNESS = 0.1;
+
 export type RenderBackground =
   | { kind: "color"; color: string }
   // frame: caja (px) respecto a la que se encuadra la imagen; por defecto, el lienzo entero.
-  | { kind: "image"; draw: ImageDraw | null; fallbackColor: string; frame: Rect };
+  | { kind: "image"; draw: ImageDraw | null; fallbackColor: string; frame: Rect; filters: ImageFilters | null };
 
 interface ItemBase {
   id: string;
   zIndex: number;
   box: Rect; // px, sin rotar
   rotation: number; // grados, alrededor del centro de la caja
+  opacity: number; // 0..1
 }
 export type RenderItem =
-  | (ItemBase & { kind: "image"; draw: ImageDraw | null })
+  | (ItemBase & { kind: "image"; draw: ImageDraw | null; filters: ImageFilters | null })
   | (ItemBase & {
       kind: "text";
       element: Extract<Element, { type: "text" }>;
@@ -46,6 +66,8 @@ export type RenderItem =
       effects: TextEffects;
       // Encuadre de la textura (coordenadas relativas a la caja). Con repeat, dest es una tesela que se repite.
       texture: TextureDraw | null;
+      // Máscara de recorte, colocada igual que una textura.
+      mask: MaskDraw | null;
     })
   | (ItemBase & { kind: "shape"; element: Extract<Element, { type: "shape" }> });
 
@@ -97,6 +119,11 @@ function textureDraw(tex: TextTexture, dims: AssetDims | null, box: Rect, ppi: n
   };
 }
 
+function maskDraw(m: TextMask, dims: AssetDims | null, box: Rect, ppi: number): MaskDraw | null {
+  const d = textureDraw(m, dims, box, ppi);
+  return d && { ...d, mode: m.mode, threshold: m.threshold, softness: m.softness ?? DEFAULT_MASK_SOFTNESS };
+}
+
 // Composición pura y determinista, compartida por la vista previa y la exportación.
 // No toca DOM: devuelve la lista de operaciones de dibujo en píxeles.
 export function renderDocument(doc: Project, opts: RenderOptions): RenderedDocument {
@@ -119,6 +146,7 @@ export function renderDocument(doc: Project, opts: RenderOptions): RenderedDocum
       fallbackColor: BACKGROUND_FALLBACK,
       frame,
       draw: imageDraw(assetDims(assets.get(id)), id, null, frame, canvas.backgroundFit ?? "cover", canvas.backgroundPos ?? CENTER, ppi),
+      filters: activeFilters(canvas.backgroundFilters),
     };
   }
 
@@ -128,13 +156,13 @@ export function renderDocument(doc: Project, opts: RenderOptions): RenderedDocum
     .map(([e]) => e)
     .filter((e) => e.visible)
     .map((e): RenderItem => {
-      const base = { id: e.id, zIndex: e.zIndex, box: { x: e.x * ppi, y: e.y * ppi, width: e.width * ppi, height: e.height * ppi }, rotation: e.rotation };
+      const base = { id: e.id, zIndex: e.zIndex, box: { x: e.x * ppi, y: e.y * ppi, width: e.width * ppi, height: e.height * ppi }, rotation: e.rotation, opacity: e.opacity ?? 1 };
       if (e.type === "image") {
         const dims = assetDims(assets.get(e.assetRef.assetId));
         const region = dims
           ? { x: e.crop.x * dims.widthPx, y: e.crop.y * dims.heightPx, width: e.crop.width * dims.widthPx, height: e.crop.height * dims.heightPx }
           : null;
-        return { ...base, kind: "image", draw: imageDraw(dims, e.assetRef.assetId, region, base.box, e.fit, CENTER, ppi) };
+        return { ...base, kind: "image", draw: imageDraw(dims, e.assetRef.assetId, region, base.box, e.fit, CENTER, ppi), filters: activeFilters(e.filters) };
       }
       if (e.type === "text") {
         return {
@@ -142,6 +170,7 @@ export function renderDocument(doc: Project, opts: RenderOptions): RenderedDocum
           layout: opts.measureText ? layoutText(e, ppi, opts.measureText) : null,
           effects: textEffects(e, ppi),
           texture: e.texture ? textureDraw(e.texture, assetDims(assets.get(e.texture.assetId)), base.box, ppi) : null,
+          mask: e.mask ? maskDraw(e.mask, assetDims(assets.get(e.mask.assetId)), base.box, ppi) : null,
         };
       }
       return { ...base, kind: "shape", element: e };

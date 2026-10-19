@@ -5,7 +5,7 @@ import type { ShapeItem } from "../src/canvas/paintShape";
 import { recordingContext } from "./helpers/recordingContext";
 
 const stroked: ShapeItem = {
-  id: "s", zIndex: 0, kind: "shape", rotation: 30, box: { x: 30, y: 60, width: 300, height: 150 },
+  id: "s", zIndex: 0, kind: "shape", rotation: 30, opacity: 1, box: { x: 30, y: 60, width: 300, height: 150 },
   element: {
     id: "s", type: "shape", shape: "rect", x: 0.1, y: 0.2, width: 1, height: 0.5, rotation: 30, zIndex: 0, visible: true,
     fill: "#ff0000", stroke: { color: "#00ff00", width: 0.02 },
