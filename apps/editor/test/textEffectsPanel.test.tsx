@@ -115,4 +115,15 @@ describe("panel de texto: acabado de las letras", () => {
     await waitFor(() => expect(textOf(store).texture?.assetId).toBe("id4"));
     expect(vi.mocked(generateTextureAsset)).toHaveBeenLastCalledWith(expect.anything(), { kind: "paper", seed: 42 });
   });
+  it("en mármol se pueden pedir grietas pintadas de un color: sin máscara", async () => {
+    const user = userEvent.setup();
+    const store = await mount();
+    await user.click(screen.getByRole("button", { name: "Añadir capa de texto" }));
+    fireEvent.change(screen.getByLabelText("Grietas"), { target: { value: "lines" } });
+    fireEvent.change(screen.getByLabelText("Color de las grietas"), { target: { value: "#a8222a" } });
+    await user.click(screen.getByRole("button", { name: "Generar textura" }));
+    await waitFor(() => expect(textOf(store).texture).toEqual({ assetId: "id3", fit: "tile", tileIn: 1.5 }));
+    expect(vi.mocked(generateTextureAsset)).toHaveBeenLastCalledWith(expect.anything(), { kind: "cracked-marble", seed: 1, cracks: "lines", crackColor: "#a8222a" });
+    expect(textOf(store).mask).toBeUndefined();
+  });
 });

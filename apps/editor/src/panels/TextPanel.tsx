@@ -357,7 +357,9 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
             if (!r.ok) return;
             const texture: TextTexture = { assetId: r.assetId, fit: "tile", tileIn: 1.5 };
             // Mármol con huecos: la máscara por transparencia hace que la sombra también tenga las grietas.
-            if (opts.kind === "cracked-marble") commit({ texture, mask: { ...texture, mode: "alpha", threshold: 0.5, softness: 0 } });
+            if (opts.kind === "cracked-marble" && opts.cracks === "holes") commit({ texture, mask: { ...texture, mode: "alpha", threshold: 0.5, softness: 0 } });
+            // Grietas pintadas: la letra queda entera; una máscara enlazada anterior ya no tiene sentido.
+            else if (opts.kind === "cracked-marble") commit({ texture, mask: undefined });
             else setTexture(texture);
           }}
         />
@@ -423,6 +425,9 @@ function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Pr
   const [kind, setKind] = useState<TextureKind>("cracked-marble");
   const [seed, setSeed] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [cracks, setCracks] = useState<"holes" | "lines">("holes");
+  const [crackColor, setCrackColor] = useState("#a8222a");
+  const crackId = useId();
   return (
     <div className="mb-4 rounded-[9px] border border-line-soft bg-card p-2.5" role="group" aria-label={t("textureGenerateTitle")}>
       <div className="mb-2 flex items-end gap-2">
@@ -434,6 +439,23 @@ function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Pr
         </div>
         <NumberField label={t("textureSeed")} value={seed} min={0} step={1} digits={0} onCommit={(v) => setSeed(Math.max(0, Math.round(v)))} />
       </div>
+      {kind === "cracked-marble" && (
+        <div className="mb-2 flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <label htmlFor={crackId} className="mb-1 block text-[10px] text-muted">{t("textureCracks")}</label>
+            <select id={crackId} className={`${fieldCls} font-sans`} value={cracks} onChange={(e) => setCracks(e.target.value as "holes" | "lines")}>
+              <option value="holes">{t("textureCracksHoles")}</option>
+              <option value="lines">{t("textureCracksLines")}</option>
+            </select>
+          </div>
+          {cracks === "lines" && (
+            <input
+              type="color" aria-label={t("textureCrackColor")} value={crackColor} onChange={(e) => setCrackColor(e.target.value.toLowerCase())}
+              className="h-[34px] w-10 flex-none cursor-pointer rounded-lg border border-field bg-white p-[3px]"
+            />
+          )}
+        </div>
+      )}
       <div className="flex gap-1.5">
         <button type="button" className={`${toggleBtn} w-auto px-2`} onClick={() => setSeed(Math.floor(Math.random() * 1_000_000))}>{t("textureSeedRandom")}</button>
         <button
@@ -441,7 +463,7 @@ function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Pr
           onClick={async () => {
             setBusy(true);
             try {
-              await onGenerate(kind === "cracked-marble" ? { kind, seed, cracks: "holes" } : { kind, seed });
+              await onGenerate(kind !== "cracked-marble" ? { kind, seed } : cracks === "holes" ? { kind, seed, cracks } : { kind, seed, cracks, crackColor });
             } finally {
               setBusy(false);
             }
