@@ -2,7 +2,7 @@ import { cachedDpiReport as dpiReport } from "./dpiCache";
 import { useI18n } from "../i18n";
 import type { GeometryEdit } from "../store/editorStore";
 import { useDisplayDoc, useEditorState, useStore } from "../store/react";
-import { NumberField, chipBtn, fieldCls } from "./ui";
+import { NumberField, Slider, chipBtn, fieldCls } from "./ui";
 
 // Alternativa numérica y accesible a arrastrar: posición, tamaño, rotación (y recorte en imágenes).
 export function GeometryPanel() {
@@ -43,6 +43,13 @@ export function GeometryPanel() {
       </div>
       <div className="mt-2 flex gap-2">
         <NumberField label={t("rotation")} value={el.rotation} step={1} onCommit={(rotation) => set({ rotation })} />
+      </div>
+      {/* La opacidad es del diseño base (las variantes no la ajustan). */}
+      <div className="mt-2.5">
+        <Slider
+          label={t("opacity")} min={0} max={100} step={1} value={Math.round((el.opacity ?? 1) * 100)} format={(v) => `${v} %`}
+          onCommit={(v) => store.dispatch({ type: "updateElement", id: el.id, props: { opacity: v >= 100 ? undefined : v / 100 } })}
+        />
       </div>
       <div className="mt-2.5 flex gap-1.5">
         <button type="button" className={`${chipBtn} flex-1`} disabled={index < 0 || index === stack.length - 1} onClick={() => toIndex(stack.length - 1)}>{t("bringToFront")}</button>
