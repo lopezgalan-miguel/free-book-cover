@@ -157,8 +157,9 @@ test("textura en mosaico y anchura de letra se ven igual en la vista previa y en
   await expect.poll(async () => (await doc(page)).elements[0].scaleX).toBe(0.6);
   // Más estrecho: menos tinta, y la vista previa coincide con la exportación.
   await expect.poll(async () => (await previewVsExport(page)).ink).toBeLessThan(before.ink);
+  // La caja cambia de ancho con las letras: se espera a que la vista previa se haya redibujado.
+  await expect.poll(async () => (await previewVsExport(page)).sameScale).toBeLessThan(1.5);
   const after = await previewVsExport(page);
-  expect(after.sameScale).toBeLessThan(1.5);
   expect(after.at300).toBeLessThan(6);
   // Con teselas pequeñas aparecen los cuatro colores del cuadrante dentro del texto.
   expect(await countColor(page, [220, 30, 30], 50)).toBeGreaterThan(10);
