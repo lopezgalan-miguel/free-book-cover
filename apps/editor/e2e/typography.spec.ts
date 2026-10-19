@@ -144,6 +144,27 @@ test("un bloque curvado y con textura se ve igual en la vista previa y en la exp
   await expect.poll(async () => (await previewVsExport(page)).sameScale).toBeLessThan(1.5);
 });
 
+test("textura en mosaico y anchura de letra se ven igual en la vista previa y en la exportación", async ({ page }) => {
+  await newText(page, "ESTRECHO");
+  await page.getByLabel("Subir textura").setInputFiles({ name: "tex.png", mimeType: "image/png", buffer: quadrants(300, 300) });
+  await expect.poll(async () => (await doc(page)).elements[0].texture).toEqual({ assetId: expect.any(String) });
+  await expect.poll(async () => (await previewVsExport(page)).ink).toBeGreaterThan(0.01);
+  const before = await previewVsExport(page);
+  await page.getByRole("group", { name: "Encaje de la textura" }).getByRole("button", { name: "Mosaico" }).click();
+  await page.getByLabel("Tamaño de tesela").fill("0.3");
+  await expect.poll(async () => (await doc(page)).elements[0].texture).toMatchObject({ fit: "tile", tileIn: 0.3 });
+  await page.getByLabel("Anchura de letra").fill("0.6");
+  await expect.poll(async () => (await doc(page)).elements[0].scaleX).toBe(0.6);
+  // Más estrecho: menos tinta, y la vista previa coincide con la exportación.
+  await expect.poll(async () => (await previewVsExport(page)).ink).toBeLessThan(before.ink);
+  const after = await previewVsExport(page);
+  expect(after.sameScale).toBeLessThan(1.5);
+  expect(after.at300).toBeLessThan(6);
+  // Con teselas pequeñas aparecen los cuatro colores del cuadrante dentro del texto.
+  expect(await countColor(page, [220, 30, 30], 50)).toBeGreaterThan(10);
+  expect(await countColor(page, [30, 30, 220], 50)).toBeGreaterThan(10);
+});
+
 test("subir una fuente real la registra con FontFace, la guarda en IndexedDB y se recarga al reabrir; una corrupta se rechaza", async ({ page }) => {
   await newText(page, "Fuente");
   await page.getByLabel("Subir fuente").setInputFiles({ name: "Iconos.ttf", mimeType: "font/ttf", buffer: findTtf() });

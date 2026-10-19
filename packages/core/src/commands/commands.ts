@@ -2,7 +2,7 @@ import { applyResizePolicy, type ResizePolicy, type ResizeTargets } from "../geo
 import { overridesOf } from "../variants/variants.js";
 import { validatePrintSetup, type PrintSetup } from "../kdp/kdp.js";
 import { applyPrintSetup } from "../kdp/recalc.js";
-import { projectSchema, type Asset, type BackgroundOverride, type DigitalTarget, type Element, type ElementOverride, type ImageElement, type Project, type ShapeElement, type TextElement } from "../schema/project.js";
+import { projectSchema, type Asset, type BackgroundOverride, type DigitalTarget, type Element, type ElementOverride, type ImageElement, type Project, type ShapeElement, type TextElement, type ViewOverride } from "../schema/project.js";
 
 // Campos que un updateElement no puede tocar: identidad, tipo y orden de apilado.
 type Immutable = "id" | "type" | "zIndex";
@@ -35,6 +35,10 @@ export type Command =
   | { type: "setVariantElement"; targetId: string; elementId: string; props: ElementOverride }
   | { type: "resetVariantElement"; targetId: string; elementId: string }
   | { type: "setVariantBackground"; targetId: string; props: BackgroundOverride }
+  // Encuadre de la variante (zona visible del base); se fusiona con el que ya tenga.
+  | { type: "setVariantView"; targetId: string; view: ViewOverride }
+  // Varios ajustes de una variante a la vez (encuadre, fondo y elementos) en un solo paso.
+  | { type: "updateVariant"; targetId: string; view?: ViewOverride; background?: BackgroundOverride; elements?: Record<string, ElementOverride> }
   // Borra todos los ajustes de la variante (vuelve a la derivación por defecto).
   | { type: "resetVariant"; targetId: string }
   // Cubierta KDP (SDD R-01): fija los datos de impresión, recalcula el lienzo y reposiciona sin deformar.
@@ -161,6 +165,29 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
         const ov = overridesOf(t);
         return { ...t, layoutOverrides: { ...ov, background: stripUndefined({ ...(ov.background ?? {}), ...cmd.props }) } };
       });
+    case "setVariantView":
+      return withTarget(doc, cmd.targetId, (t) => {
+        const ov = overridesOf(t);
+        return { ...t, layoutOverrides: { ...ov, view: stripUndefined({ ...(ov.view ?? {}), ...cmd.view }) } };
+      });
+    case "updateVariant": {
+      const missing = Object.keys(cmd.elements ?? {}).find((id) => !doc.elements.some((e) => e.id === id));
+      if (missing) return notFound(missing);
+      return withTarget(doc, cmd.targetId, (t) => {
+        const ov = overridesOf(t);
+        const elements = { ...ov.elements };
+        for (const [id, props] of Object.entries(cmd.elements ?? {})) elements[id] = stripUndefined({ ...(elements[id] ?? {}), ...props });
+        return {
+          ...t,
+          layoutOverrides: {
+            ...ov,
+            ...(cmd.view ? { view: stripUndefined({ ...(ov.view ?? {}), ...cmd.view }) } : {}),
+            ...(cmd.background ? { background: stripUndefined({ ...(ov.background ?? {}), ...cmd.background }) } : {}),
+            ...(cmd.elements ? { elements } : {}),
+          },
+        };
+      });
+    }
     case "resetVariant":
       return withTarget(doc, cmd.targetId, (t) => ({ ...t, layoutOverrides: {} }));
     case "setPrintSetup": {

@@ -1,15 +1,29 @@
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { browserMeasure } from "../canvas/measure";
+import { useExportServices } from "../export/exportContext";
+import { browserExportDeps } from "../export/exportImage";
+import { useFonts } from "../fonts/fontContext";
 import { useStore } from "../store/react";
 import { createMcpBridge, type McpBridge, type McpBridgeDeps, type McpSnapshot } from "./bridge";
 
 const Ctx = createContext<McpBridge | null>(null);
 
-// `bridge` permite inyectar uno en las pruebas; por defecto se crea con el store y el medidor del navegador.
+// `bridge` permite inyectar uno en las pruebas; por defecto se crea con el store, el medidor del navegador,
+// el registro de fuentes (import_font) y las dependencias de exportación (export_image).
 // Con StrictMode el montaje simulado llama a dispose(); el segundo efecto lo vuelve a suscribir (attach).
 export function McpBridgeProvider({ bridge, createSocket, children }: { bridge?: McpBridge; createSocket?: McpBridgeDeps["createSocket"]; children: ReactNode }) {
   const store = useStore();
-  const own = useMemo(() => bridge ?? createMcpBridge({ store, measure: browserMeasure, ...(createSocket ? { createSocket } : {}) }), [bridge, store, createSocket]);
+  const fonts = useFonts();
+  // Solo deps: el objeto de servicios puede ser nuevo en cada render y recrearía el puente (y su conexión).
+  const overrideDeps = useExportServices().deps;
+  const own = useMemo(
+    () => bridge ?? createMcpBridge({
+      store, measure: browserMeasure, fonts,
+      exportDeps: () => overrideDeps ?? browserExportDeps(fonts, () => store.getState().assets),
+      ...(createSocket ? { createSocket } : {}),
+    }),
+    [bridge, store, createSocket, fonts, overrideDeps],
+  );
   useEffect(() => {
     if (bridge) return;
     own.attach();

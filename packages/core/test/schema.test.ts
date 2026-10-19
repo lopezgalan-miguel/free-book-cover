@@ -27,6 +27,25 @@ describe("esquema Project", () => {
     expect(projectSchema.safeParse({ ...p, elements: [textEl("t", { curvature: 101 })] }).success).toBe(false);
     expect(projectSchema.safeParse({ ...p, elements: [textEl("t", { curvature: -100 })] }).success).toBe(true);
   });
+  it("textura de texto: modo cubrir o mosaico con tesela positiva y desplazamiento 0..1", () => {
+    const p = full();
+    const withTex = (texture: unknown) => ({ ...p, elements: [textEl("t1", { texture } as never)] });
+    expect(projectSchema.safeParse(withTex({ assetId: "a1", fit: "tile", tileIn: 1.5, pos: { x: 0, y: 1 } })).success).toBe(true);
+    expect(projectSchema.safeParse(withTex({ assetId: "a1", fit: "cover" })).success).toBe(true);
+    expect(projectSchema.safeParse(withTex({ assetId: "a1", fit: "tile", tileIn: 0 })).success).toBe(false);
+    expect(projectSchema.safeParse(withTex({ assetId: "a1", fit: "tile", tileIn: 101 })).success).toBe(false);
+    expect(projectSchema.safeParse(withTex({ assetId: "a1", pos: { x: 1.2, y: 0 } })).success).toBe(false);
+    expect(projectSchema.safeParse(withTex({ assetId: "a1", fit: "stretch" })).success).toBe(false);
+    expect(projectSchema.safeParse(withTex({ assetId: "a1", scale: 2 })).success).toBe(false);
+  });
+  it("anchura del texto (scaleX) entre 0,5 y 1,5", () => {
+    const p = full();
+    const withScale = (scaleX: number) => ({ ...p, elements: [textEl("t1", { scaleX })] });
+    expect(projectSchema.safeParse(withScale(0.5)).success).toBe(true);
+    expect(projectSchema.safeParse(withScale(1.5)).success).toBe(true);
+    expect(projectSchema.safeParse(withScale(0.49)).success).toBe(false);
+    expect(projectSchema.safeParse(withScale(1.51)).success).toBe(false);
+  });
   it("rechaza lienzo no positivo o por encima del límite", () => {
     const p = baseProject();
     for (const w of [0, -1, 100.01, NaN, Infinity]) {

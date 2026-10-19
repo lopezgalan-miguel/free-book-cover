@@ -1,13 +1,13 @@
 import { useState } from "react";
 import {
-  DIGITAL_PRESETS, MAX_TARGET_PX, customTarget, elementVisibility, isResolvedTarget, overridesOf, targetFromPreset, visibleArea,
-  type Element, type ResolvedTarget,
+  DIGITAL_PRESETS, MAX_TARGET_PX, MAX_VARIANT_ZOOM, customTarget, elementVisibility, isResolvedTarget, overridesOf, targetFromPreset, visibleArea,
+  type Element, type ResolvedTarget, type ViewOverride,
 } from "@free-book-cover/core";
 import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { useI18n } from "../i18n";
 import { useDisplayDoc, useEditorState, useStore } from "../store/react";
 import { gcdRatio, presetLabel, targetLabel } from "./variantLabels";
-import { chipBtn, fieldCls, NumberField, Section } from "./ui";
+import { chipBtn, fieldCls, NumberField, Section, Slider } from "./ui";
 
 const CUSTOM = "custom";
 const layerName = (e: Element, imageName: string): string =>
@@ -106,7 +106,9 @@ function ActiveVariant({ target }: { target: ResolvedTarget }) {
   const outside = elementVisibility(display).filter((v) => v.visibility !== "inside");
   const sel = display.elements.find((e) => e.id === selectedId);
   const selOv = sel ? ov.elements?.[sel.id] : undefined;
-  const hasOverrides = Boolean(ov.background) || Object.keys(ov.elements ?? {}).length > 0;
+  const hasOverrides = Boolean(ov.background) || Boolean(ov.view) || Object.keys(ov.elements ?? {}).length > 0;
+  const setView = (view: ViewOverride) => store.dispatch({ type: "setVariantView", targetId: target.id, view });
+  const pct = (v: number) => `${Math.round(v * 100)} %`;
 
   const setFontScale = (pct: number) => {
     if (!sel || sel.type !== "text" || !(pct > 0)) return;
@@ -124,6 +126,11 @@ function ActiveVariant({ target }: { target: ResolvedTarget }) {
       <p className="mt-1.5 font-mono text-[11px] text-subtle" data-testid="variant-area">
         {t("variantVisibleArea", { pct: Math.round(area.coverage * 100) })}
       </p>
+      <div className="mt-2.5" data-testid="variant-view">
+        <Slider label={t("variantViewX")} min={0} max={1} step={0.01} value={ov.view?.x ?? 0.5} format={pct} onCommit={(x) => setView({ x })} />
+        <Slider label={t("variantViewY")} min={0} max={1} step={0.01} value={ov.view?.y ?? 0.5} format={pct} onCommit={(y) => setView({ y })} />
+        <Slider label={t("variantViewZoom")} min={1} max={MAX_VARIANT_ZOOM} step={0.05} value={ov.view?.zoom ?? 1} format={(v) => `${v.toFixed(2)}×`} onCommit={(zoom) => setView({ zoom })} />
+      </div>
       {outside.length > 0 && (
         <ul className="mt-1.5 space-y-0.5" aria-label={t("variantOutsideTitle")}>
           {outside.map((o) => {

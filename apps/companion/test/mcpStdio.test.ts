@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyCommand, createProject, type Project, type TextElement } from "@free-book-cover/core";
+import { MCP_TOOL_NAMES, applyCommand, createProject, type Project, type TextElement } from "@free-book-cover/core";
 import { startServer, type CompanionServer } from "../src/server/server.js";
 import { openWs, type TestWs } from "./helpers/ws.js";
 
@@ -98,7 +98,7 @@ describe("MCP por stdio con el companion real y un editor simulado", () => {
     simulatedEditor(editor);
     const { client } = await spawnClient();
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(5);
+    expect(tools.map((t) => t.name).sort()).toEqual([...MCP_TOOL_NAMES].sort());
 
     const state = await call(client, "get_canvas_state", {});
     expect(state.structuredContent).toMatchObject({ projectId: "p1", revision: 0 });

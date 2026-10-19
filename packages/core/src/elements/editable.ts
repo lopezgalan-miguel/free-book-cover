@@ -3,13 +3,13 @@ import type { Element } from "../schema/project.js";
 // Propiedades de estilo que viven en cada tramo de texto (no en el bloque).
 export const TEXT_RUN_KEYS: readonly string[] = ["fontFamily", "fontSizePt", "weight", "italic", "underline", "uppercase", "color"];
 // Cambios que alteran la maquetación del texto: la altura de la caja se recalcula.
-export const TEXT_RELAYOUT_KEYS: readonly string[] = ["fontFamily", "fontSizePt", "weight", "italic", "uppercase", "lineHeight", "letterSpacing", "width", "curvature"];
+export const TEXT_RELAYOUT_KEYS: readonly string[] = ["fontFamily", "fontSizePt", "weight", "italic", "uppercase", "lineHeight", "letterSpacing", "width", "curvature", "scaleX"];
 
 const GEOMETRY_KEYS = ["x", "y", "width", "height", "rotation", "visible"];
 // Record exhaustivo: un tipo de elemento nuevo no compila hasta declarar qué se puede editar.
 const TYPE_KEYS: Record<Element["type"], readonly string[]> = {
-  text: [...TEXT_RUN_KEYS, "align", "lineHeight", "letterSpacing", "shadow", "outline", "curvature"],
-  image: ["fit"],
+  text: [...TEXT_RUN_KEYS, "align", "lineHeight", "letterSpacing", "shadow", "outline", "curvature", "scaleX", "texture"],
+  image: ["fit", "crop"],
   shape: ["fill", "stroke"],
 };
 

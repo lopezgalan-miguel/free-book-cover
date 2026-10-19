@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MCP_TOOLS, MCP_TOOL_NAMES, toolErrorSchema, type McpToolName, type ToolOutcome } from "@free-book-cover/core";
@@ -16,6 +16,7 @@ const err = (r: any) => {
   return JSON.parse(r.content[0].text).error;
 };
 let dir: string;
+let exportDir: string;
 let client: Client;
 const calls: { tool: McpToolName; args: any }[] = [];
 let outcome: ToolOutcome = { ok: true, data: {} };
@@ -23,14 +24,20 @@ let outcome: ToolOutcome = { ok: true, data: {} };
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "fbc-mcp-"));
   await writeFile(join(dir, "a.png"), PNG);
+  await writeFile(join(dir, "f.ttf"), Buffer.from([0, 1, 0, 0, 1, 2, 3, 4]));
+  exportDir = await mkdtemp(join(tmpdir(), "fbc-exp-"));
 });
-afterAll(() => rm(dir, { recursive: true, force: true }));
+afterAll(async () => {
+  await rm(dir, { recursive: true, force: true });
+  await rm(exportDir, { recursive: true, force: true });
+});
 beforeEach(async () => {
   calls.length = 0;
   outcome = { ok: true, data: {} };
   const server = createMcpServer({
     relay: { call: async (tool, args) => { calls.push({ tool, args }); return outcome; } },
     imports: { allowedDirs: [dir], maxBytes: 1000 },
+    exportDir,
   });
   const [a, b] = InMemoryTransport.createLinkedPair();
   client = new Client({ name: "prueba", version: "1" });
@@ -112,5 +119,24 @@ describe("servidor MCP: llamadas", () => {
     const missing: any = await client.callTool({ name: "import_asset", arguments: { projectId: "p", kind: "image", path: join(dir, "nada.png") } });
     expect(err(missing)).toEqual({ kind: "not_found", resource: "file" });
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("servidor MCP: fuentes y exportación", () => {
+  it("import_font lee la fuente local y entrega sus bytes y nombre al editor", async () => {
+    outcome = { ok: true, data: { assetId: "f1", family: "f", revision: 2, sizeBytes: 8, saved: true } };
+    const r: any = await client.callTool({ name: "import_font", arguments: { projectId: "p", path: join(dir, "f.ttf") } });
+    expect(r.isError).toBeFalsy();
+    expect(calls[0]).toEqual({ tool: "import_font", args: { projectId: "p", name: "f.ttf", dataBase64: Buffer.from([0, 1, 0, 0, 1, 2, 3, 4]).toString("base64") } });
+    const notFont: any = await client.callTool({ name: "import_font", arguments: { projectId: "p", path: join(dir, "a.png") } });
+    expect(err(notFont).kind).toBe("invalid_params");
+  });
+  it("export_image escribe el archivo del editor en el directorio de exportación y devuelve la ruta", async () => {
+    outcome = { ok: true, data: { fileName: "portada-base-1x1.png", format: "png", mimeType: "image/png", widthPx: 1, heightPx: 1, bytes: PNG.length, dataBase64: PNG.toString("base64") } };
+    const r: any = await client.callTool({ name: "export_image", arguments: { projectId: "p", format: "png" } });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent).toEqual({ path: join(exportDir, "portada-base-1x1.png"), fileName: "portada-base-1x1.png", format: "png", widthPx: 1, heightPx: 1, bytes: PNG.length });
+    expect(await readFile(join(exportDir, "portada-base-1x1.png"))).toEqual(PNG);
+    expect(JSON.stringify(r.structuredContent)).not.toContain("dataBase64");
   });
 });

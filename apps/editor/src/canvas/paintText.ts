@@ -28,15 +28,19 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
   const { shadow, outline } = item.effects;
   const tex = item.texture && sources.get(item.texture.assetId);
   const pattern = tex && item.texture ? makePattern(ctx, tex, item.texture) : null;
+  // Anchura de las letras: la maquetación ya viene estrechada; aquí se estrecha el dibujo. Dentro del
+  // espacio escalado, desplazamientos, espaciado y subrayado se dividen por la escala.
+  const sx = item.element.scaleX ?? 1;
 
   const place = (op: Op, draw: () => void) => {
     ctx.save();
     ctx.translate(op.x, op.y);
     if (op.rotation) ctx.rotate(op.rotation);
+    if (sx !== 1) ctx.scale(sx, 1);
     ctx.font = op.style.font;
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
-    setSpacing(ctx, op.style.spacingPx);
+    setSpacing(ctx, op.style.spacingPx / sx);
     draw();
     ctx.restore();
   };
@@ -60,10 +64,10 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
           ctx.lineJoin = "round";
           ctx.lineWidth = outline.width;
           ctx.strokeStyle = outline.color;
-          ctx.strokeText(op.text, op.dx, 0);
+          ctx.strokeText(op.text, op.dx / sx, 0);
         } else {
           ctx.fillStyle = op.style.color;
-          ctx.fillText(op.text, op.dx, 0);
+          ctx.fillText(op.text, op.dx / sx, 0);
         }
       });
     }
@@ -76,7 +80,7 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
         ctx.lineJoin = "round";
         ctx.lineWidth = outline.width;
         ctx.strokeStyle = outline.color;
-        ctx.strokeText(op.text, op.dx, 0);
+        ctx.strokeText(op.text, op.dx / sx, 0);
       });
     }
   }
@@ -88,10 +92,10 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
         pattern.pattern.setTransform(ctx.getTransform().inverse().multiply(base).multiply(pattern.matrix));
         ctx.fillStyle = pattern.pattern;
       } else ctx.fillStyle = op.style.color;
-      ctx.fillText(op.text, op.dx, 0);
+      ctx.fillText(op.text, op.dx / sx, 0);
       if (op.style.underline && op.width > 0) {
         const t = Math.max(1, op.style.fontPx / 20);
-        ctx.fillRect(op.dx, op.style.fontPx * 0.12, op.width, t);
+        ctx.fillRect(op.dx / sx, op.style.fontPx * 0.12, op.width / sx, t);
       }
     });
   }
@@ -102,9 +106,10 @@ function setSpacing(ctx: CanvasRenderingContext2D, px: number): void {
   if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = `${px}px`;
 }
 
-// Matriz que lleva la imagen (píxeles de la miniatura/origen decodificado) al encuadre "cubrir" de la caja.
+// Matriz que lleva la imagen (píxeles de la miniatura/origen decodificado) a su encuadre en la caja:
+// "cubrir" la caja o, en mosaico, una tesela que el patrón repite.
 function makePattern(ctx: CanvasRenderingContext2D, src: { image: CanvasImageSource; scale: number }, d: NonNullable<TextItem["texture"]>) {
-  const pattern = ctx.createPattern(src.image, "no-repeat");
+  const pattern = ctx.createPattern(src.image, d.repeat ? "repeat" : "no-repeat");
   if (!pattern) return null;
   const sx = d.dest.width / (d.src.width * src.scale);
   const sy = d.dest.height / (d.src.height * src.scale);

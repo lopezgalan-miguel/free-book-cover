@@ -1,4 +1,4 @@
-import type { Asset, Element, Project } from "../schema/project.js";
+import type { Asset, Element, Project, TextTexture } from "../schema/project.js";
 import { CENTER, placeImage, rectCenter, rotatePoint, type FitMode, type Placement, type Point, type Rect } from "../geometry/fit.js";
 import { effectiveDpi, isLowDpi } from "../images/dpi.js";
 import { layoutText, textEffects, type TextEffects, type TextLayout, type TextMeasure } from "../text/layout.js";
@@ -21,6 +21,10 @@ export interface ImageDraw extends Placement {
   lowDpi: boolean;
 }
 
+export interface TextureDraw extends ImageDraw {
+  repeat: boolean;
+}
+
 export type RenderBackground =
   | { kind: "color"; color: string }
   // frame: caja (px) respecto a la que se encuadra la imagen; por defecto, el lienzo entero.
@@ -40,8 +44,8 @@ export type RenderItem =
       // null si no hay medidor. Coordenadas relativas a la esquina de la caja.
       layout: TextLayout | null;
       effects: TextEffects;
-      // Encuadre "cubrir" de la textura sobre la caja (coordenadas relativas a la caja).
-      texture: ImageDraw | null;
+      // Encuadre de la textura (coordenadas relativas a la caja). Con repeat, dest es una tesela que se repite.
+      texture: TextureDraw | null;
     })
   | (ItemBase & { kind: "shape"; element: Extract<Element, { type: "shape" }> });
 
@@ -72,6 +76,25 @@ function imageDraw(dims: AssetDims | null, assetId: string, region: Rect | null,
   const placement = placeImage(full, box, fit, pos);
   const dpi = effectiveDpi(placement.src.width, placement.src.height, placement.dest.width / ppi, placement.dest.height / ppi);
   return { ...placement, assetId, fit, dpi, lowDpi: isLowDpi(dpi) };
+}
+
+function textureDraw(tex: TextTexture, dims: AssetDims | null, box: Rect, ppi: number): TextureDraw | null {
+  const local: Rect = { x: 0, y: 0, width: box.width, height: box.height };
+  if (tex.fit !== "tile" || tex.tileIn === undefined) {
+    const d = imageDraw(dims, tex.assetId, null, local, "cover", tex.pos ?? CENTER, ppi);
+    return d && { ...d, repeat: false };
+  }
+  if (!dims) return null;
+  // Tesela de tileIn pulgadas de ancho; pos la desplaza una fracción de su tamaño.
+  const w = tex.tileIn * ppi;
+  const h = (w * dims.heightPx) / dims.widthPx;
+  const pos = tex.pos ?? { x: 0, y: 0 };
+  const dpi = effectiveDpi(dims.widthPx, dims.heightPx, tex.tileIn, h / ppi);
+  return {
+    src: { x: 0, y: 0, width: dims.widthPx, height: dims.heightPx },
+    dest: { x: -pos.x * w, y: -pos.y * h, width: w, height: h },
+    assetId: tex.assetId, fit: "cover", dpi, lowDpi: isLowDpi(dpi), repeat: true,
+  };
 }
 
 // Composición pura y determinista, compartida por la vista previa y la exportación.
@@ -114,12 +137,11 @@ export function renderDocument(doc: Project, opts: RenderOptions): RenderedDocum
         return { ...base, kind: "image", draw: imageDraw(dims, e.assetRef.assetId, region, base.box, e.fit, CENTER, ppi) };
       }
       if (e.type === "text") {
-        const tex = e.texture?.assetId;
         return {
           ...base, kind: "text", element: e,
           layout: opts.measureText ? layoutText(e, ppi, opts.measureText) : null,
           effects: textEffects(e, ppi),
-          texture: tex ? imageDraw(assetDims(assets.get(tex)), tex, null, { x: 0, y: 0, width: base.box.width, height: base.box.height }, "cover", CENTER, ppi) : null,
+          texture: e.texture ? textureDraw(e.texture, assetDims(assets.get(e.texture.assetId)), base.box, ppi) : null,
         };
       }
       return { ...base, kind: "shape", element: e };

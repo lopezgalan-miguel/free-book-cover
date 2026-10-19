@@ -23,6 +23,8 @@ const server = createMcpServer({
   relay,
   // Por defecto solo el directorio de trabajo del cliente MCP.
   imports: { allowedDirs: dirs.length ? dirs : [process.cwd()], maxBytes },
+  // export_image solo escribe si se configura un directorio.
+  exportDir: process.env.FBC_EXPORT_DIR || null,
 });
 await server.connect(new StdioServerTransport());
 const stop = () => {

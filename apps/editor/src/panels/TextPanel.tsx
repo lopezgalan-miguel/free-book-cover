@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import {
   FONT_CATALOG, applyStyleToRange, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, nearestFace, rangeStyle, replaceText, runsToText,
-  type FontGroupId, type RunStylePatch, type TextElement,
+  type FontGroupId, type RunStylePatch, type TextElement, type TextTexture,
 } from "@free-book-cover/core";
 import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { useAssetUrl } from "../canvas/useImageSources";
@@ -208,6 +208,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
         <Slider label={t("size")} min={6} max={300} step={1} value={cur.fontSizePt ?? first?.fontSizePt ?? 24} format={(v) => `${v} pt`} onCommit={(v) => style({ fontSizePt: v })} />
         <Slider label={t("lineH")} min={0.8} max={2.4} step={0.05} value={el.lineHeight} format={(v) => v.toFixed(2)} onCommit={(lineHeight) => commit({ lineHeight })} />
         <Slider label={t("letterS")} min={-0.05} max={0.5} step={0.01} value={el.letterSpacing} format={(v) => `${v.toFixed(2)}em`} onCommit={(letterSpacing) => commit({ letterSpacing })} />
+        <Slider label={t("scaleX")} min={0.5} max={1.5} step={0.01} value={el.scaleX ?? 1} format={(v) => `${Math.round(v * 100)} %`} onCommit={(scaleX) => commit({ scaleX })} />
       </Section>}
 
       {show("color") && <Section title={t("color")}>
@@ -276,12 +277,32 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
               e.target.value = "";
               if (!f) return;
               const r = await importImage(store, f, "asset");
-              if (r.ok) commit({ texture: { assetId: r.assetId } });
+              // Sustituir la imagen conserva el encaje elegido.
+              if (r.ok) commit({ texture: { ...latest()?.texture, assetId: r.assetId } });
             }}
           />
         </label>
+        {el.texture && <TextureFit texture={el.texture} onChange={(texture) => commit({ texture })} />}
         <Slider label={t("curve")} min={-100} max={100} step={1} value={el.curvature} testId="curve-slider" onCommit={(curvature) => commit({ curvature })} />
       </Section>}
+    </div>
+  );
+}
+
+// Encaje de la textura: rellenar la caja o repetir una tesela de tamaño fijo, con desplazamiento.
+function TextureFit({ texture, onChange }: { texture: TextTexture; onChange: (t: TextTexture) => void }) {
+  const { t } = useI18n();
+  const tile = texture.fit === "tile";
+  const pos = texture.pos ?? (tile ? { x: 0, y: 0 } : { x: 0.5, y: 0.5 });
+  return (
+    <div className="mb-4">
+      <div className="mb-2.5 flex gap-1.5" role="group" aria-label={t("textureFit")}>
+        <button type="button" aria-pressed={!tile} className={`${toggleBtn} w-auto flex-1 px-2`} onClick={() => onChange({ ...texture, fit: "cover" })}>{t("fitCover")}</button>
+        <button type="button" aria-pressed={tile} className={`${toggleBtn} w-auto flex-1 px-2`} onClick={() => onChange({ ...texture, fit: "tile", tileIn: texture.tileIn ?? 1 })}>{t("textureTile")}</button>
+      </div>
+      {tile && <Slider label={t("textureTileSize")} min={0.1} max={6} step={0.05} value={texture.tileIn ?? 1} format={(v) => `${v.toFixed(2)} in`} onCommit={(tileIn) => onChange({ ...texture, tileIn })} />}
+      <Slider label={t("textureOffsetX")} min={0} max={1} step={0.01} value={pos.x} format={(v) => `${Math.round(v * 100)} %`} onCommit={(x) => onChange({ ...texture, pos: { ...pos, x } })} />
+      <Slider label={t("textureOffsetY")} min={0} max={1} step={0.01} value={pos.y} format={(v) => `${Math.round(v * 100)} %`} onCommit={(y) => onChange({ ...texture, pos: { ...pos, y } })} />
     </div>
   );
 }

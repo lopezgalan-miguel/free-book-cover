@@ -35,6 +35,38 @@ describe("contrato MCP", () => {
     expect(MCP_TOOLS.update_element_style.input.safeParse({ ...base, style: { id: "otro" } }).success).toBe(false);
     expect(MCP_TOOLS.update_element_style.input.safeParse({ ...base, style: { color: "#112233", shadow: { on: true, intensity: 50 } } }).success).toBe(true);
   });
+  it("update_element_style admite anchura y textura (null la quita) y recorte de imagen", () => {
+    const base = { projectId: "p", expectedRevision: 1, elementId: "e" };
+    const ok = (style: unknown) => MCP_TOOLS.update_element_style.input.safeParse({ ...base, style }).success;
+    expect(ok({ scaleX: 0.7 })).toBe(true);
+    expect(ok({ scaleX: 2 })).toBe(false);
+    expect(ok({ texture: { assetId: "a", fit: "tile", tileIn: 1.2, pos: { x: 0, y: 0.5 } } })).toBe(true);
+    expect(ok({ texture: null })).toBe(true);
+    expect(ok({ texture: { assetId: "a", tileIn: -1 } })).toBe(false);
+    expect(ok({ crop: { x: 0, y: 0.1, width: 1, height: 0.8 } })).toBe(true);
+  });
+  it("herramientas de portada: fuentes, capas, variantes, KDP y exportación", () => {
+    const m = { projectId: "p", expectedRevision: 0 };
+    expect(MCP_TOOLS.import_font.input.safeParse({ projectId: "p", path: "/f.ttf" }).success).toBe(true);
+    expect(MCP_TOOLS.add_image_element.input.safeParse({ ...m, assetId: "a", x: 0, y: 0, width: 2, height: 3, fit: "cover", crop: { x: 0, y: 0, width: 0.5, height: 1 } }).success).toBe(true);
+    expect(MCP_TOOLS.add_image_element.input.safeParse({ ...m }).success).toBe(false);
+    expect(MCP_TOOLS.add_shape_element.input.safeParse({ ...m, shape: "rect", x: 0, y: 0, width: 1, height: 1, fill: "#000000" }).success).toBe(true);
+    expect(MCP_TOOLS.add_shape_element.input.safeParse({ ...m, shape: "star", x: 0, y: 0, width: 1, height: 1, fill: "#000000" }).success).toBe(false);
+    expect(MCP_TOOLS.add_variant.input.safeParse({ ...m, presetId: "instagram-feed-portrait" }).success).toBe(true);
+    expect(MCP_TOOLS.add_variant.input.safeParse({ ...m, presetId: "custom", widthPx: 1000, heightPx: 1000 }).success).toBe(true);
+    expect(MCP_TOOLS.add_variant.input.safeParse({ ...m, presetId: "no-existe" }).success).toBe(false);
+    expect(MCP_TOOLS.update_variant.input.safeParse({ ...m, targetId: "v", view: { y: 0, zoom: 1.2 }, elements: { e1: { y: 1, fontScale: 0.9 } } }).success).toBe(true);
+    expect(MCP_TOOLS.update_variant.input.safeParse({ ...m, targetId: "v" }).success).toBe(false);
+    expect(MCP_TOOLS.set_print_setup.input.safeParse({ ...m, trimWidthIn: 5, trimHeightIn: 8, pageCount: 132, paperAndInk: "bw-white" }).success).toBe(true);
+    expect(MCP_TOOLS.set_print_setup.input.safeParse({ ...m, trimWidthIn: 5, trimHeightIn: 8, pageCount: 0, paperAndInk: "bw-white" }).success).toBe(false);
+    expect(MCP_TOOLS.export_image.input.safeParse({ projectId: "p", format: "png" }).success).toBe(true);
+    expect(MCP_TOOLS.export_image.input.safeParse({ projectId: "p", format: "png", target: "v1", quality: 90 }).success).toBe(true);
+    expect(MCP_TOOLS.export_image.input.safeParse({ projectId: "p", format: "pdf" }).success).toBe(false);
+    expect(MCP_TOOLS.set_canvas.input.safeParse({ ...m, widthIn: 5.333333, heightIn: 8.533333 }).success).toBe(true);
+    expect(MCP_TOOLS.set_canvas.input.safeParse({ ...m, widthIn: 5, heightIn: 8, name: "x" }).success).toBe(false);
+    expect(MCP_TOOLS.set_canvas.input.safeParse({ ...m, widthIn: 0, heightIn: 8 }).success).toBe(false);
+    expect(MCP_TOOLS.set_canvas.input.safeParse({ ...m }).success).toBe(false);
+  });
   it("apply_background exige exactamente uno de assetId o color", () => {
     const base = { projectId: "p", expectedRevision: 0 };
     expect(MCP_TOOLS.apply_background.input.safeParse(base).success).toBe(false);

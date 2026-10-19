@@ -32,12 +32,25 @@ Todas las entradas son `strict` (campos desconocidos se rechazan). Longitudes en
 | `update_element_style` | `projectId`, `expectedRevision`, `elementId`, `style` (propiedades permitidas según el tipo) | `element`, `revision`, `saved` |
 | `import_asset` | `projectId`, `expectedRevision?`, `kind: "image"`, `path` | `assetId`, `revision`, `mimeType`, `widthPx`, `heightPx`, `sizeBytes`, `saved` |
 | `apply_background` | `projectId`, `expectedRevision`, `assetId` o `color`, `fit?` (`cover`/`contain`/`fill`) | `revision`, `background`, `fit`, `saved` |
+| `import_font` | `projectId`, `expectedRevision?`, `path` (.ttf/.otf/.woff2) | `assetId`, `family`, `revision`, `sizeBytes`, `saved` |
+| `add_image_element` | `projectId`, `expectedRevision`, `assetId`, `x?`, `y?`, `width?`+`height?`, `rotation?`, `fit?`, `crop?` | `elementId`, `revision`, `saved` |
+| `add_shape_element` | `projectId`, `expectedRevision`, `shape` (`rect`/`ellipse`), `x`, `y`, `width`, `height`, `fill`, `stroke?`, `rotation?` | `elementId`, `revision`, `saved` |
+| `add_variant` | `projectId`, `expectedRevision`, `presetId` (preajuste o `custom` con `widthPx`, `heightPx`), `name?` | `targetId`, `widthPx`, `heightPx`, `revision`, `saved` |
+| `update_variant` | `projectId`, `expectedRevision`, `targetId`, `view?` (`x`, `y`, `zoom`), `background?`, `elements?` (ajustes por elemento) | `targetId`, `visibleArea`, `notInside[]`, `revision`, `saved` |
+| `set_print_setup` | `projectId`, `expectedRevision`, `trimWidthIn`, `trimHeightIn`, `pageCount`, `paperAndInk` | `revision`, `canvas`, `spineIn`, `back`, `spine`, `front`, `safeFront`, `safeBack`, `spineSafe`, `barcode`, `saved` |
+| `set_canvas` | `projectId`, `expectedRevision`, `widthIn`, `heightIn` | `revision`, `canvas`, `saved` |
+| `export_image` | `projectId`, `target?` (variante; sin él, el base a 300 ppp), `format` (`png`/`jpeg`/`webp`), `quality?` | `path`, `fileName`, `format`, `widthPx`, `heightPx`, `bytes` |
 
 Los esquemas JSON de entrada y salida se publican en `tools/list` (generados con `z.toJSONSchema`). Notas:
 
 - `get_canvas_state.projectId` es opcional (desviación respecto a la tabla del SDD) para que un cliente pueda descubrir el proyecto autorizado; el resto lo exige.
 - `fontFamily` debe ser del catálogo del editor o una fuente subida al proyecto; otra cosa es `invalid_params` (el editor no sustituye fuentes en silencio).
-- `update_element_style`: en textos admite `fontFamily`, `fontSizePt`, `weight`, `italic`, `underline`, `uppercase`, `color` (se aplican a todos los fragmentos), `align`, `lineHeight`, `letterSpacing`, `shadow`, `outline`, `curvature`; en formas `fill` y `stroke`; en imágenes `fit`; y en todos `x`, `y`, `width`, `height`, `rotation`, `visible`. `id`, `type` y `zIndex` no se pueden cambiar. Una propiedad que no aplica al tipo es `invalid_params`.
+- `update_element_style`: en textos admite `fontFamily`, `fontSizePt`, `weight`, `italic`, `underline`, `uppercase`, `color` (se aplican a todos los fragmentos), `align`, `lineHeight`, `letterSpacing`, `shadow`, `outline`, `curvature`, `scaleX` (anchura de letra, 0,5–1,5) y `texture` (`{ assetId, fit?: "cover" | "tile", tileIn?, pos? }`; `null` la quita); en formas `fill` y `stroke`; en imágenes `fit` y `crop`; y en todos `x`, `y`, `width`, `height`, `rotation`, `visible`. `id`, `type` y `zIndex` no se pueden cambiar. Una propiedad que no aplica al tipo es `invalid_params`.
+- `update_variant` aplica encuadre, fondo y ajustes de elementos con un único comando (`updateVariant`): una revisión y un paso de deshacer. `view.x`/`view.y` (0..1, 0,5 = centrado) desplazan la zona visible del base y `view.zoom` (1..8) la amplía; fondo y elementos derivados se mueven juntos y los ajustes por elemento siguen siendo absolutos en pulgadas de la variante.
+- `set_print_setup` solo admite los cortes contrastados de tapa blanda (5 × 8 y 6 × 9); otro corte es `invalid_params`.
+- `export_image` comprueba fuentes y recursos como el diálogo *Exportar*. El editor entrega los bytes y el proceso MCP los escribe en `FBC_EXPORT_DIR` sin sobrescribir (añade `-2`, `-3`…); sin esa variable devuelve `invalid_params`. Un archivo de más de 28 MiB no cabe en el canal y se rechaza con el motivo. El PDF de KDP no se exporta por MCP (sigue en el diálogo).
+- `get_canvas_state` incluye `printSetup` y `variants` cuando existen, y la familia de las fuentes subidas.
+- Un recurso o variante ausente es `not_found` con `resource` `asset` o `variant`.
 - `apply_background` aplica fondo y encuadre con un único comando (`setBackground` con `fit`): una revisión y un solo paso de deshacer.
 - `saved`: el editor guarda el proyecto tras cada cambio; si el guardado falla, la edición sigue aplicada (se puede deshacer) y `saved` es `false`.
 
@@ -82,6 +95,7 @@ Atomicidad: cada herramienta es un único comando de `core` (o, en `import_asset
 | `FBC_URL` / `FBC_PORT` | proceso MCP | Dirección del companion (por defecto `http://127.0.0.1:47321`). |
 | `FBC_IMPORT_DIRS` | proceso MCP | Directorios permitidos para `import_asset`. |
 | `FBC_MAX_IMPORT_BYTES` | proceso MCP | Máximo por archivo importado (por defecto 20 MiB). |
+| `FBC_EXPORT_DIR` | proceso MCP | Directorio donde `export_image` escribe los archivos. Sin él, no se exporta. |
 | `FBC_ALLOWED_ORIGIN`, `FBC_PORT`, `FBC_TOKEN` | companion | Como en el Paso 7. |
 
 ## Pruebas automatizadas
@@ -106,7 +120,7 @@ Preparación común:
 ### MCP Inspector
 
 1. `npx @modelcontextprotocol/inspector -e FBC_TOKEN=<token> -e FBC_IMPORT_DIRS=$HOME/Pictures pnpm --silent --dir /ruta/al/repo/apps/companion mcp`
-2. En la interfaz del Inspector: **Connect**; en *Tools* → *List Tools* deben verse las cinco herramientas con sus esquemas.
+2. En la interfaz del Inspector: **Connect**; en *Tools* → *List Tools* deben verse las trece herramientas con sus esquemas.
 3. `get_canvas_state` sin argumentos: devuelve `projectId` y `revision`.
 4. `add_text_element` con `projectId`, `expectedRevision` = la revisión leída y `text`: el texto aparece en el lienzo y en «Capas de texto»; el estado pasa a «Guardado».
 5. Repita la misma llamada con la revisión antigua: `isError` con `conflict`, y el documento no cambia.
@@ -116,7 +130,7 @@ Preparación común:
 ### Segundo cliente real: Claude Code
 
 1. `claude mcp add kdp-cover --env FBC_TOKEN=<token> --env FBC_IMPORT_DIRS=$HOME/Pictures -- pnpm --silent --dir /ruta/al/repo/apps/companion mcp`
-2. En una sesión de Claude Code, `/mcp` debe mostrar `kdp-cover` conectado con cinco herramientas.
+2. En una sesión de Claude Code, `/mcp` debe mostrar `kdp-cover` conectado con trece herramientas.
 3. Pida: «Lee el estado del lienzo y añade el texto "Prueba MCP" con fuente Georgia». Debe aparecer en el editor.
 4. Pida añadir otro texto usando deliberadamente la revisión anterior (o edite algo en el editor entre medias): el cliente debe recibir el conflicto y reintentar tras releer.
 5. Compruebe en el editor que **Deshacer** revierte el cambio hecho por el agente.
@@ -127,5 +141,6 @@ Si algo falla: sin respuesta → revise que el companion esté en marcha y el to
 
 - Un único editor conectado a la vez (el más reciente gana) y un único proyecto autorizado.
 - El proceso MCP no se reconecta solo de forma proactiva: lo hace en la siguiente llamada.
-- `import_asset` solo admite imágenes y rutas locales; las fuentes no se importan por MCP.
+- `import_asset` e `import_font` solo admiten rutas locales dentro de `FBC_IMPORT_DIRS`.
+- `export_image` no genera el PDF de KDP; para el PDF se usa *Exportar → PDF* en el editor.
 - Los tipos de informe/comprobación del companion siguen duplicados respecto a core (deuda del Paso 7, sin tocar).
