@@ -25,3 +25,4 @@ export * from "./mcp/protocol.js";
 export * from "./assets/usage.js";
 export * from "./elements/editable.js";
 export * from "./elements/defaults.js";
+export * from "./textures/generate.js";

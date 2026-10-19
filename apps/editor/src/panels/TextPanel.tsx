@@ -1,13 +1,14 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
-  FONT_CATALOG, applyStyleToRange, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, nearestFace, rangeStyle, replaceText, runsToText,
-  type FontGroupId, type InnerShadow, type RunStylePatch, type TextElement, type TextMask, type TextTexture,
+  FONT_CATALOG, TEXTURE_KINDS, applyStyleToRange, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, nearestFace, rangeStyle, replaceText, runsToText,
+  type FontGroupId, type InnerShadow, type TextureKind, type TextureOptions, type RunStylePatch, type TextElement, type TextMask, type TextTexture,
 } from "@free-book-cover/core";
 import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { useAssetUrl } from "../canvas/useImageSources";
 import { useFontVersion, useFonts } from "../fonts/fontContext";
 import { importFont } from "../fonts/importFont";
 import { importImage } from "../images/importImage";
+import { generateTextureAsset } from "../images/generateTexture";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";
@@ -331,6 +332,16 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
             ))}
           </div>
         )}
+        <GenerateTexture
+          onGenerate={async (opts) => {
+            const r = await generateTextureAsset(store, opts);
+            if (!r.ok) return;
+            const texture: TextTexture = { assetId: r.assetId, fit: "tile", tileIn: 1.5 };
+            // Mármol con huecos: la máscara por transparencia hace que la sombra también tenga las grietas.
+            if (opts.kind === "cracked-marble") commit({ texture, mask: { ...texture, mode: "alpha", threshold: 0.5, softness: 0 } });
+            else setTexture(texture);
+          }}
+        />
         {el.texture && <TextureFit texture={el.texture} onChange={setTexture} />}
         {el.texture && (
           <Switch
@@ -380,6 +391,46 @@ function TextureFit({ texture, onChange }: { texture: TextTexture; onChange: (t:
       {tile && <Slider label={t("textureTileSize")} min={0.1} max={6} step={0.05} value={texture.tileIn ?? 1} format={(v) => `${v.toFixed(2)} in`} onCommit={(tileIn) => onChange({ ...texture, tileIn })} />}
       <Slider label={t("textureOffsetX")} min={0} max={1} step={0.01} value={pos.x} format={(v) => `${Math.round(v * 100)} %`} onCommit={(x) => onChange({ ...texture, pos: { ...pos, x } })} />
       <Slider label={t("textureOffsetY")} min={0} max={1} step={0.01} value={pos.y} format={(v) => `${Math.round(v * 100)} %`} onCommit={(y) => onChange({ ...texture, pos: { ...pos, y } })} />
+    </div>
+  );
+}
+
+const KIND_KEY: Record<TextureKind, DictKey> = { "cracked-marble": "textureKindMarble", stone: "textureKindStone", paper: "textureKindPaper" };
+
+// Texturas incluidas: tipo y semilla (misma semilla, misma textura).
+function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Promise<void> }) {
+  const { t } = useI18n();
+  const id = useId();
+  const [kind, setKind] = useState<TextureKind>("cracked-marble");
+  const [seed, setSeed] = useState(1);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="mb-4 rounded-[9px] border border-line-soft bg-card p-2.5" role="group" aria-label={t("textureGenerateTitle")}>
+      <div className="mb-2 flex items-end gap-2">
+        <div className="min-w-0 flex-[1.4]">
+          <label htmlFor={id} className="mb-1 block text-[10px] text-muted">{t("textureKind")}</label>
+          <select id={id} className={`${fieldCls} font-sans`} value={kind} onChange={(e) => setKind(e.target.value as TextureKind)}>
+            {TEXTURE_KINDS.map((k) => <option key={k} value={k}>{t(KIND_KEY[k])}</option>)}
+          </select>
+        </div>
+        <NumberField label={t("textureSeed")} value={seed} min={0} step={1} digits={0} onCommit={(v) => setSeed(Math.max(0, Math.round(v)))} />
+      </div>
+      <div className="flex gap-1.5">
+        <button type="button" className={`${toggleBtn} w-auto px-2`} onClick={() => setSeed(Math.floor(Math.random() * 1_000_000))}>{t("textureSeedRandom")}</button>
+        <button
+          type="button" className={`${toggleBtn} w-auto flex-1 px-2`} disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await onGenerate(kind === "cracked-marble" ? { kind, seed, cracks: "holes" } : { kind, seed });
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? t("textureGenerating") : t("textureGenerate")}
+        </button>
+      </div>
     </div>
   );
 }

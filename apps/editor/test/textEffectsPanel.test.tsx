@@ -9,6 +9,13 @@ import { FontRegistry, type FontEnv } from "../src/fonts/fontRegistry";
 import { I18nProvider } from "../src/i18n";
 import { createEditorStore } from "../src/store/editorStore";
 import { openStorage } from "../src/storage/projectStorage";
+import { importImage } from "../src/images/importImage";
+import { generateTextureAsset } from "../src/images/generateTexture";
+
+// En Node no hay canvas para codificar el PNG: el generador se sustituye por la importación de un PNG de 1024 px.
+vi.mock("../src/images/generateTexture", () => ({
+  generateTextureAsset: vi.fn(async (store: Parameters<typeof importImage>[0]) => importImage(store, png(1024, 1024), "asset", async () => null)),
+}));
 
 const be32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
 const png = (w: number, h: number) =>
@@ -91,5 +98,21 @@ describe("panel de texto: acabado de las letras", () => {
     expect(textOf(store).mask).toEqual({ assetId: "id4", mode: "dark", threshold: 0.35, softness: 0.1 });
     await user.click(screen.getByRole("button", { name: "Quitar máscara" }));
     expect(textOf(store).mask).toBeUndefined();
+  });
+
+  it("«Generar textura» crea la textura en mosaico y, en mármol con huecos, la máscara enlazada por transparencia", async () => {
+    const user = userEvent.setup();
+    const store = await mount();
+    await user.click(screen.getByRole("button", { name: "Añadir capa de texto" }));
+    fireEvent.change(screen.getByLabelText("Semilla"), { target: { value: "42" } });
+    fireEvent.blur(screen.getByLabelText("Semilla"));
+    await user.click(screen.getByRole("button", { name: "Generar textura" }));
+    await waitFor(() => expect(textOf(store).texture).toEqual({ assetId: "id3", fit: "tile", tileIn: 1.5 }));
+    expect(vi.mocked(generateTextureAsset)).toHaveBeenLastCalledWith(expect.anything(), { kind: "cracked-marble", seed: 42, cracks: "holes" });
+    expect(textOf(store).mask).toEqual({ assetId: "id3", fit: "tile", tileIn: 1.5, mode: "alpha", threshold: 0.5, softness: 0 });
+    fireEvent.change(screen.getByLabelText("Tipo de textura"), { target: { value: "paper" } });
+    await user.click(screen.getByRole("button", { name: "Generar textura" }));
+    await waitFor(() => expect(textOf(store).texture?.assetId).toBe("id4"));
+    expect(vi.mocked(generateTextureAsset)).toHaveBeenLastCalledWith(expect.anything(), { kind: "paper", seed: 42 });
   });
 });
