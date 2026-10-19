@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import {
-  PAPERS, SUPPORTED_TRIMS, elementsOutsideCanvas, kdpLayout, validatePrintSetup, type PrintSetup, type SetupIssue,
+  PAPERS, SUPPORTED_TRIMS, elementsOutsideCanvas, isLargeTrim, kdpLayout, validatePrintSetup, type PrintSetup, type SetupIssue,
 } from "@free-book-cover/core";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
@@ -19,6 +19,7 @@ export function issueMessage(t: (k: DictKey, v?: Record<string, string | number>
     case "trim_out_of_range": return t("kdpErrTrimRange");
     case "trim_unsupported": return t("kdpErrTrimUnsupported");
     case "paper_unsupported": return t("kdpErrPaper");
+    case "paper_unavailable_for_trim": return t("kdpErrPaperTrim");
     case "pages_invalid": return t("kdpErrPagesInvalid");
     case "pages_below_min": return t("kdpErrPagesMin", { n: i.min });
     case "pages_above_max": return t("kdpErrPagesMax", { n: i.max });
@@ -77,7 +78,11 @@ export function KdpSetupWizard() {
       <div>
         <label htmlFor={`${uid}t`} className="mb-1 block text-[10px] text-muted">{t("kdpTrim")}</label>
         <select id={`${uid}t`} className={fieldCls} value={trim} onChange={(e) => setTrim(e.target.value)}>
-          {SUPPORTED_TRIMS.map((s) => <option key={trimKey(s.widthIn, s.heightIn)} value={trimKey(s.widthIn, s.heightIn)}>{s.widthIn} × {s.heightIn} in</option>)}
+          {SUPPORTED_TRIMS.map((s) => (
+            <option key={trimKey(s.widthIn, s.heightIn)} value={trimKey(s.widthIn, s.heightIn)}>
+              {s.widthIn} × {s.heightIn} in{isLargeTrim(s.widthIn, s.heightIn) ? ` (${t("kdpTrimLarge")})` : ""}
+            </option>
+          ))}
           <option value={CUSTOM}>{t("kdpTrimCustom")}</option>
         </select>
       </div>

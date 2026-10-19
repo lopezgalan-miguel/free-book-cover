@@ -108,7 +108,7 @@ describe("validación de datos de impresión", () => {
   it("tamaño fuera de rango o sin máximo contrastado", () => {
     expect(validatePrintSetup(setup({ trimWidthIn: 3.9 }))).toMatchObject({ ok: false, issues: [{ kind: "trim_out_of_range" }] });
     expect(validatePrintSetup(setup({ trimHeightIn: 11.7 }))).toMatchObject({ ok: false, issues: [{ kind: "trim_out_of_range" }] });
-    expect(validatePrintSetup(setup({ trimWidthIn: 8.5, trimHeightIn: 11 }))).toMatchObject({ ok: false, issues: [{ kind: "trim_unsupported" }] });
+    expect(validatePrintSetup(setup({ trimWidthIn: 7, trimHeightIn: 9 }))).toMatchObject({ ok: false, issues: [{ kind: "trim_unsupported" }] });
   });
 });
 

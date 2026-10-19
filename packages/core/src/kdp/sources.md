@@ -1,4 +1,4 @@
-# Fuentes y valores KDP / plataformas — contrastados el 2026-10-02
+# Fuentes y valores KDP / plataformas — contrastados el 2026-10-02 (cortes y máximos de páginas: 2026-10-19)
 
 Volver a contrastar antes de cada versión. Si hay discrepancias, manda la plantilla oficial del [calculador de cubiertas](https://kdp.amazon.com/cover-calculator).
 
@@ -23,12 +23,21 @@ Fuente: [Barcodes](https://kdp.amazon.com/en_US/help/topic/G5HDYGP4BXLX4RUW)
 - Tamaño sugerido 2 × 1,2 in (mínimo 1,4 × 0,8 in), fondo blanco sólido, ≥ 0,25 in del lomo y del corte, sin solaparse con texto.
 - Si no se aporta, KDP coloca uno en la contraportada. **No se publica la posición exacta**: reservaremos la esquina inferior derecha de la contraportada (2 × 1,2 in a 0,25 in del lomo y del corte inferior) y la contrastaremos con la plantilla.
 
-Fuente: [Print Options](https://kdp.amazon.com/en_US/help/topic/G201834180)
+Fuente: [Paperback Submission Guidelines](https://kdp.amazon.com/en_US/help/topic/G201834240), tabla «Trim size» de kdp.amazon.com, consultada el 2026-10-19. (La página [Print Options](https://kdp.amazon.com/en_US/help/topic/G201834180) solo muestra la fila de 5 × 8 en su tabla de .com; la de .co.jp es otra lista de cortes.)
 
-- Mínimo de 24 páginas (72 en color estándar). Máximo para 5 × 8 y 6 × 9 in: B/N blanco 828, crema 776, *groundwood* 812, color estándar 600, color premium 828. Los demás tamaños tienen sus propios máximos.
-- **Hueco documentado (entrega 6):** la tabla oficial completa no se pudo contrastar de forma fiable (una lectura resumida de la página sugería los mismos máximos para 6,14 × 9,21, 7 × 10 y 8,25 × 11 in, pero no está verificada). El producto solo admite 5 × 8 y 6 × 9 in y rechaza el resto (`trim_unsupported`, incluidos los tamaños personalizados dentro de 4–8,5 × 6–11,69 in) hasta contrastar la tabla oficial; ampliar `SUPPORTED_TRIMS` en `kdp.ts` cuando se haga.
-- Tamaño grande: más de 6,12 in de ancho o más de 9 in de alto.
-- Tamaño personalizado: de 4 a 8,5 in de ancho y de 6 a 11,69 in de alto.
+Mínimo de 24 páginas (72 en color estándar). Máximo por corte y papel (B/N blanco / B/N crema / *groundwood* / color estándar / color prémium):
+
+| Corte (in) | Blanco | Crema | Groundwood | Color estándar | Prémium |
+| --- | --- | --- | --- | --- | --- |
+| 5 × 8, 5,06 × 7,81, 5,25 × 8, 5,5 × 8,5, 6 × 9, 6,14 × 9,21, 6,69 × 9,61, 7 × 10, 7,44 × 9,69, 7,5 × 9,25, 8 × 10 | 828 | 776 | 812 | 600 | 828 |
+| 8,25 × 6, 8,25 × 8,25 | 800 | 750 | 784 | 600 | 800 |
+| 8,27 × 11,69 | 780 | 730 | 764 | no disponible | 590 |
+| 8,5 × 8,5, 8,5 × 11 | 590 | 550 | 578 | 600 | 590 |
+
+- El producto admite exactamente estos 16 cortes (`SUPPORTED_TRIMS` en `kdp.ts`, con su máximo por papel). Un papel que el corte no admite da `paper_unavailable_for_trim`.
+- Los tamaños personalizados (de 4 a 8,5 in de ancho y de 6 a 11,69 in de alto) no tienen máximo publicado y siguen rechazándose (`trim_unsupported`).
+- Tamaño grande: más de 6,12 in de ancho o más de 9 in de alto (otro coste de impresión; el asistente lo marca).
+- *Groundwood* no se admite (ver abajo).
 
 Fuente: [Groundwood Paper](https://kdp.amazon.com/en_US/help/topic/G99WKT9FARBGHBJF)
 
