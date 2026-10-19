@@ -142,6 +142,13 @@ test("sombra interior, sombra configurable y opacidad: la vista coincide con la 
   await expect.poll(() => previewVsExport(page, true)).toBeLessThan(4);
 });
 
+test("la sombra interior oscurece la letra por dentro", async ({ page }) => {
+  await page.waitForTimeout(200);
+  const before = await counts(page);
+  await update(page, { innerShadow: { on: true, color: "#000000", opacity: 1, angle: 90, distance: 0, blur: 0.15 } });
+  await expect.poll(async () => (await counts(page)).white).toBeLessThan(before.white * 0.8);
+});
+
 test.describe("en pantalla retina", () => {
   test.use({ deviceScaleFactor: 2 });
   test("la sombra de la vista cae donde en la exportación", async ({ page }) => {

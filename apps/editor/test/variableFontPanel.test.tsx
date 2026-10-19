@@ -62,6 +62,18 @@ describe("panel de texto: fuente variable", () => {
     fireEvent.change(width, { target: { value: "100" } });
     expect(textOf(store).runs[0]!.stretch).toBeUndefined();
   });
+  it("al cambiar a otra fuente se quita la anchura (la nueva no tiene ese eje)", async () => {
+    const user = userEvent.setup();
+    const store = await mount();
+    await user.click(screen.getByRole("button", { name: "Añadir capa de texto" }));
+    fireEvent.change(await screen.findByLabelText("Contenido del texto"), { target: { value: "LAMENTOS" } });
+    await user.upload(screen.getByLabelText("Subir fuente"), variableTtf());
+    fireEvent.change(await screen.findByLabelText("Anchura de la fuente (wdth)"), { target: { value: "60" } });
+    expect(textOf(store).runs[0]!.stretch).toBe(60);
+    await user.click(screen.getByRole("button", { name: /^Lora/ }));
+    expect(textOf(store).runs[0]!.fontFamily).toBe("Lora");
+    expect(textOf(store).runs[0]!.stretch).toBeUndefined();
+  });
   it("una fuente del catálogo no muestra controles de ejes", async () => {
     const user = userEvent.setup();
     await mount();

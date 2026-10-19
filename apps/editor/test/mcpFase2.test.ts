@@ -114,4 +114,15 @@ describe("MCP: texturas y fuentes variables", () => {
     ok(await run("update_element_style", mut({ elementId: id, style: { fontFamily: font.family, stretch: 60, weight: 870 } })));
     expect((doc().elements[0] as TextElement).runs[0]).toMatchObject({ fontFamily: "RS VF", stretch: 60, weight: 870 });
   });
+  it("cambiar a una fuente del catálogo quita la anchura, y stretch null la quita", async () => {
+    const font = ok(await run("import_font", { projectId: doc().id, name: "RS VF.ttf", dataBase64: variableTtfB64() }));
+    const id = await text();
+    ok(await run("update_element_style", mut({ elementId: id, style: { fontFamily: font.family, stretch: 60 } })));
+    ok(await run("update_element_style", mut({ elementId: id, style: { stretch: null } })));
+    expect((doc().elements[0] as TextElement).runs[0]!.stretch).toBeUndefined();
+    ok(await run("update_element_style", mut({ elementId: id, style: { stretch: 70 } })));
+    ok(await run("update_element_style", mut({ elementId: id, style: { fontFamily: "Lora" } })));
+    expect((doc().elements[0] as TextElement).runs[0]).toMatchObject({ fontFamily: "Lora" });
+    expect((doc().elements[0] as TextElement).runs[0]!.stretch).toBeUndefined();
+  });
 });

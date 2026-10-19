@@ -112,7 +112,8 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
     // Si la familia nueva no tiene el peso o la cursiva actuales se pasa a la cara más próxima, a la vista.
     const w = weight ?? first?.weight ?? 400;
     const nf = nearestFace(name, w, italic ?? false, own);
-    const patch: RunStylePatch = { fontFamily: name };
+    // La anchura (wdth) es de la fuente variable anterior: con otra familia se quita.
+    const patch: RunStylePatch = { fontFamily: name, stretch: undefined };
     if (nf && weight !== undefined && nf.weight !== weight) patch.weight = nf.weight;
     if (nf && italic !== undefined && nf.italic !== italic) patch.italic = nf.italic;
     registry.ensureCatalog(name, patch.weight ?? w, patch.italic ?? italic ?? false);

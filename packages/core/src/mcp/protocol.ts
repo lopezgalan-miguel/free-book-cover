@@ -102,7 +102,7 @@ export const elementStyleSchema = z
       .describe("Solo textos: intensity (0..100) es el desenfoque; color, opacity (0..1), angle (grados, 90 = abajo) y distance (em, 0..1) son opcionales."),
     innerShadow: innerShadowSchema.nullable().optional().describe("Solo textos: sombra dentro de la letra (relieve o bordes oscurecidos); distance y blur en em. null la quita."),
     mask: textMaskSchema.nullable().optional().describe("Solo textos: máscara de recorte (assetId de una imagen, colocada como la textura). mode dark/light/alpha borra la letra donde la imagen es oscura, clara o transparente, por debajo de threshold (0..1), con rampa softness. Con el mismo assetId que la textura: grietas huecas. null la quita."),
-    stretch: finite.min(25).max(200).optional().describe("Solo textos con una fuente variable subida: anchura (eje wdth, %) de todos los fragmentos."),
+    stretch: finite.min(25).max(200).nullable().optional().describe("Solo textos con una fuente variable subida: anchura (eje wdth, %) de todos los fragmentos. null la quita; cambiar fontFamily sin indicarla también."),
     opacity: finite.min(0).max(1).optional().describe("Opacidad de la capa (0..1)."),
     filters: imageFiltersSchema.nullable().optional().describe("Solo imágenes: blur (0..100), brightness y saturation (%, 100 = sin cambio). null los quita."),
     outline: z.object({ on: z.boolean(), width: finite.min(0).max(100), color: colorSchema }).strict().optional(),
