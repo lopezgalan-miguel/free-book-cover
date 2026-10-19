@@ -2,13 +2,13 @@ import { cachedDpiReport as dpiReport } from "./dpiCache";
 import { useI18n } from "../i18n";
 import type { GeometryEdit } from "../store/editorStore";
 import { useDisplayDoc, useEditorState, useStore } from "../store/react";
-import { NumberField, Section, fieldCls } from "./ui";
+import { NumberField, chipBtn, fieldCls } from "./ui";
 
 // Alternativa numérica y accesible a arrastrar: posición, tamaño, rotación (y recorte en imágenes).
 export function GeometryPanel() {
   const { t } = useI18n();
   const store = useStore();
-  const { selectedId } = useEditorState();
+  const { selectedId, history } = useEditorState();
   // En una variante se muestran y editan los valores de la variante.
   const doc = useDisplayDoc();
   const el = doc.elements.find((e) => e.id === selectedId);
@@ -21,6 +21,10 @@ export function GeometryPanel() {
     );
   }
   const set = (props: GeometryEdit) => store.editGeometry(el.id, props);
+  // Orden de apilado (del diseño base): extremos de la pila en un solo paso.
+  const stack = [...history.present.elements].sort((a, b) => a.zIndex - b.zIndex);
+  const index = stack.findIndex((e) => e.id === el.id);
+  const toIndex = (i: number) => store.dispatch({ type: "reorderElement", id: el.id, toIndex: i });
   const dpi = el.type === "image" ? dpiReport(doc).find((d) => d.id === el.id) : undefined;
   const pct = (v: number) => v * 100;
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -39,6 +43,10 @@ export function GeometryPanel() {
       </div>
       <div className="mt-2 flex gap-2">
         <NumberField label={t("rotation")} value={el.rotation} step={1} onCommit={(rotation) => set({ rotation })} />
+      </div>
+      <div className="mt-2.5 flex gap-1.5">
+        <button type="button" className={`${chipBtn} flex-1`} disabled={index < 0 || index === stack.length - 1} onClick={() => toIndex(stack.length - 1)}>{t("bringToFront")}</button>
+        <button type="button" className={`${chipBtn} flex-1`} disabled={index <= 0} onClick={() => toIndex(0)}>{t("sendToBack")}</button>
       </div>
       {el.type === "image" && (
         <>

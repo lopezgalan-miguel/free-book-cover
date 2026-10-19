@@ -4,7 +4,7 @@ import { useAssetUrl } from "../canvas/useImageSources";
 import { importImage } from "../images/importImage";
 import { useI18n } from "../i18n";
 import { useDisplayDoc, useEditorState, useStore } from "../store/react";
-import { chipBtn, NumberField, Section } from "./ui";
+import { chipBtn, ColorField, NumberField, Section } from "./ui";
 
 // Fondo: imagen o color, con encuadre Rellenar/Ajustar/Centrar. Independiente del contenedor.
 export function BackgroundPanel() {
@@ -65,7 +65,14 @@ export function BackgroundPanel() {
           <button className={`${chipBtn} mt-2`} onClick={() => store.dispatch({ type: "setBackground", background: "#ffffff" })}>{t("removeBg")}</button>
         </>
       ) : (
-        <p className="mt-2 text-[10.5px] text-muted">{t("bgNone")}</p>
+        <>
+          <p className="mt-2 text-[10.5px] text-muted">{t("bgNone")}</p>
+          <div className="mb-1.5 mt-2.5 text-[11px] text-subtle">{t("bgColor")}</div>
+          <ColorField
+            value={typeof canvas.background === "string" ? canvas.background : "#ffffff"} pickerLabel={t("bgColorPicker")} hexLabel={t("bgColorHex")}
+            onChange={(background) => store.dispatch({ type: "setBackground", background }, { mergeKey: "bg-color" })} onEnd={() => store.endGesture()}
+          />
+        </>
       )}
     </Section>
   );

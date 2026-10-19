@@ -8,13 +8,14 @@ type Saved = Awaited<ReturnType<ReturnType<typeof useStore>["listProjects"]>>;
 const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
 
 // Proyecto: nombre, crear/abrir otro, copia de seguridad y liberación de espacio. Independiente del contenedor.
-export function ProjectPanel() {
+// `onOpened`: se llama tras abrir otro proyecto (el diálogo se cierra).
+export function ProjectPanel({ onOpened }: { onOpened?: () => void } = {}) {
   const { t } = useI18n();
   const store = useStore();
   const state = useEditorState();
   const doc = state.history.present;
   const [draft, setDraft] = useState<string | null>(null);
-  const [saved, setSaved] = useState<Saved>([]);
+  const [saved, setSaved] = useState<Saved | null>(null);
   const [confirm, setConfirm] = useState<"space" | { del: string } | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -26,7 +27,7 @@ export function ProjectPanel() {
     setDraft(null);
   };
   const unused = store.unusedAssets();
-  const others = saved.filter((p) => p.id !== doc.id);
+  const others = (saved ?? []).filter((p) => p.id !== doc.id);
   const label = (name: string) => name || t("projectUnnamed");
 
   return (
@@ -44,12 +45,13 @@ export function ProjectPanel() {
         />
         <div className="mt-2.5 flex items-center gap-2">
           <button type="button" className={chipBtn} onClick={() => { setNote(null); void store.newProject().then(refresh); }}>{t("projectNew")}</button>
+          <button type="button" className={chipBtn} onClick={() => { setNote(null); void store.duplicateProject(t("projectCopyName", { name: doc.name || t("projectUnnamed") })).then(refresh); }}>{t("projectDuplicate")}</button>
           <span className="text-[10.5px] text-muted">{t("projectNewHint")}</span>
         </div>
       </Section>
 
       <Section title={t("projectSaved")}>
-        {others.length === 0 ? <p className="text-[11.5px] text-muted">{t("projectNoOthers")}</p> : (
+        {saved === null ? <p className="text-[11.5px] text-muted" role="status">{t("projectLoading")}</p> : others.length === 0 ? <p className="text-[11.5px] text-muted">{t("projectNoOthers")}</p> : (
           <ul className="grid gap-1.5">
             {others.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-line bg-white px-2.5 py-1.5" data-testid="saved-project">
@@ -62,7 +64,7 @@ export function ProjectPanel() {
                   </span>
                 ) : (
                   <span className="flex flex-none gap-1.5">
-                    <button type="button" className={chipBtn} aria-label={`${t("projectOpen")} ${label(p.name)}`} onClick={() => { setNote(null); void store.openProject(p.id).then(refresh); }}>{t("projectOpen")}</button>
+                    <button type="button" className={chipBtn} aria-label={`${t("projectOpen")} ${label(p.name)}`} onClick={() => { setNote(null); void store.openProject(p.id).then((ok) => { refresh(); if (ok) onOpened?.(); }); }}>{t("projectOpen")}</button>
                     <button type="button" className={chipBtn} aria-label={`${t("projectDelete")} ${label(p.name)}`} onClick={() => setConfirm({ del: p.id })}>{t("projectDelete")}</button>
                   </span>
                 )}
@@ -72,7 +74,7 @@ export function ProjectPanel() {
         )}
         {confirm && typeof confirm === "object" && (
           <p role="alert" className="mt-2 text-[11.5px] text-danger">
-            {t("projectDeleteConfirm", { name: label(saved.find((p) => p.id === confirm.del)?.name ?? "") })}
+            {t("projectDeleteConfirm", { name: label((saved ?? []).find((p) => p.id === confirm.del)?.name ?? "") })}
           </p>
         )}
       </Section>

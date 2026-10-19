@@ -49,6 +49,35 @@ export function NumberField({
   );
 }
 
+const HEX6 = /^[0-9a-fA-F]{6}$/;
+// Color con selector y campo hexadecimal. `onChange` llega en cada cambio (un gesto continuo se agrupa con
+// mergeKey en quien despacha); `onEnd` cierra el gesto al salir del campo.
+export function ColorField({ value, pickerLabel, hexLabel, onChange, onEnd }: { value: string; pickerLabel: string; hexLabel: string; onChange: (color: string) => void; onEnd?: () => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="color" aria-label={pickerLabel} value={value} onChange={(e) => onChange(e.target.value.toLowerCase())} onBlur={onEnd}
+        className="h-[34px] w-10 flex-none cursor-pointer rounded-lg border border-field bg-white p-[3px]"
+      />
+      <div className="flex min-w-0 flex-1 items-center rounded-lg border border-field bg-white px-2.5">
+        <span className="font-mono text-[13px] text-faint">#</span>
+        <input
+          type="text" aria-label={hexLabel} maxLength={7}
+          className="min-w-0 flex-1 bg-transparent px-1.5 py-[7px] font-mono text-[13px] uppercase text-ink outline-none"
+          value={draft ?? value.slice(1).toUpperCase()}
+          onChange={(e) => {
+            const v = e.target.value.replace("#", "");
+            setDraft(v);
+            if (HEX6.test(v)) onChange(`#${v.toLowerCase()}`);
+          }}
+          onBlur={() => { setDraft(null); onEnd?.(); }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // Deslizador con etiqueta y valor visibles. Durante el arrastre solo cambia el valor mostrado y se
 // confirma al soltar (un único paso de historial); con teclado confirma en cada cambio.
 export function Slider({

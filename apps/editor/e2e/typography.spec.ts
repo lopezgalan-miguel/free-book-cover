@@ -52,9 +52,9 @@ test.beforeEach(async ({ page }) => {
 test("un bloque con dos fragmentos de estilo distinto se pinta con ambos y se recupera tras guardar y recargar", async ({ page }) => {
   await newText(page, "ROJO AZUL");
   await selectRange(page, 0, 5);
-  await page.getByLabel("Color hexadecimal").fill("FF0000");
+  await page.getByLabel("Color hexadecimal", { exact: true }).fill("FF0000");
   await selectRange(page, 5, 9);
-  await page.getByLabel("Color hexadecimal").fill("0000FF");
+  await page.getByLabel("Color hexadecimal", { exact: true }).fill("0000FF");
   await page.getByRole("button", { name: "Negrita" }).click();
   await expect.poll(async () => (await doc(page)).elements[0].runs.length).toBe(2);
   // Fabric pinta los dos fragmentos, cada uno con su color

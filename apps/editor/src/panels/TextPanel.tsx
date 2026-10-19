@@ -12,7 +12,7 @@ import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";
 import type { TextSection } from "../layout/mobileTabs";
-import { Section, Slider, Switch, fieldCls, toggleBtn } from "./ui";
+import { NumberField, Section, Slider, Switch, fieldCls, toggleBtn } from "./ui";
 
 const ALL_SECTIONS: readonly TextSection[] = ["text", "font", "style", "color", "fx"];
 
@@ -47,6 +47,11 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
   const [hexDraft, setHexDraft] = useState<string | null>(null);
 
   const latest = () => store.getState().history.present.elements.find((e): e is TextElement => e.id === id && e.type === "text");
+  // Una entrada por textura distinta (recurso + encaje) de las demás capas de texto.
+  const reusable = doc.elements
+    .filter((e): e is TextElement & { texture: TextTexture } => e.type === "text" && e.id !== id && !!e.texture)
+    .map((e) => ({ key: JSON.stringify(e.texture), texture: e.texture, name: e.runs.map((r) => r.text).join("").slice(0, 40) || "—" }))
+    .filter((r, i, all) => all.findIndex((x) => x.key === r.key) === i);
   // Un solo comando por cambio; el alto sigue al contenido cuando se puede medir.
   // mergeKey: los cambios continuos de un mismo gesto (teclas, selector de color) son un solo paso de deshacer.
   const commit = (props: Partial<Omit<TextElement, "id" | "type" | "zIndex">>, mergeKey?: string) => {
@@ -206,6 +211,10 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
           ))}
         </div>
         <Slider label={t("size")} min={6} max={300} step={1} value={cur.fontSizePt ?? first?.fontSizePt ?? 24} format={(v) => `${v} pt`} onCommit={(v) => style({ fontSizePt: v })} />
+        {/* El deslizador va de punto en punto; el campo admite décimas (10,5 pt). */}
+        <div className="-mt-1 mb-3 flex">
+          <NumberField label={t("sizeExact")} value={cur.fontSizePt ?? first?.fontSizePt ?? 24} min={1} max={1000} step={0.1} digits={1} onCommit={(v) => v > 0 && style({ fontSizePt: v })} />
+        </div>
         <Slider label={t("lineH")} min={0.8} max={2.4} step={0.05} value={el.lineHeight} format={(v) => v.toFixed(2)} onCommit={(lineHeight) => commit({ lineHeight })} />
         <Slider label={t("letterS")} min={-0.05} max={0.5} step={0.01} value={el.letterSpacing} format={(v) => `${v.toFixed(2)}em`} onCommit={(letterSpacing) => commit({ letterSpacing })} />
         <Slider label={t("scaleX")} min={0.5} max={1.5} step={0.01} value={el.scaleX ?? 1} format={(v) => `${Math.round(v * 100)} %`} onCommit={(scaleX) => commit({ scaleX })} />
@@ -282,6 +291,20 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
             }}
           />
         </label>
+        {/* Texturas que ya usan otras capas: se aplican con su encaje, sin volver a subir la imagen. */}
+        {reusable.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label={t("textureReuse")}>
+            {reusable.map((r) => (
+              <button
+                key={r.key} type="button" className={`${toggleBtn} w-auto gap-1.5 px-1.5`} aria-pressed={el.texture?.assetId === r.texture.assetId && JSON.stringify(el.texture) === JSON.stringify(r.texture)}
+                aria-label={t("textureReuseFrom", { name: r.name })} title={t("textureReuseFrom", { name: r.name })}
+                onClick={() => commit({ texture: r.texture })}
+              >
+                <TextureThumb assetId={r.texture.assetId} assets={assets} />
+              </button>
+            ))}
+          </div>
+        )}
         {el.texture && <TextureFit texture={el.texture} onChange={(texture) => commit({ texture })} />}
         <Slider label={t("curve")} min={-100} max={100} step={1} value={el.curvature} testId="curve-slider" onCommit={(curvature) => commit({ curvature })} />
       </Section>}
