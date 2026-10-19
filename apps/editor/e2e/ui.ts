@@ -44,7 +44,7 @@ export async function editCoverOps(page: Page, mobile: boolean, background: Buff
   await openTab(page, mobile, "style");
   await page.getByRole("button", { name: "Negrita" }).click();
   await page.getByLabel("Tamaño", { exact: true }).fill("48");
-  await page.getByRole("switch", { name: "Sombra" }).click();
+  await page.getByRole("switch", { name: "Sombra", exact: true }).click();
   await closeSheet(page, mobile);
 
   await openTab(page, mobile, "canvas");

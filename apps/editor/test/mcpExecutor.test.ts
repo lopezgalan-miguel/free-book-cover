@@ -270,6 +270,18 @@ describe("update_element_style: anchura, textura y recorte", () => {
     ok(await run("update_element_style", mut({ elementId, style: { texture: null } })));
     expect("texture" in doc().elements[0]!).toBe(false);
   });
+  it("scaleX ensancha la caja con las letras y conserva el centro, salvo que se indique width o x", async () => {
+    withFonts();
+    const { elementId } = await add();
+    const el0 = doc().elements[0]!;
+    const center = el0.x + el0.width / 2;
+    ok(await run("update_element_style", mut({ elementId, style: { scaleX: 1.2 } })));
+    const el1 = doc().elements[0]!;
+    expect(el1.width).toBeCloseTo(el0.width * 1.2);
+    expect(el1.x + el1.width / 2).toBeCloseTo(center);
+    ok(await run("update_element_style", mut({ elementId, style: { scaleX: 0.6, width: 2, x: 0.25 } })));
+    expect(doc().elements[0]).toMatchObject({ scaleX: 0.6, width: 2, x: 0.25 });
+  });
   it("una textura con recurso inexistente o que no es imagen no cambia nada", async () => {
     withFonts();
     const { elementId } = await add();
@@ -363,7 +375,7 @@ describe("set_print_setup", () => {
   });
   it("un corte no admitido es invalid_params y no cambia nada", async () => {
     const before = doc();
-    expect(err(await run("set_print_setup", mut({ trimWidthIn: 5.5, trimHeightIn: 8.5, pageCount: 116, paperAndInk: "bw-white" }))).kind).toBe("invalid_params");
+    expect(err(await run("set_print_setup", mut({ trimWidthIn: 7, trimHeightIn: 9, pageCount: 116, paperAndInk: "bw-white" }))).kind).toBe("invalid_params");
     expect(doc()).toBe(before);
   });
 });

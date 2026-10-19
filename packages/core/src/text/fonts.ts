@@ -85,8 +85,14 @@ export function fontStack(family: string): string {
   return `${q}, sans-serif`;
 }
 
-export function fontCss(f: { family: string; weight: number; italic: boolean; px: number }): string {
-  return `${f.italic ? "italic " : ""}${f.weight} ${f.px}px ${fontStack(f.family)}`;
+// Familia que se pide al navegador. Con anchura (eje wdth) es un alias registrado aparte con el descriptor
+// font-stretch fijo: el navegador acota el eje a ese valor, y ctx.font no admite porcentajes de anchura.
+export function fontFamilyFor(family: string, stretch?: number): string {
+  return stretch === undefined ? family : `${family} @wdth ${stretch}`;
+}
+
+export function fontCss(f: { family: string; weight: number; italic: boolean; px: number; stretch?: number | undefined }): string {
+  return `${f.italic ? "italic " : ""}${f.weight} ${f.px}px ${fontStack(fontFamilyFor(f.family, f.stretch))}`;
 }
 
 // Formatos de fuente admitidos para subir (SDD R-04), detectados por la firma del archivo.
@@ -119,6 +125,8 @@ export interface FontProblem {
   elementIds: string[];
   // Solo con face_missing: las caras pedidas que no existen.
   faces?: FontFaceSpec[];
+  // Solo con face_missing: anchuras pedidas a una familia que no es una fuente subida.
+  stretches?: number[];
 }
 export type FontsReport = { ok: true } | { ok: false; problems: FontProblem[] };
 
@@ -131,6 +139,21 @@ export function usedFaces(doc: Project): Map<string, FontFaceSpec[]> {
       if (r.text === "") continue;
       const list = out.get(r.fontFamily) ?? [];
       if (!list.some((f) => f.weight === r.weight && f.italic === r.italic)) list.push({ weight: r.weight, italic: r.italic });
+      out.set(r.fontFamily, list);
+    }
+  }
+  return out;
+}
+
+// Anchuras (eje wdth) pedidas por familia en fragmentos con texto de elementos visibles.
+export function usedStretches(doc: Project): Map<string, number[]> {
+  const out = new Map<string, number[]>();
+  for (const e of doc.elements) {
+    if (e.type !== "text" || !e.visible) continue;
+    for (const r of e.runs) {
+      if (r.text === "" || r.stretch === undefined) continue;
+      const list = out.get(r.fontFamily) ?? [];
+      if (!list.includes(r.stretch)) list.push(r.stretch);
       out.set(r.fontFamily, list);
     }
   }
@@ -164,6 +187,7 @@ export function checkFontsReady(doc: Project, stateOf: (family: string) => FontS
   const own = documentFontFamilies(doc);
   const problems: FontProblem[] = [];
   const used = usedFaces(doc);
+  const stretches = usedStretches(doc);
   const faceProblem = (family: string, elementIds: string[]): FontProblem | null => {
     const absent = (used.get(family) ?? []).filter((f) => !hasFace(family, f.weight, f.italic, own));
     return absent.length ? { family, reason: "face_missing", elementIds, faces: absent } : null;
@@ -171,7 +195,9 @@ export function checkFontsReady(doc: Project, stateOf: (family: string) => FontS
   for (const [family, elementIds] of usedFamilies(doc)) {
     if (catalogGroup(family) === "system") {
       const fp = faceProblem(family, elementIds);
-      if (fp) problems.push(fp);
+      const widths = stretches.get(family) ?? [];
+      if (widths.length) problems.push({ ...(fp ?? { family, reason: "face_missing", elementIds }), stretches: widths });
+      else if (fp) problems.push(fp);
       continue;
     }
     if (!own.has(family) && catalogGroup(family) === null) {
@@ -185,8 +211,19 @@ export function checkFontsReady(doc: Project, stateOf: (family: string) => FontS
     }
     // Una cara que no existe nunca se pidió al navegador, así que su estado puede faltar: se informa la cara.
     const fp = faceProblem(family, elementIds);
+    const widths = stretches.get(family) ?? [];
+    if (widths.length && !own.has(family)) {
+      problems.push({ ...(fp ?? { family, reason: "face_missing", elementIds }), stretches: widths });
+      continue;
+    }
     if (fp) problems.push(fp);
     else if (s === undefined) problems.push({ family, reason: "not_loaded", elementIds });
+    else {
+      // Cada anchura es un alias que se carga aparte: también debe estar listo.
+      const alias = widths.map((w) => stateOf(fontFamilyFor(family, w)));
+      const bad = alias.find((a) => a !== "loaded");
+      if (bad !== undefined || alias.includes(undefined)) problems.push({ family, reason: bad ?? "not_loaded", elementIds });
+    }
   }
   return problems.length ? { ok: false, problems } : { ok: true };
 }

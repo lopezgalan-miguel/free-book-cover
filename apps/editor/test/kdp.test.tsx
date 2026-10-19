@@ -75,8 +75,21 @@ describe("asistente de cubierta KDP", () => {
     await user.type(w.getByLabelText("Ancho de corte (in)"), "8");
     await user.clear(w.getByLabelText("Número de páginas"));
     await user.type(w.getByLabelText("Número de páginas"), "100");
-    expect(w.getByRole("alert")).toHaveTextContent("solo se admiten los tamaños 5 × 8 y 6 × 9");
+    expect(w.getByRole("alert")).toHaveTextContent("no está en la tabla oficial de KDP");
     expect(store.getState().history.present.printSetup).toBeUndefined();
+  });
+  it("ofrece los 16 cortes oficiales, marca los grandes y avisa de un papel que el corte no admite", async () => {
+    const user = userEvent.setup();
+    await mount();
+    const w = wizard();
+    const trim = w.getByLabelText("Tamaño de corte") as HTMLSelectElement;
+    const labels = [...trim.options].map((o) => o.textContent);
+    expect(labels).toHaveLength(17);
+    expect(labels).toContain("5.5 × 8.5 in");
+    expect(labels).toContain("8.27 × 11.69 in (grande)");
+    await user.selectOptions(trim, "8.27x11.69");
+    await user.selectOptions(w.getByLabelText("Papel y tinta"), "color-standard");
+    expect(w.getByRole("alert")).toHaveTextContent("no se imprime en color estándar");
   });
   it("avisa de los elementos que quedan fuera al recalcular y los lista en la revisión", async () => {
     const user = userEvent.setup();

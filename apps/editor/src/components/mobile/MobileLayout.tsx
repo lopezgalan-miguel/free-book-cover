@@ -8,6 +8,7 @@ import { GeometryPanel } from "../../panels/GeometryPanel";
 import { KdpPanel } from "../../panels/KdpPanel";
 import { LayersPanel } from "../../panels/LayersPanel";
 import { ShapePanel } from "../../panels/ShapePanel";
+import { ImagePanel } from "../../panels/ImagePanel";
 import { TextPanel } from "../../panels/TextPanel";
 import { VariantsPanel } from "../../panels/VariantsPanel";
 import { useEditorState, useStore } from "../../store/react";
@@ -103,6 +104,7 @@ function SheetContent({ tab }: { tab: MobileTab }) {
   const sections = TAB_TEXT_SECTIONS[tab];
   const hasText = history.present.elements.some((e) => e.id === selectedId && e.type === "text");
   const hasShape = history.present.elements.some((e) => e.id === selectedId && e.type === "shape");
+  const hasImage = history.present.elements.some((e) => e.id === selectedId && e.type === "image");
   if (tab === "canvas") {
     return (
       <>
@@ -120,7 +122,9 @@ function SheetContent({ tab }: { tab: MobileTab }) {
       {sections && <TextPanel sections={sections} />}
       {/* Con una forma seleccionada, la pestaña Color edita su relleno y borde. */}
       {tab === "color" && hasShape && <ShapePanel />}
-      {tab !== "text" && !hasText && !(tab === "color" && hasShape) && <p className="p-4 text-[13px] leading-snug text-subtle">{t("sheetNeedsText")}</p>}
+      {/* Con una imagen, sus filtros. */}
+      {tab === "color" && hasImage && <ImagePanel />}
+      {tab !== "text" && !hasText && !(tab === "color" && (hasShape || hasImage)) && <p className="p-4 text-[13px] leading-snug text-subtle">{t("sheetNeedsText")}</p>}
     </>
   );
 }

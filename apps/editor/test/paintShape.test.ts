@@ -4,7 +4,7 @@ import { recordingContext } from "./helpers/recordingContext";
 
 // Caja de 300×150 px para un elemento de 1×0,5 in: 300 px por pulgada.
 const shape = (opts: { shape?: "rect" | "ellipse"; stroke?: { color: string; width: number } } = {}): ShapeItem => ({
-  id: "s", zIndex: 0, kind: "shape", rotation: 0, box: { x: 30, y: 60, width: 300, height: 150 },
+  id: "s", zIndex: 0, kind: "shape", rotation: 0, opacity: 1, box: { x: 30, y: 60, width: 300, height: 150 },
   element: {
     id: "s", type: "shape", shape: opts.shape ?? "rect", x: 0.1, y: 0.2, width: 1, height: 0.5, rotation: 0, zIndex: 0, visible: true,
     fill: "#ff0000", ...(opts.stroke ? { stroke: opts.stroke } : {}),

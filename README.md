@@ -62,7 +62,7 @@ Notas del E2E:
 
 Lo siguiente no se puede automatizar y sigue **sin comprobar**:
 
-1. **Código de barras y pliegue frente a la plantilla oficial de KDP**: lomo ± 0,0125 in con el calculador de cubiertas, posición real del código de barras y zona segura junto al pliegue (`packages/core/src/kdp/VERIFICACION.md`, `sources.md`).
+1. **Pliegue y resto de cortes frente a la plantilla oficial de KDP**: lomo ± 0,0125 in con el calculador de cubiertas en los cortes que aún no se han contrastado y zona segura junto al pliegue. El código de barras y las medidas de 5 × 8 in, 134 páginas, crema, ya coinciden con su plantilla (`packages/core/src/kdp/VERIFICACION.md`, `sources.md`).
 2. **Inspector MCP y segundo cliente MCP real** (MCP Inspector y Claude Code o similar): pasos en `apps/companion/MCP.md`, sección «Verificación manual».
 3. **Valores de los preajustes de redes** (Instagram, Facebook): se fijaron sin contrastar en línea con cada plataforma (`packages/core/src/presets/sources.md`). Incluye confirmar con Meta si el vertical de feed de Instagram es 1080 × 1440 (3:4), que no está en el catálogo.
 4. **Subida de la muestra al previsualizador de KDP** con tu cuenta: `samples/SAMPLE.md` (lista de comprobación).

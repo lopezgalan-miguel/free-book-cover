@@ -41,9 +41,17 @@ export interface TextLayout {
   glyphs: LayoutGlyph[] | null;
 }
 
+export interface ShadowPx {
+  dx: number;
+  dy: number;
+  blur: number;
+  color: string;
+}
 export interface TextEffects {
-  shadow: { dx: number; dy: number; blur: number; color: string } | null;
+  shadow: ShadowPx | null;
   outline: { width: number; color: string } | null;
+  // Sombra proyectada dentro de la letra (relieve hundido o bordes oscurecidos).
+  innerShadow: ShadowPx | null;
 }
 
 const ASCENT = 0.8;
@@ -55,12 +63,32 @@ export function baseFontPx(el: TextElement, ppi: number): number {
   return sizes.length ? Math.max(...sizes) : px(el.runs[0]?.fontSizePt ?? 12, ppi);
 }
 
-// Sombra e contorno en px, proporcionales al cuerpo (fórmulas del mockup).
+// #rrggbb + opacidad -> rgba() para el contexto 2D.
+export function rgba(hex: string, opacity: number): string {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${opacity})`;
+}
+
+// Desplazamiento de una sombra: ángulo en grados (0 = derecha, 90 = abajo) y distancia en px.
+// Los restos de coma flotante (cos 90°) se anulan para que una sombra vertical tenga dx = 0 exacto.
+function offset(angleDeg: number, dist: number): { dx: number; dy: number } {
+  const a = (angleDeg * Math.PI) / 180;
+  const snap = (v: number) => (Math.abs(v) < 1e-9 ? 0 : v);
+  return { dx: snap(Math.cos(a) * dist), dy: snap(Math.sin(a) * dist) };
+}
+
+// Sombras y contorno en px, proporcionales al cuerpo (fórmulas del mockup). Sin los campos nuevos de la
+// sombra salen los valores de siempre: negro al 60 %, hacia abajo a 0,05 em.
 export function textEffects(el: TextElement, ppi: number): TextEffects {
   const base = baseFontPx(el, ppi);
+  const s = el.shadow;
+  const inner = el.innerShadow;
   return {
-    shadow: el.shadow.on ? { dx: 0, dy: base * 0.05, blur: base * 0.08 * (el.shadow.intensity / 50), color: "rgba(0,0,0,0.6)" } : null,
+    shadow: s.on
+      ? { ...offset(s.angle ?? 90, (s.distance ?? 0.05) * base), blur: base * 0.08 * (s.intensity / 50), color: rgba(s.color ?? "#000000", s.opacity ?? 0.6) }
+      : null,
     outline: el.outline.on && el.outline.width > 0 ? { width: (base * el.outline.width) / 120, color: el.outline.color } : null,
+    innerShadow: inner?.on ? { ...offset(inner.angle, inner.distance * base), blur: inner.blur * base, color: rgba(inner.color, inner.opacity) } : null,
   };
 }
 
@@ -80,7 +108,7 @@ function tokenize(el: TextElement, ppi: number, measure: TextMeasure): Token[] {
   for (const run of el.runs) {
     const fontPx = px(run.fontSizePt, ppi);
     const style: PieceStyle = {
-      font: fontCss({ family: run.fontFamily, weight: run.weight, italic: run.italic, px: fontPx }),
+      font: fontCss({ family: run.fontFamily, weight: run.weight, italic: run.italic, px: fontPx, stretch: run.stretch }),
       fontPx, color: run.color, underline: run.underline, spacingPx: el.letterSpacing * fontPx,
     };
     const text = run.uppercase ? run.text.toUpperCase() : run.text;

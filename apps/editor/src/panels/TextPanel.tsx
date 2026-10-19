@@ -1,13 +1,15 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
-  FONT_CATALOG, applyStyleToRange, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, nearestFace, rangeStyle, replaceText, runsToText,
-  type FontGroupId, type RunStylePatch, type TextElement, type TextTexture,
+  FONT_CATALOG, TEXTURE_KINDS, applyStyleToRange, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, letterWidthPatch, nearestFace, rangeStyle, replaceText, runsToText,
+  type FontGroupId, type InnerShadow, type TextureKind, type TextureOptions, type RunStylePatch, type TextElement, type TextMask, type TextTexture,
 } from "@free-book-cover/core";
 import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { useAssetUrl } from "../canvas/useImageSources";
 import { useFontVersion, useFonts } from "../fonts/fontContext";
 import { importFont } from "../fonts/importFont";
+import { useFontAxes } from "../fonts/useFontAxes";
 import { importImage } from "../images/importImage";
+import { generateTextureAsset } from "../images/generateTexture";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";
@@ -23,6 +25,11 @@ const WEIGHTS = [
 const SWATCHES = ["#FFFFFF", "#F4EFE6", "#C2B6A1", "#8C6F47", "#2B2824", "#1A1712", "#B4453A", "#3E5C4B"];
 const HEX = /^[0-9a-fA-F]{6}$/;
 const uploadBtn = "cursor-pointer text-[11px] font-medium text-accent-dark hover:text-ink";
+const DEFAULT_INNER: InnerShadow = { on: true, color: "#000000", opacity: 0.6, angle: 90, distance: 0.03, blur: 0.06 };
+const MASK_DEFAULTS = { mode: "dark", threshold: 0.35, softness: 0.1 } as const;
+const colorInput = "mb-3 h-[30px] w-9 flex-none cursor-pointer rounded-[7px] border border-field bg-white p-0.5";
+// La máscara está enlazada a la textura si recorta con la misma imagen: entonces sigue su encaje.
+const isLinked = (e: Pick<TextElement, "texture" | "mask"> | undefined) => !!e?.mask && !!e.texture && e.mask.assetId === e.texture.assetId;
 
 // Panel de tipografía del elemento de texto seleccionado. Independiente del contenedor: solo usa el almacén.
 // `sections` permite que el contenedor móvil muestre una parte por pestaña con los mismos controles.
@@ -61,6 +68,12 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
     const next = { ...cur, ...props };
     store.dispatch({ type: "updateElement", id, props: measure ? { ...props, height: textHeightIn(next, measure) } : props }, mergeKey ? { mergeKey: `${id}:${mergeKey}` } : {});
   };
+  // Cambia la textura y, si la máscara está enlazada, le copia el mismo encaje en el mismo paso.
+  const setTexture = (texture: TextTexture) => {
+    const cur = latest();
+    const m = cur?.mask;
+    commit(isLinked(cur) && m ? { texture, mask: { ...texture, mode: m.mode, threshold: m.threshold, ...(m.softness !== undefined ? { softness: m.softness } : {}) } } : { texture });
+  };
   const range = () => ({ start: area.current?.selectionStart ?? sel.start, end: area.current?.selectionEnd ?? sel.end });
   const style = (patch: RunStylePatch, mergeKey?: string) => {
     const cur = latest();
@@ -90,12 +103,17 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
   const faceOk = (w: number, it: boolean) => !known || hasFace(family, w, it, own);
   const canItalic = !known || (availableFaces(family, own) ?? []).some((f) => f.italic) || italic === true;
   const canBold = faceOk(700, italic ?? false) || (weight ?? 0) >= 700;
+  // Fuente variable subida: grosor y anchura continuos dentro de sus ejes (el grosor, acotado a 100..900).
+  const axes = useFontAxes(doc, assets, family);
+  const wght = axes?.find((a) => a.tag === "wght");
+  const wdth = axes?.find((a) => a.tag === "wdth");
 
   const pickFont = (name: string) => {
     // Si la familia nueva no tiene el peso o la cursiva actuales se pasa a la cara más próxima, a la vista.
     const w = weight ?? first?.weight ?? 400;
     const nf = nearestFace(name, w, italic ?? false, own);
-    const patch: RunStylePatch = { fontFamily: name };
+    // La anchura (wdth) es de la fuente variable anterior: con otra familia se quita.
+    const patch: RunStylePatch = { fontFamily: name, stretch: undefined };
     if (nf && weight !== undefined && nf.weight !== weight) patch.weight = nf.weight;
     if (nf && italic !== undefined && nf.italic !== italic) patch.italic = nf.italic;
     registry.ensureCatalog(name, patch.weight ?? w, patch.italic ?? italic ?? false);
@@ -180,7 +198,20 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
       </Section>}
 
       {show("style") && <Section title={t("style")}>
-        <div className="mb-3 flex gap-2">
+        {wght && (
+          <Slider
+            label={t("fontWeightAxis")} min={Math.max(100, Math.ceil(wght.min))} max={Math.min(900, Math.floor(wght.max))} step={1}
+            value={weight ?? Math.round(wght.def)} onCommit={(v) => style({ weight: v })}
+          />
+        )}
+        {wdth && (
+          <Slider
+            label={t("fontWidthAxis")} min={Math.max(25, Math.ceil(wdth.min))} max={Math.min(200, Math.floor(wdth.max))} step={1}
+            value={cur.stretch ?? Math.round(wdth.def)} format={(v) => `${v} %`}
+            onCommit={(v) => style({ stretch: v === Math.round(wdth.def) ? undefined : v })}
+          />
+        )}
+        <div className={`mb-3 flex gap-2 ${wght ? "hidden" : ""}`}>
           <select
             aria-label={t("fontWeight")} className={`${fieldCls} flex-1 font-sans`} value={weight ?? ""}
             onChange={(e) => style({ weight: Number(e.target.value) })}
@@ -217,7 +248,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
         </div>
         <Slider label={t("lineH")} min={0.8} max={2.4} step={0.05} value={el.lineHeight} format={(v) => v.toFixed(2)} onCommit={(lineHeight) => commit({ lineHeight })} />
         <Slider label={t("letterS")} min={-0.05} max={0.5} step={0.01} value={el.letterSpacing} format={(v) => `${v.toFixed(2)}em`} onCommit={(letterSpacing) => commit({ letterSpacing })} />
-        <Slider label={t("scaleX")} min={0.5} max={1.5} step={0.01} value={el.scaleX ?? 1} format={(v) => `${Math.round(v * 100)} %`} onCommit={(scaleX) => commit({ scaleX })} />
+        <Slider label={t("scaleX")} min={0.5} max={1.5} step={0.01} value={el.scaleX ?? 1} format={(v) => `${Math.round(v * 100)} %`} onCommit={(scaleX) => { const cur = latest(); if (cur) commit(letterWidthPatch(cur, scaleX)); }} />
       </Section>}
 
       {show("color") && <Section title={t("color")}>
@@ -254,8 +285,23 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
       {show("fx") && <Section title={t("fx")} last>
         <Switch label={t("shadow")} checked={el.shadow.on} onChange={(on) => commit({ shadow: { ...el.shadow, on } })} />
         {el.shadow.on && (
-          <Slider label={t("shadowIntensity")} min={0} max={100} step={1} value={el.shadow.intensity} onCommit={(intensity) => commit({ shadow: { ...el.shadow, intensity } })} />
+          <>
+            <Slider label={t("shadowIntensity")} min={0} max={100} step={1} value={el.shadow.intensity} onCommit={(intensity) => commit({ shadow: { ...el.shadow, intensity } })} />
+            <div className="flex items-end gap-2.5">
+              <div className="min-w-0 flex-1">
+                <Slider label={t("shadowOpacity")} min={0} max={100} step={1} value={Math.round((el.shadow.opacity ?? 0.6) * 100)} format={(v) => `${v} %`} onCommit={(v) => commit({ shadow: { ...el.shadow, opacity: v / 100 } })} />
+              </div>
+              <input
+                type="color" aria-label={t("shadowColor")} value={el.shadow.color ?? "#000000"} className={colorInput}
+                onChange={(e) => commit({ shadow: { ...el.shadow, color: e.target.value.toLowerCase() } }, "shadow-color")} onBlur={() => store.endGesture()}
+              />
+            </div>
+            <Slider label={t("shadowAngle")} min={0} max={360} step={1} value={el.shadow.angle ?? 90} format={(v) => `${v}°`} onCommit={(angle) => commit({ shadow: { ...el.shadow, angle } })} />
+            <Slider label={t("shadowDistance")} min={0} max={0.5} step={0.005} value={el.shadow.distance ?? 0.05} format={(v) => `${v.toFixed(3)} em`} onCommit={(distance) => commit({ shadow: { ...el.shadow, distance } })} />
+          </>
         )}
+        <Switch label={t("innerShadow")} checked={!!el.innerShadow?.on} onChange={(on) => commit({ innerShadow: on ? { ...(el.innerShadow ?? DEFAULT_INNER), on: true } : undefined })} />
+        {el.innerShadow?.on && <InnerShadowControls value={el.innerShadow} onChange={(innerShadow, mk) => commit({ innerShadow }, mk)} onEnd={() => store.endGesture()} />}
         <Switch label={t("outline")} checked={el.outline.on} onChange={(on) => commit({ outline: { ...el.outline, on } })} />
         {el.outline.on && (
           <div className="mb-3.5 flex items-end gap-2.5">
@@ -273,7 +319,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
         <div className="mb-2 mt-1 flex items-center justify-between">
           <span className="text-[13px] text-ink">{t("texture")}</span>
           {el.texture && (
-            <button type="button" className="text-[11.5px] text-muted hover:text-danger" onClick={() => commit({ texture: undefined })}>{t("remove")}</button>
+            <button type="button" className="text-[11.5px] text-muted hover:text-danger" onClick={() => commit(isLinked(el) ? { texture: undefined, mask: undefined } : { texture: undefined })}>{t("remove")}</button>
           )}
         </div>
         <label className="mb-4 flex cursor-pointer items-center gap-2.5 rounded-[9px] border border-dashed border-dash bg-card px-[11px] py-[9px] hover:border-faint hover:bg-white">
@@ -286,8 +332,8 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
               e.target.value = "";
               if (!f) return;
               const r = await importImage(store, f, "asset");
-              // Sustituir la imagen conserva el encaje elegido.
-              if (r.ok) commit({ texture: { ...latest()?.texture, assetId: r.assetId } });
+              // Sustituir la imagen conserva el encaje elegido (y arrastra la máscara enlazada).
+              if (r.ok) setTexture({ ...latest()?.texture, assetId: r.assetId });
             }}
           />
         </label>
@@ -298,14 +344,54 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
               <button
                 key={r.key} type="button" className={`${toggleBtn} w-auto gap-1.5 px-1.5`} aria-pressed={el.texture?.assetId === r.texture.assetId && JSON.stringify(el.texture) === JSON.stringify(r.texture)}
                 aria-label={t("textureReuseFrom", { name: r.name })} title={t("textureReuseFrom", { name: r.name })}
-                onClick={() => commit({ texture: r.texture })}
+                onClick={() => setTexture(r.texture)}
               >
                 <TextureThumb assetId={r.texture.assetId} assets={assets} />
               </button>
             ))}
           </div>
         )}
-        {el.texture && <TextureFit texture={el.texture} onChange={(texture) => commit({ texture })} />}
+        <GenerateTexture
+          onGenerate={async (opts) => {
+            const r = await generateTextureAsset(store, opts);
+            if (!r.ok) return;
+            const texture: TextTexture = { assetId: r.assetId, fit: "tile", tileIn: 1.5 };
+            // Mármol con huecos: la máscara por transparencia hace que la sombra también tenga las grietas.
+            if (opts.kind === "cracked-marble" && opts.cracks === "holes") commit({ texture, mask: { ...texture, mode: "alpha", threshold: 0.5, softness: 0 } });
+            // Grietas pintadas: la letra queda entera; una máscara enlazada anterior ya no tiene sentido.
+            else if (opts.kind === "cracked-marble") commit({ texture, mask: undefined });
+            else setTexture(texture);
+          }}
+        />
+        {el.texture && <TextureFit texture={el.texture} onChange={setTexture} />}
+        {el.texture && (
+          <Switch
+            label={t("maskOn")} checked={isLinked(el)}
+            onChange={(on) => commit({ mask: on && el.texture ? { ...el.texture, ...MASK_DEFAULTS } : undefined })}
+          />
+        )}
+        {el.mask && !isLinked(el) && (
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[12.5px] text-ink">{t("maskOwn")}</span>
+            <button type="button" className="text-[11.5px] text-muted hover:text-danger" onClick={() => commit({ mask: undefined })}>{t("maskRemove")}</button>
+          </div>
+        )}
+        {el.mask && <MaskControls mask={el.mask} onChange={(mask) => commit({ mask })} />}
+        <label className={`${uploadBtn} mb-3 inline-block`}>
+          {t("maskUpload")}
+          <input
+            type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" aria-label={t("maskUpload")}
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              const r = await importImage(store, f, "asset");
+              const m = latest()?.mask;
+              if (r.ok) commit({ mask: { assetId: r.assetId, mode: m?.mode ?? MASK_DEFAULTS.mode, threshold: m?.threshold ?? MASK_DEFAULTS.threshold, softness: m?.softness ?? MASK_DEFAULTS.softness } });
+            }}
+          />
+        </label>
+        <p className="-mt-2 mb-3 text-[10.5px] leading-snug text-muted">{t("maskHint")}</p>
         <Slider label={t("curve")} min={-100} max={100} step={1} value={el.curvature} testId="curve-slider" onCommit={(curvature) => commit({ curvature })} />
       </Section>}
     </div>
@@ -326,6 +412,104 @@ function TextureFit({ texture, onChange }: { texture: TextTexture; onChange: (t:
       {tile && <Slider label={t("textureTileSize")} min={0.1} max={6} step={0.05} value={texture.tileIn ?? 1} format={(v) => `${v.toFixed(2)} in`} onCommit={(tileIn) => onChange({ ...texture, tileIn })} />}
       <Slider label={t("textureOffsetX")} min={0} max={1} step={0.01} value={pos.x} format={(v) => `${Math.round(v * 100)} %`} onCommit={(x) => onChange({ ...texture, pos: { ...pos, x } })} />
       <Slider label={t("textureOffsetY")} min={0} max={1} step={0.01} value={pos.y} format={(v) => `${Math.round(v * 100)} %`} onCommit={(y) => onChange({ ...texture, pos: { ...pos, y } })} />
+    </div>
+  );
+}
+
+const KIND_KEY: Record<TextureKind, DictKey> = { "cracked-marble": "textureKindMarble", stone: "textureKindStone", paper: "textureKindPaper" };
+
+// Texturas incluidas: tipo y semilla (misma semilla, misma textura).
+function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Promise<void> }) {
+  const { t } = useI18n();
+  const id = useId();
+  const [kind, setKind] = useState<TextureKind>("cracked-marble");
+  const [seed, setSeed] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [cracks, setCracks] = useState<"holes" | "lines">("holes");
+  const [crackColor, setCrackColor] = useState("#a8222a");
+  const crackId = useId();
+  return (
+    <div className="mb-4 rounded-[9px] border border-line-soft bg-card p-2.5" role="group" aria-label={t("textureGenerateTitle")}>
+      <div className="mb-2 flex items-end gap-2">
+        <div className="min-w-0 flex-[1.4]">
+          <label htmlFor={id} className="mb-1 block text-[10px] text-muted">{t("textureKind")}</label>
+          <select id={id} className={`${fieldCls} font-sans`} value={kind} onChange={(e) => setKind(e.target.value as TextureKind)}>
+            {TEXTURE_KINDS.map((k) => <option key={k} value={k}>{t(KIND_KEY[k])}</option>)}
+          </select>
+        </div>
+        <NumberField label={t("textureSeed")} value={seed} min={0} step={1} digits={0} onCommit={(v) => setSeed(Math.max(0, Math.round(v)))} />
+      </div>
+      {kind === "cracked-marble" && (
+        <div className="mb-2 flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <label htmlFor={crackId} className="mb-1 block text-[10px] text-muted">{t("textureCracks")}</label>
+            <select id={crackId} className={`${fieldCls} font-sans`} value={cracks} onChange={(e) => setCracks(e.target.value as "holes" | "lines")}>
+              <option value="holes">{t("textureCracksHoles")}</option>
+              <option value="lines">{t("textureCracksLines")}</option>
+            </select>
+          </div>
+          {cracks === "lines" && (
+            <input
+              type="color" aria-label={t("textureCrackColor")} value={crackColor} onChange={(e) => setCrackColor(e.target.value.toLowerCase())}
+              className="h-[34px] w-10 flex-none cursor-pointer rounded-lg border border-field bg-white p-[3px]"
+            />
+          )}
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <button type="button" className={`${toggleBtn} w-auto px-2`} onClick={() => setSeed(Math.floor(Math.random() * 1_000_000))}>{t("textureSeedRandom")}</button>
+        <button
+          type="button" className={`${toggleBtn} w-auto flex-1 px-2`} disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await onGenerate(kind !== "cracked-marble" ? { kind, seed } : cracks === "holes" ? { kind, seed, cracks } : { kind, seed, cracks, crackColor });
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? t("textureGenerating") : t("textureGenerate")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function InnerShadowControls({ value, onChange, onEnd }: { value: InnerShadow; onChange: (v: InnerShadow, mergeKey?: string) => void; onEnd: () => void }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <div className="flex items-end gap-2.5">
+        <div className="min-w-0 flex-1">
+          <Slider label={t("innerShadowOpacity")} min={0} max={100} step={1} value={Math.round(value.opacity * 100)} format={(v) => `${v} %`} onCommit={(v) => onChange({ ...value, opacity: v / 100 })} />
+        </div>
+        <input
+          type="color" aria-label={t("innerShadowColor")} value={value.color} className={colorInput}
+          onChange={(e) => onChange({ ...value, color: e.target.value.toLowerCase() }, "inner-color")} onBlur={onEnd}
+        />
+      </div>
+      <Slider label={t("innerShadowAngle")} min={0} max={360} step={1} value={value.angle} format={(v) => `${v}°`} onCommit={(angle) => onChange({ ...value, angle })} />
+      <Slider label={t("innerShadowDistance")} min={0} max={0.3} step={0.005} value={value.distance} format={(v) => `${v.toFixed(3)} em`} onCommit={(distance) => onChange({ ...value, distance })} />
+      <Slider label={t("innerShadowBlur")} min={0} max={0.3} step={0.005} value={value.blur} format={(v) => `${v.toFixed(3)} em`} onCommit={(blur) => onChange({ ...value, blur })} />
+    </>
+  );
+}
+
+// Modo, umbral y suavizado de la máscara de recorte.
+function MaskControls({ mask, onChange }: { mask: TextMask; onChange: (m: TextMask) => void }) {
+  const { t } = useI18n();
+  const id = useId();
+  return (
+    <div className="mb-2">
+      <label className="mb-1.5 block text-[11px] text-subtle" htmlFor={id}>{t("maskMode")}</label>
+      <select id={id} className={`${fieldCls} mb-3 font-sans`} value={mask.mode} onChange={(e) => onChange({ ...mask, mode: e.target.value as TextMask["mode"] })}>
+        <option value="dark">{t("maskModeDark")}</option>
+        <option value="light">{t("maskModeLight")}</option>
+        <option value="alpha">{t("maskModeAlpha")}</option>
+      </select>
+      <Slider label={t("maskThreshold")} min={0} max={1} step={0.01} value={mask.threshold} format={(v) => `${Math.round(v * 100)} %`} onCommit={(threshold) => onChange({ ...mask, threshold })} />
+      <Slider label={t("maskSoftness")} min={0} max={0.5} step={0.01} value={mask.softness ?? 0.1} format={(v) => `${Math.round(v * 100)} %`} onCommit={(softness) => onChange({ ...mask, softness })} />
     </div>
   );
 }

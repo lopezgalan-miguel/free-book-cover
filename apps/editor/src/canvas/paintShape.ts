@@ -1,4 +1,5 @@
 import type { RenderItem } from "@free-book-cover/core";
+import { compositeLayer, layerSupported, openLayer } from "./layer";
 
 export type ShapeItem = Extract<RenderItem, { kind: "shape" }>;
 
@@ -10,7 +11,26 @@ export function shapeStrokePx(item: ShapeItem): number {
 
 // Pinta una forma con el origen del contexto en la esquina superior izquierda de la caja y sin girar.
 // Es el ÚNICO camino de dibujo de formas: lo usan la vista previa (Fabric) y el pintor de exportación.
+// Con opacidad, relleno y borde se componen en una capa para que el borde no deje ver el relleno.
 export function paintShapeItem(ctx: CanvasRenderingContext2D, item: ShapeItem): void {
+  if (item.opacity < 1) {
+    if (layerSupported(ctx)) {
+      const layer = openLayer(ctx, { x: 0, y: 0, width: item.box.width, height: item.box.height }, shapeStrokePx(item));
+      if (!layer) return;
+      drawShape(layer.ctx, item);
+      compositeLayer(ctx, layer, { opacity: item.opacity });
+      return;
+    }
+    ctx.save();
+    ctx.globalAlpha *= item.opacity;
+    drawShape(ctx, item);
+    ctx.restore();
+    return;
+  }
+  drawShape(ctx, item);
+}
+
+function drawShape(ctx: CanvasRenderingContext2D, item: ShapeItem): void {
   const { width: w, height: h } = item.box;
   const e = item.element;
   ctx.beginPath();

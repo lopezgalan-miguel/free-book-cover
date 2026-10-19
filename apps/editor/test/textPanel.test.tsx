@@ -132,6 +132,24 @@ describe("panel de texto: controles", () => {
     expect(textOf(store).shadow.on).toBe(false);
   });
 
+  it("anchura de letra: la caja se ensancha con las letras y conserva el centro, en un solo paso", async () => {
+    const user = userEvent.setup();
+    const { store } = await mount();
+    await addAndWrite(user, store, "LAMENTOS");
+    const before = textOf(store);
+    const center = before.x + before.width / 2;
+    const steps = store.getState().history.past.length;
+    fireEvent.change(screen.getByLabelText("Anchura de letra"), { target: { value: "1.25" } });
+    const after = textOf(store);
+    expect(after.scaleX).toBe(1.25);
+    expect(after.width).toBeCloseTo(before.width * 1.25);
+    expect(after.x + after.width / 2).toBeCloseTo(center);
+    expect(store.getState().history.past.length).toBe(steps + 1);
+    fireEvent.change(screen.getByLabelText("Anchura de letra"), { target: { value: "0.5" } });
+    expect(textOf(store).width).toBeCloseTo(before.width * 0.5);
+    expect(textOf(store).x + textOf(store).width / 2).toBeCloseTo(center);
+  });
+
   it("textura: subir la imagen, quedarse con el recurso en el documento y quitarla", async () => {
     const user = userEvent.setup();
     const { store } = await mount();

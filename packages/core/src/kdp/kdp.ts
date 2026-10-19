@@ -1,7 +1,7 @@
 import type { Rect } from "../geometry/fit.js";
 import type { Project } from "../schema/project.js";
 
-// Valores de KDP tapa blanda contrastados el 2026-10-02 (ver sources.md).
+// Valores de KDP tapa blanda contrastados el 2026-10-02; cortes y máximos de páginas, el 2026-10-19 (ver sources.md).
 export const BLEED_IN = 0.125;
 export const SAFE_IN = 0.125;
 export const SPINE_TEXT_MARGIN_IN = 0.0625;
@@ -16,24 +16,56 @@ export interface PaperSpec {
   id: PaperId;
   thicknessIn: number;
   minPages: number;
-  // Máximo de páginas para 5 × 8 y 6 × 9 in (los únicos tamaños contrastados).
-  maxPages: number;
 }
 export const PAPERS: readonly PaperSpec[] = [
-  { id: "bw-white", thicknessIn: 0.002252, minPages: 24, maxPages: 828 },
-  { id: "bw-cream", thicknessIn: 0.0025, minPages: 24, maxPages: 776 },
-  { id: "color-standard", thicknessIn: 0.002252, minPages: 72, maxPages: 600 },
-  { id: "color-premium", thicknessIn: 0.002347, minPages: 24, maxPages: 828 },
+  { id: "bw-white", thicknessIn: 0.002252, minPages: 24 },
+  { id: "bw-cream", thicknessIn: 0.0025, minPages: 24 },
+  { id: "color-standard", thicknessIn: 0.002252, minPages: 72 },
+  { id: "color-premium", thicknessIn: 0.002347, minPages: 24 },
 ];
 export const findPaper = (id: string): PaperSpec | undefined => PAPERS.find((p) => p.id === id);
 
-// Tamaños de corte cuyo máximo de páginas está contrastado. Los demás se rechazan (ver sources.md).
-export const SUPPORTED_TRIMS: ReadonlyArray<{ widthIn: number; heightIn: number }> = [
-  { widthIn: 5, heightIn: 8 },
-  { widthIn: 6, heightIn: 9 },
+// Máximo de páginas por papel; null = el corte no admite ese papel.
+export type MaxPages = Readonly<Record<PaperId, number | null>>;
+export interface TrimSpec {
+  widthIn: number;
+  heightIn: number;
+  maxPages: MaxPages;
+}
+const max = (bwWhite: number, bwCream: number, colorStandard: number | null, colorPremium: number): MaxPages => ({
+  "bw-white": bwWhite, "bw-cream": bwCream, "color-standard": colorStandard, "color-premium": colorPremium,
+});
+const REGULAR = max(828, 776, 600, 828);
+// Tabla oficial de kdp.amazon.com («Paperback Submission Guidelines», G201834240), en su orden. Los tamaños
+// personalizados no tienen máximo publicado y se siguen rechazando (trim_unsupported).
+export const SUPPORTED_TRIMS: readonly TrimSpec[] = [
+  { widthIn: 5, heightIn: 8, maxPages: REGULAR },
+  { widthIn: 5.06, heightIn: 7.81, maxPages: REGULAR },
+  { widthIn: 5.25, heightIn: 8, maxPages: REGULAR },
+  { widthIn: 5.5, heightIn: 8.5, maxPages: REGULAR },
+  { widthIn: 6, heightIn: 9, maxPages: REGULAR },
+  { widthIn: 6.14, heightIn: 9.21, maxPages: REGULAR },
+  { widthIn: 6.69, heightIn: 9.61, maxPages: REGULAR },
+  { widthIn: 7, heightIn: 10, maxPages: REGULAR },
+  { widthIn: 7.44, heightIn: 9.69, maxPages: REGULAR },
+  { widthIn: 7.5, heightIn: 9.25, maxPages: REGULAR },
+  { widthIn: 8, heightIn: 10, maxPages: REGULAR },
+  { widthIn: 8.25, heightIn: 6, maxPages: max(800, 750, 600, 800) },
+  { widthIn: 8.25, heightIn: 8.25, maxPages: max(800, 750, 600, 800) },
+  { widthIn: 8.27, heightIn: 11.69, maxPages: max(780, 730, null, 590) },
+  { widthIn: 8.5, heightIn: 8.5, maxPages: max(590, 550, 600, 590) },
+  { widthIn: 8.5, heightIn: 11, maxPages: max(590, 550, 600, 590) },
 ];
 const same = (a: number, b: number) => Math.abs(a - b) < 1e-9;
-export const isSupportedTrim = (w: number, h: number): boolean => SUPPORTED_TRIMS.some((t) => same(t.widthIn, w) && same(t.heightIn, h));
+const findTrim = (w: number, h: number) => SUPPORTED_TRIMS.find((t) => same(t.widthIn, w) && same(t.heightIn, h));
+export const isSupportedTrim = (w: number, h: number): boolean => findTrim(w, h) !== undefined;
+// Máximo de páginas de un corte y papel; null si el corte no está en la tabla o no admite el papel.
+export function maxPagesFor(w: number, h: number, paper: string): number | null {
+  const t = findTrim(w, h);
+  return t && findPaper(paper) ? (t.maxPages[paper as PaperId] ?? null) : null;
+}
+// Tamaño grande de KDP (otro coste de impresión): más de 6,12 in de ancho o más de 9 in de alto.
+export const isLargeTrim = (w: number, h: number): boolean => w > 6.12 || h > 9;
 
 export type PrintSetup = NonNullable<Project["printSetup"]>;
 
@@ -41,6 +73,7 @@ export type SetupIssue =
   | { kind: "trim_out_of_range" }
   | { kind: "trim_unsupported" }
   | { kind: "paper_unsupported" }
+  | { kind: "paper_unavailable_for_trim" }
   | { kind: "pages_invalid" }
   | { kind: "pages_below_min"; min: number }
   | { kind: "pages_above_max"; max: number };
@@ -56,12 +89,15 @@ export function validatePrintSetup(s: PrintSetup): SetupResult {
   if (!inRange) issues.push({ kind: "trim_out_of_range" });
   else if (!isSupportedTrim(s.trimWidthIn, s.trimHeightIn)) issues.push({ kind: "trim_unsupported" });
   const paper = findPaper(s.paperAndInk);
+  const trim = findTrim(s.trimWidthIn, s.trimHeightIn);
+  const maxPages = trim && paper ? trim.maxPages[paper.id] : undefined;
   if (!paper) issues.push({ kind: "paper_unsupported" });
+  else if (maxPages === null) issues.push({ kind: "paper_unavailable_for_trim" });
   if (!Number.isInteger(s.pageCount) || s.pageCount < 1) issues.push({ kind: "pages_invalid" });
   else if (paper) {
     if (s.pageCount < paper.minPages) issues.push({ kind: "pages_below_min", min: paper.minPages });
-    // El máximo solo se conoce para los tamaños contrastados.
-    else if (isSupportedTrim(s.trimWidthIn, s.trimHeightIn) && s.pageCount > paper.maxPages) issues.push({ kind: "pages_above_max", max: paper.maxPages });
+    // El máximo solo se conoce para los cortes de la tabla.
+    else if (typeof maxPages === "number" && s.pageCount > maxPages) issues.push({ kind: "pages_above_max", max: maxPages });
   }
   return issues.length ? { ok: false, issues } : { ok: true };
 }

@@ -5,12 +5,13 @@ import { importImage } from "../images/importImage";
 import { useI18n } from "../i18n";
 import { useDisplayDoc, useEditorState, useStore } from "../store/react";
 import { chipBtn, ColorField, NumberField, Section } from "./ui";
+import { FilterSliders } from "./ImagePanel";
 
 // Fondo: imagen o color, con encuadre Rellenar/Ajustar/Centrar. Independiente del contenedor.
 export function BackgroundPanel() {
   const { t } = useI18n();
   const store = useStore();
-  const { assets } = useEditorState();
+  const { assets, history } = useEditorState();
   const display = useDisplayDoc();
   const canvas = display.canvas;
   const assetId = typeof canvas.background === "object" ? canvas.background.assetId : null;
@@ -57,6 +58,12 @@ export function BackgroundPanel() {
             <NumberField label={t("bgPosY")} value={pos.y * 100} min={0} max={100} digits={1} onCommit={(v) => store.editBackgroundLayout({ pos: { x: pos.x, y: Math.min(100, Math.max(0, v)) / 100 } })} />
           </div>
           <p className="mt-[7px] text-[10.5px] leading-snug text-muted">{t("bgHint")}</p>
+          <div className="mt-3">
+            <FilterSliders
+              value={history.present.canvas.backgroundFilters} labels={{ blur: t("bgBlur"), brightness: t("bgBrightness"), saturation: t("bgSaturation") }}
+              onChange={(filters) => store.dispatch({ type: "setBackgroundFilters", filters })}
+            />
+          </div>
           {dpi && (
             <p className={`mt-1 font-mono text-[10.5px] ${dpi.lowDpi ? "text-warn-ink" : "text-muted"}`}>
               {t("dpiEffective", { dpi: Math.round(dpi.dpi) })}

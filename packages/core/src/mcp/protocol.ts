@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { DIGITAL_PRESETS } from "../presets/digital.js";
 import { PAPERS } from "../kdp/kdp.js";
+import { TEXTURE_KINDS } from "../textures/generate.js";
 import {
-  MAX_TARGET_PX, backgroundFitSchema, backgroundOverrideSchema, colorSchema, elementOverrideSchema, textTextureSchema, viewOverrideSchema,
+  MAX_TARGET_PX, backgroundFitSchema, backgroundOverrideSchema, colorSchema, elementOverrideSchema, imageFiltersSchema, innerShadowSchema,
+  textMaskSchema, textTextureSchema, viewOverrideSchema,
 } from "../schema/project.js";
 
 // Contrato MCP (SDD R-09): esquemas de las herramientas, errores tipificados y mensajes del canal
@@ -11,6 +13,7 @@ import {
 export const MCP_TOOL_NAMES = [
   "get_canvas_state", "add_text_element", "update_element_style", "import_asset", "apply_background",
   "import_font", "add_image_element", "add_shape_element", "add_variant", "update_variant", "set_print_setup", "export_image", "set_canvas",
+  "set_background_filters", "generate_texture",
 ] as const;
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
 
@@ -85,10 +88,26 @@ const size = finite.positive().max(100);
 export const elementStyleSchema = z
   .object({
     ...textStyle,
-    shadow: z.object({ on: z.boolean(), intensity: finite.min(0).max(100) }).strict().optional(),
+    shadow: z
+      .object({
+        on: z.boolean(),
+        intensity: finite.min(0).max(100),
+        color: colorSchema.optional(),
+        opacity: finite.min(0).max(1).optional(),
+        angle: finite.optional(),
+        distance: finite.min(0).max(1).optional(),
+      })
+      .strict()
+      .optional()
+      .describe("Solo textos: intensity (0..100) es el desenfoque; color, opacity (0..1), angle (grados, 90 = abajo) y distance (em, 0..1) son opcionales."),
+    innerShadow: innerShadowSchema.nullable().optional().describe("Solo textos: sombra dentro de la letra (relieve o bordes oscurecidos); distance y blur en em. null la quita."),
+    mask: textMaskSchema.nullable().optional().describe("Solo textos: máscara de recorte (assetId de una imagen, colocada como la textura). mode dark/light/alpha borra la letra donde la imagen es oscura, clara o transparente, por debajo de threshold (0..1), con rampa softness. Con el mismo assetId que la textura: grietas huecas. null la quita."),
+    stretch: finite.min(25).max(200).nullable().optional().describe("Solo textos con una fuente variable subida: anchura (eje wdth, %) de todos los fragmentos. null la quita; cambiar fontFamily sin indicarla también."),
+    opacity: finite.min(0).max(1).optional().describe("Opacidad de la capa (0..1)."),
+    filters: imageFiltersSchema.nullable().optional().describe("Solo imágenes: blur (0..100), brightness y saturation (%, 100 = sin cambio). null los quita."),
     outline: z.object({ on: z.boolean(), width: finite.min(0).max(100), color: colorSchema }).strict().optional(),
     curvature: finite.min(-100).max(100).optional(),
-    scaleX: finite.min(0.5).max(1.5).optional().describe("Solo textos: anchura de las letras (1 = normal, 0,5–1,5)."),
+    scaleX: finite.min(0.5).max(1.5).optional().describe("Solo textos: anchura de las letras (1 = normal, 0,5–1,5). La caja se ensancha o estrecha con ellas (centro o borde de la alineación quieto) salvo que se indique width o x."),
     texture: textTextureSchema.nullable().optional().describe("Solo textos: textura del relleno (assetId de una imagen importada; fit cover o tile con tileIn en pulgadas). null la quita."),
     fill: colorSchema.optional().describe("Solo formas."),
     stroke: z.object({ color: colorSchema, width: finite.min(0).max(100) }).strict().optional().describe("Solo formas."),
@@ -231,9 +250,28 @@ export const applyBackgroundInput = z
     assetId: z.string().min(1).max(200).optional().describe("ID de un recurso ya importado. Se indica este o `color`."),
     color: colorSchema.optional().describe("Fondo de color liso. Se indica este o `assetId`."),
     fit: backgroundFitSchema.optional().describe("Política de ajuste de la imagen: cover (por defecto), contain o fill."),
+    filters: imageFiltersSchema.nullable().optional().describe("Solo con assetId: desenfoque, brillo y saturación del fondo. null los quita; sin indicar, se conservan."),
   })
   .strict()
   .refine((v) => (v.assetId === undefined) !== (v.color === undefined), { message: "indica exactamente uno de assetId o color" });
+
+export const setBackgroundFiltersInput = z
+  .object({ projectId, expectedRevision, filters: imageFiltersSchema.nullable().describe("blur (0..100), brightness y saturation (%, 100 = sin cambio); null los quita.") })
+  .strict();
+
+export const generateTextureInput = z
+  .object({
+    projectId,
+    expectedRevision: expectedRevision.optional().describe("Opcional: si se indica y está obsoleta, no se genera nada."),
+    kind: z.enum(TEXTURE_KINDS).describe("cracked-marble (placas con grietas), stone o paper."),
+    seed: z.number().int().min(0).max(2 ** 31 - 1).describe("Misma semilla, misma textura."),
+    sizePx: z.number().int().min(64).max(2048).optional().describe("Lado de la tesela cuadrada (por defecto 1024)."),
+    scale: z.number().int().min(1).max(32).optional().describe("Placas o granos a lo ancho de la tesela."),
+    color: colorSchema.optional().describe("Color base."),
+    cracks: z.enum(["holes", "lines"]).optional().describe("Solo mármol: grietas transparentes (por defecto) o líneas opacas."),
+    crackColor: colorSchema.optional().describe("Solo mármol con cracks lines: color de las grietas (por defecto #460808)."),
+  })
+  .strict();
 
 // ---------------------------------------------------------------- salidas
 
@@ -272,7 +310,13 @@ export const updateElementStyleOutput = z.object({ element: elementSummarySchema
 export const importAssetOutput = z
   .object({ assetId: z.string(), revision: z.number().int(), mimeType: z.string(), widthPx: z.number(), heightPx: z.number(), sizeBytes: z.number(), saved })
   .strict();
-export const importFontOutput = z.object({ assetId: z.string(), family: z.string(), revision: z.number().int(), sizeBytes: z.number(), saved }).strict();
+const fontAxisOut = z.object({ tag: z.string(), min: z.number(), def: z.number(), max: z.number() }).strict();
+export const importFontOutput = z
+  .object({ assetId: z.string(), family: z.string(), revision: z.number().int(), sizeBytes: z.number(), axes: z.array(fontAxisOut).nullable().describe("Ejes de una fuente variable (wght se usa con weight y wdth con stretch); null si no es variable o es WOFF2."), saved })
+  .strict();
+const filtersOut = z.object({ blur: z.number().optional(), brightness: z.number().optional(), saturation: z.number().optional() }).strict();
+export const setBackgroundFiltersOutput = z.object({ revision: z.number().int(), filters: filtersOut.nullable(), saved }).strict();
+export const generateTextureOutput = z.object({ assetId: z.string(), widthPx: z.number().int(), heightPx: z.number().int(), revision: z.number().int(), saved }).strict();
 export const addElementOutput = z.object({ elementId: z.string(), revision: z.number().int(), saved }).strict();
 export const addVariantOutput = z.object({ targetId: z.string(), widthPx: z.number().int(), heightPx: z.number().int(), revision: z.number().int(), saved }).strict();
 export const updateVariantOutput = z
@@ -319,6 +363,8 @@ export const MCP_TOOLS = {
   update_variant: { description: "Ajusta una variante en un solo paso: encuadre (zona visible y zoom), fondo y ajustes por elemento. Devuelve el área visible y los elementos cortados.", input: updateVariantInput, output: updateVariantOutput, readOnly: false },
   set_print_setup: { description: "Configura la cubierta KDP de tapa blanda (corte, páginas, papel): ajusta el lienzo y devuelve la geometría (lomo, caras, zonas seguras, código de barras) en pulgadas.", input: setPrintSetupInput, output: setPrintSetupOutput, readOnly: false },
   set_canvas: { description: "Cambia el tamaño del lienzo (pulgadas) en modo libre o digital; los elementos no se mueven. En una cubierta KDP el tamaño lo fija set_print_setup.", input: setCanvasInput, output: setCanvasOutput, readOnly: false },
+  set_background_filters: { description: "Desenfoca, oscurece o desatura el fondo (filtros de imagen del lienzo) sin preparar la imagen fuera.", input: setBackgroundFiltersInput, output: setBackgroundFiltersOutput, readOnly: false },
+  generate_texture: { description: "Genera una textura incluida y sin costuras (mármol agrietado, piedra o papel) como recurso de imagen, para usarla en texture o mask de un texto en mosaico.", input: generateTextureInput, output: generateTextureOutput, readOnly: false },
   export_image: { description: "Exporta el diseño base (300 ppp) o una variante como PNG, JPEG o WebP y lo guarda en el directorio de exportación del companion (FBC_EXPORT_DIR).", input: exportImageInput, output: exportImageOutput, readOnly: true },
 } as const;
 

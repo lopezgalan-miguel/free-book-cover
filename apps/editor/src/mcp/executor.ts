@@ -1,6 +1,6 @@
 import {
   DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, FONT_CATALOG, availableFaces, availableWeights, hasFace, MAX_EXPORT_BYTES, MCP_TOOLS, assetDims, customTarget, defaultTextElement, documentFontFamilies,
-  editableKeys, elementVisibility, findPreset, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, needsRelayout, overridesOf,
+  editableKeys, elementVisibility, findPreset, readFontAxes, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, letterWidthPatch, needsRelayout, overridesOf,
   styleToPatch, targetFromPreset, variantDocument, visibleArea,
   type CommandError, type ElementSummary, type Project, type ResolvedTarget, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
 } from "@free-book-cover/core";
@@ -9,6 +9,7 @@ import { runExport, type ExportDeps } from "../export/exportImage";
 import type { FontRegistry } from "../fonts/fontRegistry";
 import { importFont } from "../fonts/importFont";
 import { importImage, type ThumbnailMaker } from "../images/importImage";
+import { generateTextureAsset, type PngEncoder } from "../images/generateTexture";
 import type { ExecutorPort } from "../store/ports";
 
 export interface ExecutorDeps {
@@ -22,6 +23,8 @@ export interface ExecutorDeps {
   fonts?: FontRegistry;
   /** Dependencias de exportación del navegador (export_image). */
   exportDeps?: () => ExportDeps;
+  /** Codificador PNG de las texturas generadas (generate_texture); por defecto, el del navegador. */
+  encodePng?: PngEncoder;
 }
 
 const fail = (error: ToolError): ToolOutcome => ({ ok: false, error });
@@ -163,15 +166,28 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       if (wrong.length) return invalid(...wrong.map((k) => `style.${k}: no aplicable a un elemento de tipo ${el.type}`));
       const family = style.fontFamily;
       if (el.type === "text" && typeof family === "string" && !fontKnown(doc(), family)) return invalid(`style.fontFamily: la fuente «${family}» no está en el catálogo ni en el proyecto`);
-      if (style.texture && !imageAsset(doc(), (style.texture as { assetId: string }).assetId)) {
-        return fail({ kind: "not_found", resource: "asset", id: (style.texture as { assetId: string }).assetId });
+      for (const key of ["texture", "mask"] as const) {
+        const ref = style[key] as { assetId: string } | null | undefined;
+        if (ref && !imageAsset(doc(), ref.assetId)) return fail({ kind: "not_found", resource: "asset", id: ref.assetId });
       }
       const patch = styleToPatch(el, style);
-      // null quita la textura: updateElement elimina las claves con valor undefined.
-      if (style.texture === null) patch.texture = undefined;
+      // null quita textura, máscara, sombra interior o filtros: updateElement elimina las claves con valor undefined.
+      for (const key of ["texture", "mask", "innerShadow", "filters"]) if (style[key] === null) patch[key] = undefined;
+      // La anchura es de una fuente variable concreta: null la quita, y cambiar de familia sin indicarla también.
+      if (el.type === "text" && (style.stretch === null || (style.fontFamily !== undefined && style.stretch === undefined))) {
+        patch.runs = ((patch.runs as TextElement["runs"] | undefined) ?? el.runs).map(({ stretch: _s, ...r }) => r);
+      }
       if (el.type === "text") {
-        const face = missingFace(doc(), { ...el, ...patch } as TextElement);
+        const next = { ...el, ...patch } as TextElement;
+        const face = missingFace(doc(), next);
         if (face) return invalid(`style: ${face}`);
+        const own = documentFontFamilies(doc());
+        const notUploaded = next.runs.find((r) => r.stretch !== undefined && !own.has(r.fontFamily));
+        if (notUploaded) return invalid(`style.stretch: solo se aplica a una fuente variable subida al proyecto («${notUploaded.fontFamily}» no lo es)`);
+      }
+      // La anchura de letra no reparte las líneas de nuevo: la caja se ensancha con ella, salvo que el cliente fije width o x.
+      if (el.type === "text" && typeof style.scaleX === "number" && style.width === undefined && style.x === undefined) {
+        Object.assign(patch, letterWidthPatch({ ...el, align: (style.align as TextElement["align"] | undefined) ?? el.align }, style.scaleX));
       }
       // La caja sigue al texto salvo que el cliente fije la altura.
       if (el.type === "text" && style.height === undefined && needsRelayout(style)) {
@@ -227,8 +243,13 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         if (!a || a.kind !== "image") return fail({ kind: "not_found", resource: "asset", id: args.assetId });
       }
       if (args.color !== undefined && args.fit !== undefined) return invalid("fit: solo se aplica a un fondo con assetId");
+      if (args.color !== undefined && args.filters !== undefined) return invalid("filters: solo se aplica a un fondo con assetId");
       const background = args.assetId !== undefined ? { assetId: args.assetId as string } : (args.color as string);
-      const r = store.applyRemote({ type: "setBackground", background, ...(args.assetId !== undefined && args.fit !== undefined ? { fit: args.fit } : {}) }, args.expectedRevision);
+      const r = store.applyRemote({
+        type: "setBackground", background,
+        ...(args.assetId !== undefined && args.fit !== undefined ? { fit: args.fit } : {}),
+        ...(args.filters !== undefined ? { filters: args.filters } : {}),
+      }, args.expectedRevision);
       if (!r.ok) return fail(fromCommand(r.error, "asset"));
       const now = doc();
       return { ok: true, data: { revision: r.revision, background: now.canvas.background, fit: now.canvas.backgroundFit ?? "cover", saved: await saved(store) } };
@@ -250,7 +271,25 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         if (r.reason === "limit") return invalid("la fuente supera un límite del proyecto");
         return fail({ kind: "internal" });
       }
-      return { ok: true, data: { assetId: r.assetId, family: r.family, revision: doc().revision, sizeBytes: bytes.length, saved: await saved(store) } };
+      return { ok: true, data: { assetId: r.assetId, family: r.family, revision: doc().revision, sizeBytes: bytes.length, axes: readFontAxes(bytes), saved: await saved(store) } };
+    }
+
+    case "set_background_filters": {
+      const r = store.applyRemote({ type: "setBackgroundFilters", filters: args.filters }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "asset"));
+      return { ok: true, data: { revision: r.revision, filters: doc().canvas.backgroundFilters ?? null, saved: await saved(store) } };
+    }
+
+    case "generate_texture": {
+      if (args.expectedRevision !== undefined && args.expectedRevision !== doc().revision) return conflict(args.expectedRevision, doc().revision);
+      const { projectId: _p, expectedRevision, ...opts } = args;
+      const r = await generateTextureAsset(store, opts as never, { ...(deps.encodePng ? { encode: deps.encodePng } : {}), ...(deps.makeThumbnail ? { makeThumbnail: deps.makeThumbnail } : {}) }, expectedRevision);
+      if (!r.ok) {
+        if (expectedRevision !== undefined && expectedRevision !== doc().revision) return conflict(expectedRevision, doc().revision);
+        return r.reason === "limit" ? invalid("la textura supera un límite del proyecto") : fail({ kind: "internal" });
+      }
+      const m = doc().assets.find((a) => a.id === r.assetId)?.metadata ?? {};
+      return { ok: true, data: { assetId: r.assetId, widthPx: m.widthPx, heightPx: m.heightPx, revision: doc().revision, saved: await saved(store) } };
     }
 
     case "add_image_element": {

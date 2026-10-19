@@ -1,9 +1,10 @@
 import { Canvas, FabricImage, FabricObject, Line, Rect as FRect } from "fabric";
 import { paintTextItem, type TextItem } from "./paintText";
 import { paintShapeItem, type ShapeItem } from "./paintShape";
+import { drawFilteredImage } from "./imageFilters";
 import {
   BACKGROUND_FALLBACK, assetDims, drawCenter, panPosition, placeImage, rectCenter,
-  type GuideShape, type ImageDraw, type Point, type Project, type Rect, type RenderItem, type RenderedDocument,
+  type GuideShape, type ImageDraw, type ImageFilters, type Point, type Project, type Rect, type RenderItem, type RenderedDocument,
 } from "@free-book-cover/core";
 
 // Imagen ya decodificada para la vista previa. scale = píxeles de la miniatura / píxeles del original.
@@ -45,6 +46,25 @@ class ShapeBlock extends FabricObject {
     ctx.translate(-this.width / 2, -this.height / 2);
     paintShapeItem(ctx, this.shapeItem);
     ctx.restore();
+  }
+}
+// Imagen de Fabric que pinta con los filtros del documento (mismo camino que la exportación). Sin filtros
+// se comporta como una FabricImage normal.
+class PaintedImage extends FabricImage {
+  imageFilters: ImageFilters | null = null;
+  override _renderFill(ctx: CanvasRenderingContext2D): void {
+    const f = this.imageFilters;
+    const el = this.getElement() as HTMLImageElement | undefined;
+    if (!f || !el) return super._renderFill(ctx);
+    const elW = el.naturalWidth || el.width;
+    const elH = el.naturalHeight || el.height;
+    const w = this.width;
+    const h = this.height;
+    const sX = Math.max(this.cropX, 0);
+    const sY = Math.max(this.cropY, 0);
+    const sW = Math.min(w, elW - sX);
+    const sH = Math.min(h, elH - sY);
+    drawFilteredImage(ctx, el, sX, sY, sW, sH, -w / 2, -h / 2, Math.min(w, elW - sX), Math.min(h, elH - sY), f);
   }
 }
 interface Tracked {
@@ -177,8 +197,10 @@ export class CoverScene {
     this.tracked.set(o, { id, box, center: o.getCenterPoint(), w: o.getScaledWidth(), h: o.getScaledHeight() });
   }
 
-  private makeImage(src: ImageSource, draw: ImageDraw, item: RenderItem | null): FabricImage {
-    const obj = new FabricImage(src.image as HTMLImageElement);
+  private makeImage(src: ImageSource, draw: ImageDraw, item: RenderItem | null, filters: ImageFilters | null = null): FabricImage {
+    const obj = new PaintedImage(src.image as HTMLImageElement);
+    obj.imageFilters = filters;
+    if (item && item.opacity < 1) obj.set({ opacity: item.opacity });
     const rect = item ? drawCenter(item, draw.dest) : rectCenter(draw.dest);
     applyDraw(obj, draw, src.scale, rect, item?.rotation ?? 0);
     return obj;
@@ -214,7 +236,7 @@ export class CoverScene {
       const src = sources.get(bg.draw.assetId);
       const dims = assetDims(doc.assets.find((a) => a.id === bg.draw!.assetId));
       if (src && dims) {
-        const obj = this.makeImage(src, bg.draw, null);
+        const obj = this.makeImage(src, bg.draw, null, bg.filters);
         obj.set({ selectable: false, evented: false, hoverCursor: "grab" });
         c.add(obj);
         this.bg = {
@@ -246,7 +268,7 @@ export class CoverScene {
     const common = { left: center.x, top: center.y, originX: "center", originY: "center", angle: it.rotation } as const;
     if (it.kind === "image") {
       const src = it.draw && sources.get(it.draw.assetId);
-      if (it.draw && src) return this.makeImage(src, it.draw, it);
+      if (it.draw && src) return this.makeImage(src, it.draw, it, it.filters);
       // Sin dimensiones o aún sin decodificar: marcador de posición.
       return new FRect({ ...common, width: it.box.width, height: it.box.height, fill: "rgba(255,255,255,.08)", stroke: "rgba(255,255,255,.4)", strokeDashArray: [6, 4] });
     }
