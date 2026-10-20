@@ -25,7 +25,8 @@ let n = 0;
 let store: EditorStore;
 let bridge: McpBridge;
 let sockets: FakeSocket[];
-const settle = () => new Promise((r) => setTimeout(r, 20));
+// Espera a que el puente haya devuelto `n` resultados (la ejecución es asíncrona).
+const waitResults = (s: FakeSocket, n: number) => vi.waitFor(() => expect(s.sent.filter((m) => m.type === "result")).toHaveLength(n), { timeout: 5000, interval: 5 });
 const cfg = { baseUrl: "http://127.0.0.1:47321/", token: "tok" };
 
 beforeEach(async () => {
@@ -59,7 +60,7 @@ describe("puente del editor con el companion", () => {
     const s = connected();
     const before = doc();
     s.receive({ type: "call", id: "c1", tool: "add_text_element", args: { projectId: before.id, expectedRevision: 0, text: "x" } });
-    await settle();
+    await waitResults(s, 1);
     expect(s.sent.at(-1)).toEqual({ type: "result", id: "c1", ok: false, error: { kind: "editor_disconnected", reason: "not_authorized" } });
     expect(doc()).toBe(before);
   });
@@ -69,7 +70,7 @@ describe("puente del editor con el companion", () => {
     expect(s.sent.at(-1)).toEqual({ type: "authorize", projectId: doc().id });
     expect(bridge.getSnapshot().authorizedProjectId).toBe(doc().id);
     s.receive({ type: "call", id: "c1", tool: "add_text_element", args: { projectId: doc().id, expectedRevision: 0, text: "Hola" } });
-    await settle();
+    await waitResults(s, 1);
     const res = s.sent.at(-1);
     expect(res).toMatchObject({ type: "result", id: "c1", ok: true, data: { revision: 1, saved: true } });
     expect(doc().elements).toHaveLength(1);
@@ -80,7 +81,7 @@ describe("puente del editor con el companion", () => {
     bridge.authorize();
     s.receive({ type: "call", id: "a", tool: "add_text_element", args: { projectId: doc().id, expectedRevision: 0, text: "uno" } });
     s.receive({ type: "call", id: "b", tool: "add_text_element", args: { projectId: doc().id, expectedRevision: 0, text: "dos" } });
-    await settle();
+    await waitResults(s, 2);
     // Las llamadas se ejecutan en orden: la segunda ya ve la revisión 1.
     expect(s.sent.filter((m) => m.type === "result")).toEqual([
       expect.objectContaining({ id: "a", ok: true }),
@@ -95,7 +96,7 @@ describe("puente del editor con el companion", () => {
     bridge.revoke();
     expect(s.sent.at(-1)).toEqual({ type: "revoke" });
     s.receive({ type: "call", id: "c", tool: "get_canvas_state", args: { projectId: doc().id } });
-    await settle();
+    await waitResults(s, 1);
     expect(s.sent.at(-1)).toMatchObject({ ok: false, error: { reason: "not_authorized" } });
   });
   it("la autorización caduca si cambia el proyecto abierto", async () => {
