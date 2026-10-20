@@ -252,6 +252,7 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         if (args.expectedRevision !== undefined && args.expectedRevision !== doc().revision) {
           return fail({ kind: "conflict", expectedRevision: args.expectedRevision, actualRevision: doc().revision });
         }
+        if (store.getState().error?.kind === "collection_too_many") return invalid("la colección tiene más de 16 fuentes; súbelas por separado");
         if (r.reason === "unsupported") return invalid("formato de imagen no admitido (PNG, JPEG, WebP o GIF)");
         const err = store.getState().error;
         if (r.reason === "limit" && err !== before && err?.kind === "limit") return invalid(`la imagen supera un límite del proyecto (${err.error.kind})`);
@@ -297,7 +298,8 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       }
       const r = await importFont(store, deps.fonts, new File([bytes as BlobPart], args.name, {}));
       if (!r.ok) {
-        if (r.reason === "unsupported") return invalid("formato de fuente no admitido (.ttf, .otf o .woff2)");
+        if (store.getState().error?.kind === "collection_too_many") return invalid("la colección tiene más de 16 fuentes; súbelas por separado");
+        if (r.reason === "unsupported") return invalid("formato de fuente no admitido (.ttf, .otf, .woff2 o .ttc)");
         if (r.reason === "load") return invalid("el navegador no pudo cargar la fuente");
         if (r.reason === "limit") return invalid("la fuente supera un límite del proyecto");
         return fail({ kind: "internal" });

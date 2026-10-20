@@ -103,7 +103,7 @@ export function fontCss(f: { family: string; weight: number; italic: boolean; px
 
 // Formatos de fuente admitidos para subir (SDD R-04), detectados por la firma del archivo.
 export type FontFormat = "ttf" | "otf" | "woff2";
-export const FONT_EXTENSIONS = [".ttf", ".otf", ".woff2"] as const;
+export const FONT_EXTENSIONS = [".ttf", ".otf", ".woff2", ".ttc"] as const;
 
 export function detectFontFormat(bytes: Uint8Array): FontFormat | null {
   if (bytes.length < 4) return null;

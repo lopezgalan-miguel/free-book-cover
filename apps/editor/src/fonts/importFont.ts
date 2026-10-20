@@ -1,9 +1,9 @@
-import { FONT_EXTENSIONS, FONT_MIME, catalogGroup, checkAssetLimits, detectFontFormat, documentFontFamilies, familyFromFileName, type Asset } from "@free-book-cover/core";
+import { FONT_EXTENSIONS, FONT_MIME, catalogGroup, checkAssetLimits, detectFontFormat, documentFontFamilies, familyFromFileName, isFontCollection, splitFontCollection, type Asset, type FontFormat } from "@free-book-cover/core";
 import type { FontPort } from "../store/ports";
 import type { FontRegistry } from "./fontRegistry";
 
 export type ImportFontResult =
-  | { ok: true; family: string; assetId: string }
+  | { ok: true; family: string; assetId: string; added: Array<{ family: string; assetId: string }> }
   | { ok: false; reason: "unsupported" | "limit" | "load" | "command" };
 
 // Familia única dentro del proyecto: no pisa el catálogo ni otra subida.
@@ -27,30 +27,67 @@ export async function importFont(store: FontPort, registry: FontRegistry, file: 
     return { ok: false, reason: "limit" };
   }
   const data = await file.arrayBuffer();
-  const format = detectFontFormat(new Uint8Array(data, 0, Math.min(4, data.byteLength)));
-  if (!format) {
+  const bytes = new Uint8Array(data);
+  const format = detectFontFormat(bytes.subarray(0, 4));
+  const collection = isFontCollection(bytes);
+  if (!format && !collection) {
     store.reportError({ kind: "unsupported_font" });
     return { ok: false, reason: "unsupported" };
   }
-  const doc = store.getState().history.present;
-  const family = uniqueFamily(familyFromFileName(name), documentFontFamilies(doc));
-  const loaded = await registry.registerUpload(family, data);
-  if (!loaded.ok) {
-    store.reportError({ kind: "font_load_failed", family });
-    return { ok: false, reason: "load" };
+  const taken = documentFontFamilies(store.getState().history.present);
+  // Una fuente suelta es una «cara» más; una colección aporta una por cada fuente que contiene.
+  let faces: Array<{ bytes: Uint8Array; format: FontFormat; base: string; label: string; mainScore: number }>;
+  if (collection) {
+    const split = splitFontCollection(bytes);
+    if (!split.ok) {
+      store.reportError({ kind: split.reason === "too_many" ? "collection_too_many" : "unsupported_font" });
+      return { ok: false, reason: "unsupported" };
+    }
+    const fileFamily = familyFromFileName(name);
+    faces = split.faces.map((f, i) => {
+      const family = f.family || fileFamily;
+      const subfamily = f.subfamily || (f.weight === 400 && !f.italic ? "Regular" : `Cara ${i + 1}`);
+      // La principal es la más cercana a 400 sin cursiva (la cursiva queda siempre detrás).
+      return { bytes: f.bytes, format: f.format, base: subfamily === "Regular" ? family : `${family} ${subfamily}`, label: subfamily, mainScore: Math.abs(f.weight - 400) + (f.italic ? 10000 : 0) };
+    });
+  } else {
+    faces = [{ bytes, format: format!, base: familyFromFileName(name), label: "", mainScore: 0 }];
   }
-  const asset: Asset = {
-    id: store.newId(), kind: "font", mimeType: FONT_MIME[format],
-    metadata: { family, name, format, sizeBytes: file.size },
-  };
-  if (!(await store.addAsset(asset, new Blob([data], { type: asset.mimeType })))) {
-    registry.forget(family);
-    const e = store.getState().error;
-    return { ok: false, reason: e?.kind === "limit" ? "limit" : "command" };
+  // Primero se registran todas las caras: si alguna falla no se ha tocado el documento y basta olvidarlas.
+  const registered: Array<{ family: string; asset: Asset; blob: Blob }> = [];
+  const forgetAll = () => registered.forEach((r) => registry.forget(r.family));
+  const used = new Set(taken);
+  for (const f of faces) {
+    const family = uniqueFamily(f.base, used);
+    used.add(family);
+    const buf = f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) as ArrayBuffer;
+    const loaded = await registry.registerUpload(family, buf);
+    if (!loaded.ok) {
+      forgetAll();
+      store.reportError({ kind: "font_load_failed", family });
+      return { ok: false, reason: "load" };
+    }
+    const mimeType = FONT_MIME[f.format];
+    registered.push({
+      family, blob: new Blob([buf], { type: mimeType }),
+      asset: { id: store.newId(), kind: "font", mimeType, metadata: { family, name: f.label ? `${name} · ${f.label}` : name, format: f.format, sizeBytes: f.label ? f.bytes.length : file.size } },
+    });
+  }
+  const added: Array<{ family: string; assetId: string }> = [];
+  for (const r of registered) {
+    if (!(await store.addAsset(r.asset, r.blob))) {
+      // El puerto no puede retirar recursos sin dejar pasos en el historial: las caras ya añadidas quedan como
+      // recursos sin uso (el límite de tamaño se comprueba al principio y «liberar espacio» las retira).
+      forgetAll();
+      const e = store.getState().error;
+      return { ok: false, reason: e?.kind === "limit" ? "limit" : "command" };
+    }
+    added.push({ family: r.family, assetId: r.asset.id });
   }
   // Una subida correcta quita el aviso de fuente anterior; los demás errores se quedan.
   const prev = store.getState().error;
-  if (prev && (prev.kind === "unsupported_font" || prev.kind === "font_load_failed" || (prev.kind === "limit" && prev.error.kind === "font_too_large"))) store.dismissError();
-  return { ok: true, family, assetId: asset.id };
+  if (prev && (prev.kind === "unsupported_font" || prev.kind === "font_load_failed" || prev.kind === "collection_too_many" || (prev.kind === "limit" && prev.error.kind === "font_too_large"))) store.dismissError();
+  const main = faces.reduce((best, f, i) => (f.mainScore < faces[best]!.mainScore ? i : best), 0);
+  return { ok: true, family: added[main]!.family, assetId: added[main]!.assetId, added };
 }
 

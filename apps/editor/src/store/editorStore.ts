@@ -18,6 +18,7 @@ export type EditorError =
   | { kind: "storage_unavailable" }
   | { kind: "unsupported_image" }
   | { kind: "unsupported_font" }
+  | { kind: "collection_too_many" }
   | { kind: "font_load_failed"; family: string }
   | { kind: "restore" }
   | { kind: "limit"; error: LimitError }

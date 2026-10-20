@@ -174,7 +174,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
             <label className={uploadBtn}>
               {t("upload")}
               <input
-                type="file" accept=".ttf,.otf,.woff2" className="sr-only" aria-label={t("uploadFont")}
+                type="file" accept=".ttf,.otf,.woff2,.ttc" className="sr-only" aria-label={t("uploadFont")}
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
                   e.target.value = "";
