@@ -138,7 +138,7 @@ export const elementStyleSchema = z
     filters: imageFiltersSchema.nullable().optional().describe("Solo imágenes: blur (0..100), brightness y saturation (%, 100 = sin cambio). null los quita."),
     outline: z.object({ on: z.boolean(), width: finite.min(0).max(100), color: colorSchema }).strict().optional(),
     curvature: finite.min(-100).max(100).optional(),
-    scaleX: finite.min(0.5).max(1.5).optional().describe("Solo textos: anchura de las letras (1 = normal, 0,5–1,5). La caja se ensancha o estrecha con ellas (centro o borde de la alineación quieto) salvo que se indique width o x."),
+    scaleX: finite.min(0.5).max(1.5).optional().describe("Solo textos: anchura de las letras (1 = normal, 0,5–1,5). La caja no cambia de ancho ni de posición; las líneas se recolocan (si la palabra más larga deja de caber, el ajuste automático ensancha la caja)."),
     texture: textTextureSchema.nullable().optional().describe("Solo textos: textura del relleno (assetId de una imagen importada; fit cover o tile con tileIn en pulgadas). null la quita."),
     fill: colorSchema.optional().describe("Solo formas."),
     stroke: z.object({ color: colorSchema, width: finite.min(0).max(100) }).strict().optional().describe("Solo formas."),
