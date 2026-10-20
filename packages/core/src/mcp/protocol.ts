@@ -306,6 +306,7 @@ export const generateTextureInput = z
     color: colorSchema.optional().describe("Color base."),
     cracks: z.enum(["holes", "lines"]).optional().describe("Solo mármol: grietas transparentes (por defecto) o líneas opacas."),
     crackColor: colorSchema.optional().describe("Solo mármol con cracks lines: color de las grietas (por defecto #460808)."),
+    soften: z.number().int().min(0).max(8).optional().describe("Suavizado: radio en px de la tesela (0 a 8, por defecto 0); la tesela sigue sin costuras."),
   })
   .strict();
 

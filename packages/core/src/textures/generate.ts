@@ -18,6 +18,8 @@ export interface TextureOptions {
   cracks?: "holes" | "lines";
   // Solo mármol con líneas: color de las grietas. Por defecto rojo muy oscuro.
   crackColor?: string;
+  // Radio de suavizado en px de la tesela, 0..8 (por defecto 0): desenfoque periódico, sigue sin costuras.
+  soften?: number;
 }
 
 export interface GeneratedTexture {
@@ -26,7 +28,7 @@ export interface GeneratedTexture {
   data: Uint8ClampedArray; // RGBA
 }
 
-const DEFAULTS: Record<TextureKind, { scale: number; color: string }> = {
+export const TEXTURE_DEFAULTS: Record<TextureKind, { scale: number; color: string }> = {
   "cracked-marble": { scale: 10, color: "#f4cfb3" },
   stone: { scale: 4, color: "#9a948a" },
   paper: { scale: 8, color: "#efe6d2" },
@@ -140,9 +142,9 @@ export function textureSampler(o: TextureOptions): { size: number; sample: Textu
   if (!TEXTURE_KINDS.includes(o.kind)) throw new RangeError(`tipo de textura desconocido: ${String(o.kind)}`);
   const size = o.sizePx ?? 1024;
   if (!Number.isInteger(size) || size < 64 || size > 2048) throw new RangeError("sizePx debe ser un entero entre 64 y 2048");
-  const scale = Math.round(o.scale ?? DEFAULTS[o.kind].scale);
+  const scale = Math.round(o.scale ?? TEXTURE_DEFAULTS[o.kind].scale);
   if (!(scale >= 1 && scale <= 32)) throw new RangeError("scale debe estar entre 1 y 32");
-  const [br, bg, bb] = parseColor(o.color ?? DEFAULTS[o.kind].color);
+  const [br, bg, bb] = parseColor(o.color ?? TEXTURE_DEFAULTS[o.kind].color);
   const rand = rng(o.seed);
   const tone = (data: Uint8ClampedArray | number[], i: number, k: number, a = 255) => {
     data[i] = Math.min(255, Math.max(0, br * k));
@@ -233,9 +235,56 @@ export function textureSampler(o: TextureOptions): { size: number; sample: Textu
   };
 }
 
+// Tres pasadas de caja (≈ gaussiana) en un eje, con los bordes envueltos. buf: size×size×4 en coma flotante.
+function boxBlurAxis(buf: Float32Array, size: number, r: number, horizontal: boolean) {
+  const win = 2 * r + 1;
+  const line = new Float32Array(size * 4);
+  const stride = horizontal ? 4 : size * 4;
+  const lineStride = horizontal ? size * 4 : 4;
+  for (let l = 0; l < size; l++) {
+    const base = l * lineStride;
+    for (let pass = 0; pass < 3; pass++) {
+      const acc = [0, 0, 0, 0];
+      for (let k = -r; k <= r; k++) for (let c = 0; c < 4; c++) acc[c]! += buf[base + mod(k, size) * stride + c]!;
+      for (let p = 0; p < size; p++) {
+        for (let c = 0; c < 4; c++) line[p * 4 + c] = acc[c]! / win;
+        const out = mod(p - r, size);
+        const inn = mod(p + r + 1, size);
+        for (let c = 0; c < 4; c++) acc[c]! += buf[base + inn * stride + c]! - buf[base + out * stride + c]!;
+      }
+      for (let p = 0; p < size; p++) for (let c = 0; c < 4; c++) buf[base + p * stride + c] = line[p * 4 + c]!;
+    }
+  }
+}
+
+// Suaviza en sitio sobre RGBA premultiplicado: los huecos (rgb 0, alfa 0) no oscurecen el canto.
+function soften(data: Uint8ClampedArray, size: number, r: number) {
+  const buf = new Float32Array(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3]! / 255;
+    buf[i] = data[i]! * a;
+    buf[i + 1] = data[i + 1]! * a;
+    buf[i + 2] = data[i + 2]! * a;
+    buf[i + 3] = data[i + 3]!;
+  }
+  boxBlurAxis(buf, size, r, true);
+  boxBlurAxis(buf, size, r, false);
+  for (let i = 0; i < data.length; i += 4) {
+    const a = buf[i + 3]!;
+    const k = a > 0 ? 255 / a : 0;
+    data[i] = buf[i]! * k;
+    data[i + 1] = buf[i + 1]! * k;
+    data[i + 2] = buf[i + 2]! * k;
+    data[i + 3] = a;
+  }
+}
+
 export function generateTexture(o: TextureOptions): GeneratedTexture {
   const { size, sample } = textureSampler(o);
+  const radius = Math.round(o.soften ?? 0);
+  if (!(radius >= 0 && radius <= 8)) throw new RangeError("soften debe estar entre 0 y 8");
   const data = new Uint8ClampedArray(size * size * 4);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) sample(x, y, data, (y * size + x) * 4);
+  if (radius > 0) soften(data, size, radius);
   return { widthPx: size, heightPx: size, data };
 }
