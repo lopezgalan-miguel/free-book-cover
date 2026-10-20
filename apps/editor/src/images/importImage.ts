@@ -44,6 +44,7 @@ export async function importImage(
   target: ImportTarget,
   makeThumbnail: ThumbnailMaker = browserThumbnail,
   expectedRevision?: number,
+  extraMetadata?: Record<string, unknown>,
 ): Promise<ImportResult> {
   const head = new Uint8Array(await file.slice(0, HEADER_BYTES).arrayBuffer());
   const header = readImageHeader(head);
@@ -62,6 +63,7 @@ export async function importImage(
       ...(header.orientation ? { orientation: header.orientation } : {}),
       sizeBytes: file.size,
       ...("name" in file && typeof file.name === "string" ? { name: file.name } : {}),
+      ...(extraMetadata ?? {}),
     },
   };
   const stored = new Blob([file], { type: header.mimeType });

@@ -9,7 +9,7 @@ import { useFontVersion, useFonts } from "../fonts/fontContext";
 import { importFont } from "../fonts/importFont";
 import { useFontAxes } from "../fonts/useFontAxes";
 import { importImage } from "../images/importImage";
-import { generateTextureAsset } from "../images/generateTexture";
+import { generateTextureAsset, generatorOptionsOf } from "../images/generateTexture";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";
@@ -352,6 +352,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
           </div>
         )}
         <GenerateTexture
+          initial={generatorOptionsOf(doc.assets.find((a) => a.id === el.texture?.assetId))}
           onGenerate={async (opts) => {
             const r = await generateTextureAsset(store, opts);
             if (!r.ok) return;
@@ -419,22 +420,22 @@ function TextureFit({ texture, onChange }: { texture: TextTexture; onChange: (t:
 const KIND_KEY: Record<TextureKind, DictKey> = { "cracked-marble": "textureKindMarble", stone: "textureKindStone", paper: "textureKindPaper" };
 
 // Texturas incluidas: tipo y semilla (misma semilla, misma textura).
-export function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Promise<void> }) {
+export function GenerateTexture({ onGenerate, initial }: { onGenerate: (o: TextureOptions) => Promise<void>; initial?: TextureOptions | null }) {
   const { t } = useI18n();
   const id = useId();
-  const [kind, setKind] = useState<TextureKind>("cracked-marble");
-  const [seed, setSeed] = useState(1);
+  const [kind, setKind] = useState<TextureKind>(initial?.kind ?? "cracked-marble");
+  const [seed, setSeed] = useState(initial?.seed ?? 1);
   const [busy, setBusy] = useState(false);
-  const [scale, setScale] = useState(TEXTURE_DEFAULTS["cracked-marble"].scale);
-  const [color, setColor] = useState(TEXTURE_DEFAULTS["cracked-marble"].color);
-  const [soften, setSoften] = useState(0);
+  const [scale, setScale] = useState(initial?.scale ?? TEXTURE_DEFAULTS[initial?.kind ?? "cracked-marble"].scale);
+  const [color, setColor] = useState(initial?.color ?? TEXTURE_DEFAULTS[initial?.kind ?? "cracked-marble"].color);
+  const [soften, setSoften] = useState(initial?.soften ?? 0);
   const changeKind = (k: TextureKind) => {
     setKind(k);
     setScale(TEXTURE_DEFAULTS[k].scale);
     setColor(TEXTURE_DEFAULTS[k].color);
   };
-  const [cracks, setCracks] = useState<"holes" | "lines">("holes");
-  const [crackColor, setCrackColor] = useState("#a8222a");
+  const [cracks, setCracks] = useState<"holes" | "lines">(initial?.cracks ?? "holes");
+  const [crackColor, setCrackColor] = useState(initial?.crackColor ?? "#a8222a");
   const crackId = useId();
   return (
     <div className="mb-4 rounded-[9px] border border-line-soft bg-card p-2.5" role="group" aria-label={t("textureGenerateTitle")}>

@@ -13,7 +13,8 @@ import { importImage } from "../src/images/importImage";
 import { generateTextureAsset } from "../src/images/generateTexture";
 
 // En Node no hay canvas para codificar el PNG: el generador se sustituye por la importación de un PNG de 1024 px.
-vi.mock("../src/images/generateTexture", () => ({
+vi.mock("../src/images/generateTexture", async (orig) => ({
+  ...(await orig<typeof import("../src/images/generateTexture")>()),
   generateTextureAsset: vi.fn(async (store: Parameters<typeof importImage>[0]) => importImage(store, png(1024, 1024), "asset", async () => null)),
 }));
 
