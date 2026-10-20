@@ -162,6 +162,8 @@ export const printSetupSchema = z
     pageCount: z.number().int().positive(),
     paperAndInk: z.string().min(1),
     readingDirection: z.literal("ltr"),
+    // Encuadernación; sin ella, tapa blanda (documentos anteriores a la tapa dura).
+    binding: z.enum(["paperback", "hardcover"]).optional(),
   })
   .strict();
 
@@ -178,6 +180,7 @@ export const elementOverrideSchema = z
     height: finite.nonnegative().optional(),
     rotation: finite.optional(),
     visible: z.boolean().optional(),
+    opacity: finite.min(0).max(1).optional(),
     // Multiplicador del tamaño de letra derivado (solo textos).
     fontScale: finite.positive().optional(),
     // Solo imágenes.

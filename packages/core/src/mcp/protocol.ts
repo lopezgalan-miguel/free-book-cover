@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DIGITAL_PRESETS } from "../presets/digital.js";
+import { MAX_NAME_LENGTH } from "../commands/commands.js";
 import { PAPERS } from "../kdp/kdp.js";
 import { TEXTURE_KINDS } from "../textures/generate.js";
 import {
@@ -13,7 +14,7 @@ import {
 export const MCP_TOOL_NAMES = [
   "get_canvas_state", "add_text_element", "update_element_style", "import_asset", "apply_background",
   "import_font", "add_image_element", "add_shape_element", "add_variant", "update_variant", "set_print_setup", "export_image", "set_canvas",
-  "set_background_filters", "generate_texture",
+  "set_background_filters", "generate_texture", "rename_project", "remove_element", "reorder_element", "export_kdp_pdf",
 ] as const;
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
 
@@ -49,6 +50,12 @@ const finite = z.number().finite();
 const projectId = z.string().min(1).max(200).describe("ID del proyecto autorizado en el editor.");
 const expectedRevision = z.number().int().nonnegative().describe("Revisión del documento que el cliente leyó; si ya no es la vigente, la llamada se rechaza sin modificar nada.");
 
+export const renameProjectInput = z.object({ projectId, expectedRevision, name: z.string().trim().min(1).max(MAX_NAME_LENGTH) }).strict();
+export const removeElementInput = z.object({ projectId, expectedRevision, elementId: z.string().min(1).max(200) }).strict();
+export const reorderElementInput = z
+  .object({ projectId, expectedRevision, elementId: z.string().min(1).max(200), toIndex: z.number().int().nonnegative().describe("Posición en la pila: 0 = fondo; si excede el último, queda al frente.") })
+  .strict();
+
 export const getCanvasStateInput = z
   .object({ projectId: projectId.optional().describe("Si se omite, se usa el proyecto autorizado.") })
   .strict();
@@ -67,17 +74,40 @@ const textStyle = {
 };
 export const TEXT_STYLE_KEYS = Object.keys(textStyle);
 
+// Fragmento con estilo propio; lo que no indique lo toma del estilo del elemento.
+export const runInputSchema = z
+  .object({
+    text: z.string().max(5000),
+    fontFamily: textStyle.fontFamily,
+    fontSizePt: textStyle.fontSizePt,
+    weight: textStyle.weight,
+    italic: textStyle.italic,
+    underline: textStyle.underline,
+    uppercase: textStyle.uppercase,
+    color: textStyle.color,
+  })
+  .strict();
+export type RunInput = z.infer<typeof runInputSchema>;
+// Mismos límites que text: el texto unido tiene entre 1 y 5000 caracteres.
+const runsInput = z
+  .array(runInputSchema)
+  .min(1)
+  .max(200)
+  .refine((rs) => { const n = rs.reduce((a, r) => a + r.text.length, 0); return n >= 1 && n <= 5000; }, { message: "el texto de los fragmentos debe tener entre 1 y 5000 caracteres en total" });
+
 export const addTextElementInput = z
   .object({
     projectId,
     expectedRevision,
-    text: z.string().min(1).max(5000),
+    text: z.string().min(1).max(5000).optional(),
+    runs: runsInput.optional().describe("Fragmentos con estilos distintos (alternativa a text); los estilos del elemento son el valor por defecto de cada uno."),
     x: finite.optional().describe("Pulgadas desde la izquierda del lienzo."),
     y: finite.optional().describe("Pulgadas desde arriba."),
     width: finite.positive().max(100).optional().describe("Ancho de la caja en pulgadas."),
     ...textStyle,
   })
-  .strict();
+  .strict()
+  .refine((a) => (a.text === undefined) !== (a.runs === undefined), { message: "indica exactamente uno de text o runs" });
 
 const unit = finite.min(0).max(1);
 const cropSchema = z.object({ x: unit, y: unit, width: finite.positive().max(1), height: finite.positive().max(1) }).strict();
@@ -88,6 +118,7 @@ const size = finite.positive().max(100);
 export const elementStyleSchema = z
   .object({
     ...textStyle,
+    runs: runsInput.optional().describe("Solo textos: sustituye el texto entero por fragmentos. Las claves de fragmento de style son el valor por defecto de cada uno; lo que nadie indica se hereda del primer fragmento actual."),
     shadow: z
       .object({
         on: z.boolean(),
@@ -210,7 +241,7 @@ export const updateVariantInput = z
     targetId: z.string().min(1).max(200),
     view: viewOverrideSchema.optional().describe("Encuadre: x, y (0..1, 0,5 = centrado) y zoom (1..8) de la zona visible del diseño base."),
     background: backgroundOverrideSchema.optional(),
-    elements: z.record(z.string().min(1).max(200), elementOverrideSchema).optional().describe("Ajustes por elemento en pulgadas de la variante (x, y, width, height, rotation, visible, fontScale, fit, crop)."),
+    elements: z.record(z.string().min(1).max(200), elementOverrideSchema).optional().describe("Ajustes por elemento en pulgadas de la variante (x, y, width, height, rotation, visible, opacity 0..1, fontScale, fit, crop)."),
   })
   .strict()
   .refine((v) => v.view !== undefined || v.background !== undefined || v.elements !== undefined, { message: "indica view, background o elements" });
@@ -227,6 +258,7 @@ export const setPrintSetupInput = z
     trimHeightIn: finite.positive().max(100),
     pageCount: z.number().int().positive().max(10000),
     paperAndInk: z.enum(PAPERS.map((p) => p.id) as [string, ...string[]]),
+    binding: z.enum(["paperback", "hardcover"]).optional().describe("Encuadernación; por defecto tapa blanda. La tapa dura exige 300 ppp en todas las imágenes."),
   })
   .strict();
 
@@ -241,6 +273,15 @@ export const exportImageInput = z
 // Lo que el editor devuelve al companion; el proceso MCP escribe el archivo y responde con la ruta.
 export const exportImageEditorOutput = z
   .object({ fileName: z.string().min(1).max(255), format: z.enum(["png", "jpeg", "webp"]), mimeType: z.string(), widthPx: z.number().int(), heightPx: z.number().int(), bytes: z.number().int(), dataBase64: z.string().min(1) })
+  .strict();
+
+export const exportKdpPdfInput = z.object({ projectId }).strict();
+// Lo que el editor devuelve al companion: el PDF (null si el companion de preimpresión lo rechazó) y el informe en texto.
+export const exportKdpPdfEditorOutput = z
+  .object({
+    state: z.enum(["ready", "not_validated"]), fileName: z.string().min(1).max(255), pdfBase64: z.string().min(1).nullable(), reportFileName: z.string().min(1).max(255), reportText: z.string(),
+    checks: z.array(z.object({ id: z.string(), status: z.string() }).strict()), widthIn: z.number(), heightIn: z.number(),
+  })
   .strict();
 
 export const applyBackgroundInput = z
@@ -270,6 +311,7 @@ export const generateTextureInput = z
     color: colorSchema.optional().describe("Color base."),
     cracks: z.enum(["holes", "lines"]).optional().describe("Solo mármol: grietas transparentes (por defecto) o líneas opacas."),
     crackColor: colorSchema.optional().describe("Solo mármol con cracks lines: color de las grietas (por defecto #460808)."),
+    soften: z.number().int().min(0).max(8).optional().describe("Suavizado: radio en px de la tesela (0 a 8, por defecto 0); la tesela sigue sin costuras."),
   })
   .strict();
 
@@ -283,6 +325,7 @@ export const elementSummarySchema = z
     fontFamily: z.string().optional(),
     fontSizePt: z.number().optional(),
     color: z.string().optional(),
+    runs: z.array(z.object({ text: z.string(), fontFamily: z.string(), fontSizePt: z.number(), weight: z.number(), italic: z.boolean(), color: z.string() }).strict()).optional(),
     assetId: z.string().optional(),
     fill: z.string().optional(),
   })
@@ -331,8 +374,11 @@ export const updateVariantOutput = z
 export const setPrintSetupOutput = z
   .object({
     revision: z.number().int(),
+    binding: z.enum(["paperback", "hardcover"]),
     canvas: z.object({ widthIn: z.number(), heightIn: z.number() }).strict(),
     spineIn: z.number(),
+    // Solo tapa dura: x de las dos líneas de bisagra (no poner texto entre ellas y el lomo).
+    hinges: z.tuple([z.number(), z.number()]).nullable(),
     back: rectOut,
     spine: rectOut,
     front: rectOut,
@@ -343,9 +389,19 @@ export const setPrintSetupOutput = z
     saved,
   })
   .strict();
+export const renameProjectOutput = z.object({ revision: z.number().int(), name: z.string(), saved }).strict();
+export const removeElementOutput = z.object({ revision: z.number().int(), saved }).strict();
+export const reorderElementOutput = z.object({ revision: z.number().int(), order: z.array(z.string()).describe("IDs de los elementos del fondo al frente."), saved }).strict();
 export const setCanvasOutput = z.object({ revision: z.number().int(), canvas: z.object({ widthIn: z.number(), heightIn: z.number() }).strict(), saved }).strict();
 export const exportImageOutput = z
   .object({ path: z.string(), fileName: z.string(), format: z.enum(["png", "jpeg", "webp"]), widthPx: z.number().int(), heightPx: z.number().int(), bytes: z.number().int() })
+  .strict();
+
+export const exportKdpPdfOutput = z
+  .object({
+    state: z.enum(["ready", "not_validated"]), path: z.string().nullable().describe("null si la preimpresión rechazó la entrada y no hay PDF."), reportPath: z.string(),
+    checks: z.array(z.object({ id: z.string(), status: z.string() }).strict()), widthIn: z.number(), heightIn: z.number(),
+  })
   .strict();
 
 export const applyBackgroundOutput = z.object({ revision: z.number().int(), background: z.union([z.object({ assetId: z.string() }), z.string()]), fit: z.enum(["cover", "contain", "fill"]), saved }).strict();
@@ -361,11 +417,15 @@ export const MCP_TOOLS = {
   add_shape_element: { description: "Añade un rectángulo o una elipse con relleno y borde opcional.", input: addShapeElementInput, output: addElementOutput, readOnly: false },
   add_variant: { description: "Añade una variante digital (preajuste de redes o tamaño propio) derivada del diseño base.", input: addVariantInput, output: addVariantOutput, readOnly: false },
   update_variant: { description: "Ajusta una variante en un solo paso: encuadre (zona visible y zoom), fondo y ajustes por elemento. Devuelve el área visible y los elementos cortados.", input: updateVariantInput, output: updateVariantOutput, readOnly: false },
-  set_print_setup: { description: "Configura la cubierta KDP de tapa blanda (corte, páginas, papel): ajusta el lienzo y devuelve la geometría (lomo, caras, zonas seguras, código de barras) en pulgadas.", input: setPrintSetupInput, output: setPrintSetupOutput, readOnly: false },
+  set_print_setup: { description: "Configura la cubierta KDP de tapa blanda o dura (corte, páginas, papel, encuadernación): ajusta el lienzo y devuelve la geometría (lomo, caras, bisagras, zonas seguras, código de barras) en pulgadas. En tapa dura, si alguna imagen queda por debajo de 300 ppp, es invalid_params con la lista.", input: setPrintSetupInput, output: setPrintSetupOutput, readOnly: false },
   set_canvas: { description: "Cambia el tamaño del lienzo (pulgadas) en modo libre o digital; los elementos no se mueven. En una cubierta KDP el tamaño lo fija set_print_setup.", input: setCanvasInput, output: setCanvasOutput, readOnly: false },
   set_background_filters: { description: "Desenfoca, oscurece o desatura el fondo (filtros de imagen del lienzo) sin preparar la imagen fuera.", input: setBackgroundFiltersInput, output: setBackgroundFiltersOutput, readOnly: false },
   generate_texture: { description: "Genera una textura incluida y sin costuras (mármol agrietado, piedra o papel) como recurso de imagen, para usarla en texture o mask de un texto en mosaico.", input: generateTextureInput, output: generateTextureOutput, readOnly: false },
+  rename_project: { description: "Cambia el nombre del proyecto (1 a 120 caracteres).", input: renameProjectInput, output: renameProjectOutput, readOnly: false },
+  remove_element: { description: "Borra un elemento y sus ajustes en las variantes; se puede deshacer en el editor.", input: removeElementInput, output: removeElementOutput, readOnly: false, destructive: true },
+  reorder_element: { description: "Mueve un elemento en la pila de capas (0 = fondo; un índice mayor que el último lo deja al frente) y devuelve el orden del fondo al frente.", input: reorderElementInput, output: reorderElementOutput, readOnly: false },
   export_image: { description: "Exporta el diseño base (300 ppp) o una variante como PNG, JPEG o WebP y lo guarda en el directorio de exportación del companion (FBC_EXPORT_DIR).", input: exportImageInput, output: exportImageOutput, readOnly: true },
+  export_kdp_pdf: { description: "Genera el PDF de imprenta de una cubierta KDP (CMYK, 300 ppp) con el companion de preimpresión y lo guarda con su informe de preimpresión en FBC_EXPORT_DIR. Exige el editor conectado al companion (diálogo de exportación). El estado es ready solo si todas las comprobaciones pasan; si no, es not_validated.", input: exportKdpPdfInput, output: exportKdpPdfOutput, readOnly: true },
 } as const;
 
 /** Esquema JSON de una herramienta (MCP lo exige de tipo object). */

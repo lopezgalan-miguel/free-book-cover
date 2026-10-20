@@ -8,7 +8,7 @@ export const TEXT_RELAYOUT_KEYS: readonly string[] = ["fontFamily", "fontSizePt"
 const GEOMETRY_KEYS = ["x", "y", "width", "height", "rotation", "visible", "opacity"];
 // Record exhaustivo: un tipo de elemento nuevo no compila hasta declarar qué se puede editar.
 const TYPE_KEYS: Record<Element["type"], readonly string[]> = {
-  text: [...TEXT_RUN_KEYS, "align", "lineHeight", "letterSpacing", "shadow", "outline", "curvature", "scaleX", "texture", "innerShadow", "mask"],
+  text: [...TEXT_RUN_KEYS, "runs", "align", "lineHeight", "letterSpacing", "shadow", "outline", "curvature", "scaleX", "texture", "innerShadow", "mask"],
   image: ["fit", "crop", "filters"],
   shape: ["fill", "stroke"],
 };

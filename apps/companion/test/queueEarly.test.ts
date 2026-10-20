@@ -12,7 +12,7 @@ beforeAll(async () => {
     token: TOKEN, allowedOrigins: [ORIGIN], port: 0, maxQueue: 1,
     preflight: async () => {
       preflightCalls++;
-      return { report: { ok: true, checks: [], measured: { pageSizePt: null, expectedSizePt: { width: 1, height: 1 }, minPpi: 300, bytes: 1, maxInkPercent: 1, encoding: "flate" } }, pdfPath: null, proof: null, dispose: async () => undefined };
+      return { report: { ok: true, checks: [], measured: { pageSizePt: null, expectedSizePt: { width: 1, height: 1 }, minPpi: 300, bytes: 1, maxInkPercent: 1, encoding: "flate" } }, pdfPath: null, proof: null, gamut: null, dispose: async () => undefined };
     },
   });
 });

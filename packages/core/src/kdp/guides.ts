@@ -8,6 +8,7 @@ export type GuideShape =
   | { kind: "safe"; rect: Rect }
   | { kind: "spineSafe"; rect: Rect }
   | { kind: "fold"; x: number; y1: number; y2: number }
+  | { kind: "hinge"; x: number; y1: number; y2: number }
   | { kind: "barcode"; rect: Rect };
 
 export function kdpGuides(l: KdpLayout): GuideShape[] {
@@ -27,6 +28,7 @@ export function kdpGuides(l: KdpLayout): GuideShape[] {
     { kind: "fold", x: l.folds[1], y1: 0, y2: l.heightIn },
     { kind: "barcode", rect: l.barcode },
   ];
+  if (l.hinges) for (const x of l.hinges) out.push({ kind: "hinge", x, y1: 0, y2: l.heightIn });
   if (l.spineSafe) out.push({ kind: "spineSafe", rect: l.spineSafe });
   return out;
 }

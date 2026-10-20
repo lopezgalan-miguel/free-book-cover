@@ -117,6 +117,9 @@ export function guideObjects(g: GuideShape, ppi: number): FabricObject[] {
       return [new FRect({ ...box(g.rect), ...ghost, fill: "rgba(255,255,255,.85)", stroke: "#555555", strokeWidth: 1, strokeDashArray: [5, 3], strokeUniform: true })];
     case "fold":
       return [new Line([g.x * ppi, g.y1 * ppi, g.x * ppi, g.y2 * ppi], { ...ghost, stroke: GUIDE_BLUE, strokeWidth: 1, strokeDashArray: [8, 4] })];
+    case "hinge":
+      // Bisagra de la tapa dura: trazo y punto, como en la plantilla de KDP.
+      return [new Line([g.x * ppi, g.y1 * ppi, g.x * ppi, g.y2 * ppi], { ...ghost, stroke: GUIDE_BLUE, strokeWidth: 1, strokeDashArray: [1, 4, 6, 4] })];
   }
 }
 

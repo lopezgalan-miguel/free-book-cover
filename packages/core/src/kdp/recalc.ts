@@ -6,7 +6,8 @@ import { kdpLayout, zoneAt, type KdpLayout, type PrintSetup } from "./kdp.js";
 // Regla: cada elemento pertenece a la cara donde cae su centro y se ancla a lo que queda más cerca:
 //  - contraportada y portada: al borde izquierdo o derecho de su cara, según la mitad en la que esté;
 //  - lomo: se mantiene centrado en el lomo;
-//  - vertical: al borde superior o inferior, según la mitad del lienzo en la que esté.
+//  - vertical: al borde superior o inferior de las caras, según la mitad del lienzo en la que esté (en tapa
+//    dura las caras empiezan tras la solapa, no tras el sangrado).
 // Así, al cambiar solo las páginas, la contraportada no se mueve y la portada se desplaza el cambio del lomo.
 export function repositionElements(elements: Element[], from: KdpLayout, to: KdpLayout): Element[] {
   return elements.map((e) => {
@@ -22,7 +23,7 @@ export function repositionElements(elements: Element[], from: KdpLayout, to: Kdp
       const n = to[zone];
       dx = cx < a.x + a.width / 2 ? n.x - a.x : n.x + n.width - (a.x + a.width);
     }
-    const dy = cy < from.heightIn / 2 ? 0 : to.heightIn - from.heightIn;
+    const dy = cy < from.heightIn / 2 ? to.front.y - from.front.y : to.front.y + to.front.height - (from.front.y + from.front.height);
     if (dx === 0 && dy === 0) return e;
     return { ...e, x: e.x + dx, y: e.y + dy };
   });

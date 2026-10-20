@@ -9,7 +9,7 @@ import { checkDetail, checkTitle, reportText, statusLabel } from "../export/pdfR
 import type { CompanionConnection } from "../export/useCompanion";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
-import { chipBtn, fieldCls } from "../panels/ui";
+import { Switch, chipBtn, fieldCls } from "../panels/ui";
 import { useStore } from "../store/react";
 
 const STATUS_CLS = { pass: "text-ok", warn: "text-warn-ink", fail: "text-danger-ink" } as const;
@@ -45,6 +45,7 @@ export function CompanionConnect({ conn }: { conn: CompanionConnection }) {
 function errorText(t: ReturnType<typeof useI18n>["t"], e: PdfError): string {
   switch (e.kind) {
     case "not_kdp": return t("pdfErrNotKdp");
+    case "low_dpi": return `${t("pdfLowDpi")} ${t("lowDpiFix")}`;
     case "limit": return t("pdfErrLimit", { mp: e.megapixels.toFixed(1), limit: e.limitMegapixels });
     case "fonts": return `${t("exFontsBlocked")} ${e.problems.map((p) => p.family).join(", ")}`;
     case "missing_assets": return t("exAssetsMissing", { n: e.assetIds.length });
@@ -62,6 +63,7 @@ export function PdfExportPanel({ conn, doc }: { conn: CompanionConnection; doc: 
   const [stage, setStage] = useState<PdfStage | null>(null);
   const [error, setError] = useState<PdfError | null>(null);
   const [result, setResult] = useState<PdfResult | null>(null);
+  const [showGamut, setShowGamut] = useState(false);
   const running = useRef(false);
   const [busy, setBusy] = useState(false);
 
@@ -127,8 +129,13 @@ export function PdfExportPanel({ conn, doc }: { conn: CompanionConnection; doc: 
           <p className="mt-2 text-[11px] text-subtle">{t(result.via === "worker" ? "pdfVia_worker" : "pdfVia_main")}</p>
           {result.proofPng && (
             <figure className="mt-3">
-              <img data-testid="pdf-proof" alt={t("pdfProof")} src={`data:image/png;base64,${result.proofPng}`} className="max-h-48 w-full rounded-md border border-line object-contain" />
-              <figcaption className="mt-1 text-[11px] text-subtle">{t("pdfProof")}</figcaption>
+              {result.gamutPng && <Switch label={t("pdfGamutToggle")} checked={showGamut} onChange={setShowGamut} />}
+              <img
+                data-testid="pdf-proof" alt={t(showGamut && result.gamutPng ? "pdfGamutCaption" : "pdfProof")}
+                src={`data:image/png;base64,${showGamut && result.gamutPng ? result.gamutPng : result.proofPng}`}
+                className="max-h-48 w-full rounded-md border border-line object-contain"
+              />
+              <figcaption className="mt-1 text-[11px] text-subtle">{t(showGamut && result.gamutPng ? "pdfGamutCaption" : "pdfProof")}</figcaption>
             </figure>
           )}
           <p className="mt-2 text-[11px] leading-snug text-subtle">{t("pdfDisclaimer")}</p>

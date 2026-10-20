@@ -1,5 +1,5 @@
 import {
-  assetDims, buildExportReport, checkExportSize, formatInfo, renderDocument,
+  assetDims, buildExportReport, checkExportSize, coverPxPerInch, formatInfo, renderDocument,
   type ExportFormat, type ExportReport, type FontProblem, type Project,
 } from "@free-book-cover/core";
 import type { StoredAsset } from "../storage/projectStorage";
@@ -112,7 +112,7 @@ export function browserExportDeps(fonts: ExportDeps["fonts"], getAssets: () => S
           sources.set(id, { image: bmp, scale: bmp.width / dims.widthPx });
         }
         const measure = browserMeasure();
-        const r = renderDocument(doc, { pxPerInch: widthPx / doc.canvas.widthIn, ...(measure ? { measureText: measure } : {}) });
+        const r = renderDocument(doc, { pxPerInch: coverPxPerInch(doc.canvas.widthIn, doc.canvas.heightIn, widthPx, heightPx), ...(measure ? { measureText: measure } : {}) });
         const canvas = document.createElement("canvas");
         canvas.width = widthPx;
         canvas.height = heightPx;

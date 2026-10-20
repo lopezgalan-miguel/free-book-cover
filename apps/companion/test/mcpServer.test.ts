@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
@@ -61,9 +61,14 @@ describe("servidor MCP: descubrimiento", () => {
       expect(t.description).toBeTruthy();
     }
     const add = tools.find((t) => t.name === "add_text_element")!;
-    expect(add.inputSchema.required).toEqual(expect.arrayContaining(["projectId", "expectedRevision", "text"]));
+    expect(add.inputSchema.required).toEqual(expect.arrayContaining(["projectId", "expectedRevision"]));
     expect(tools.find((t) => t.name === "get_canvas_state")!.annotations?.readOnlyHint).toBe(true);
     expect(add.annotations?.readOnlyHint).toBe(false);
+  });
+  it("gestión: renombrar, borrar y reordenar; solo remove_element es destructiva", async () => {
+    const { tools } = await client.listTools();
+    for (const name of ["rename_project", "remove_element", "reorder_element"]) expect(tools.map((t) => t.name)).toContain(name);
+    expect(tools.filter((t) => t.annotations?.destructiveHint).map((t) => t.name)).toEqual(["remove_element"]);
   });
 });
 
@@ -138,5 +143,57 @@ describe("servidor MCP: fuentes y exportación", () => {
     expect(r.structuredContent).toEqual({ path: join(exportDir, "portada-base-1x1.png"), fileName: "portada-base-1x1.png", format: "png", widthPx: 1, heightPx: 1, bytes: PNG.length });
     expect(await readFile(join(exportDir, "portada-base-1x1.png"))).toEqual(PNG);
     expect(JSON.stringify(r.structuredContent)).not.toContain("dataBase64");
+  });
+});
+
+describe("servidor MCP: export_kdp_pdf", () => {
+  const editorOut = (over: object = {}) => ({
+    state: "ready", fileName: "mi-libro-kdp-3743x2775.pdf", pdfBase64: Buffer.from("%PDF-1.4").toString("base64"), reportFileName: "mi-libro-kdp-3743x2775-informe-preimpresion.txt",
+    reportText: "Informe", checks: [{ id: "size", status: "pass" }], widthIn: 12.5, heightIn: 9.25, ...over,
+  });
+  it("sin exportDir: error sin llamar al editor", async () => {
+    const server = createMcpServer({ relay: { call: async (tool, args) => { calls.push({ tool, args }); return outcome; } }, imports: { allowedDirs: [dir], maxBytes: 1000 } });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const c = new Client({ name: "prueba", version: "1" });
+    await Promise.all([server.connect(a), c.connect(b)]);
+    const r: any = await c.callTool({ name: "export_kdp_pdf", arguments: { projectId: "p" } });
+    expect(err(r).kind).toBe("invalid_params");
+    expect(calls).toHaveLength(0);
+  });
+  it("escribe el PDF y el informe y devuelve sus rutas", async () => {
+    outcome = { ok: true, data: editorOut() };
+    const r: any = await client.callTool({ name: "export_kdp_pdf", arguments: { projectId: "p" } });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent).toEqual({
+      state: "ready", path: join(exportDir, "mi-libro-kdp-3743x2775.pdf"), reportPath: join(exportDir, "mi-libro-kdp-3743x2775-informe-preimpresion.txt"),
+      checks: [{ id: "size", status: "pass" }], widthIn: 12.5, heightIn: 9.25,
+    });
+    expect((await readFile(r.structuredContent.path)).toString()).toBe("%PDF-1.4");
+    expect(await readFile(r.structuredContent.reportPath, "utf8")).toBe("Informe");
+  });
+  it("sin PDF (entrada rechazada): path null y el informe escrito", async () => {
+    outcome = { ok: true, data: editorOut({ state: "not_validated", fileName: "rechazado.pdf", pdfBase64: null, reportFileName: "rechazado-informe.txt" }) };
+    const r: any = await client.callTool({ name: "export_kdp_pdf", arguments: { projectId: "p" } });
+    expect(r.structuredContent).toMatchObject({ state: "not_validated", path: null, reportPath: join(exportDir, "rechazado-informe.txt") });
+    expect(await readFile(join(exportDir, "rechazado-informe.txt"), "utf8")).toBe("Informe");
+  });
+  it("PDF e informe comparten sufijo cuando ya existen archivos con ese nombre", async () => {
+    const out = editorOut({ fileName: "dup.pdf", reportFileName: "dup-informe.txt" });
+    outcome = { ok: true, data: out };
+    await writeFile(join(exportDir, "dup-informe.txt"), "previo");
+    const r: any = await client.callTool({ name: "export_kdp_pdf", arguments: { projectId: "p" } });
+    expect(r.structuredContent).toMatchObject({ path: join(exportDir, "dup-2.pdf"), reportPath: join(exportDir, "dup-informe-2.txt") });
+    expect(await readFile(join(exportDir, "dup-informe.txt"), "utf8")).toBe("previo");
+    await expect(readFile(join(exportDir, "dup.pdf"))).rejects.toThrow();
+  });
+  it("una respuesta del editor no válida (export_kdp_pdf y export_image) da internal y se registra", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    outcome = { ok: true, data: { basura: true } };
+    for (const [name, args] of [["export_kdp_pdf", { projectId: "p" }], ["export_image", { projectId: "p", format: "png" }]] as const) {
+      log.mockClear();
+      expect(err(await client.callTool({ name, arguments: args })).kind).toBe("internal");
+      expect(log).toHaveBeenCalledWith(expect.stringContaining(name));
+    }
+    log.mockRestore();
   });
 });

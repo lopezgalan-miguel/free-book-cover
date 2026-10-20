@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import {
-  DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, EXPORT_FORMATS, checkExportSize, formatBytes, formatInfo, isResolvedTarget, printPixelSize, variantDocument,
+  DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, EXPORT_FORMATS, checkExportSize, formatBytes, formatInfo, hardcoverLowDpi, isResolvedTarget, printPixelSize, variantDocument,
   type ExportFormat, type ExportReport, type Project, type ResolvedTarget,
 } from "@free-book-cover/core";
 import { useFonts } from "../fonts/fontContext";
@@ -12,6 +12,7 @@ import { useModal } from "./useModal";
 import { browserExportDeps, downloadBlob, runExport, type ExportError } from "../export/exportImage";
 import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
+import { LowDpiAlert } from "../panels/KdpSetupWizard";
 import { targetLabel } from "../panels/variantLabels";
 import { chipBtn, fieldCls } from "../panels/ui";
 import { useEditorState, useStore } from "../store/react";
@@ -47,7 +48,9 @@ function Dialog({ onClose }: { onClose: () => void }) {
   const isKdpBase = base.mode === "kdp-paperback" && !!base.printSetup;
   const companion = useCompanion(isKdpBase);
   const pdfEligible = isKdpBase && destId === BASE;
-  const pdfEnabled = pdfEligible && companion.status === "connected";
+  // Tapa dura: sin 300 ppp en todas las imágenes no hay PDF (aunque el companion esté conectado).
+  const lowHard = useMemo(() => (isKdpBase ? hardcoverLowDpi(base) : []), [isKdpBase, base]);
+  const pdfEnabled = pdfEligible && companion.status === "connected" && lowHard.length === 0;
   const pdfOn = pdf && pdfEnabled;
   const [error, setError] = useState<ExportError | null>(null);
   const [report, setReport] = useState<ExportReport | null>(null);
@@ -176,7 +179,10 @@ function Dialog({ onClose }: { onClose: () => void }) {
               </button>
             )}
           </div>
-          {isKdpBase && !pdfEnabled && (
+          {pdfEligible && lowHard.length > 0 && (
+            <div className="mt-2"><LowDpiAlert doc={base} entries={lowHard} title={t("pdfLowDpi")} testId="pdf-low-dpi" /></div>
+          )}
+          {isKdpBase && !pdfEnabled && lowHard.length === 0 && (
             <p data-testid="pdf-disabled-reason" className="mt-2 text-[11.5px] leading-snug text-subtle">
               {pdfEligible ? t("pdfNeedsCompanion") : t("pdfNeedsKdp")}
             </p>

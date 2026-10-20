@@ -43,7 +43,7 @@ export interface EditorState {
 }
 
 // Propiedades geométricas que se editan en el base o, con una variante activa, solo en ella.
-export type GeometryEdit = Pick<ElementOverride, "x" | "y" | "width" | "height" | "rotation" | "crop" | "fit">;
+export type GeometryEdit = Pick<ElementOverride, "x" | "y" | "width" | "height" | "rotation" | "opacity" | "crop" | "fit">;
 
 export { ZOOM_MIN, ZOOM_MAX, type StageTone } from "./view";
 
@@ -114,7 +114,8 @@ export function createEditorStore(deps: EditorDeps) {
   // Geometría: con una variante activa solo cambia esa variante; si no, el elemento del base.
   function editGeometry(id: string, props: GeometryEdit): boolean {
     const target = activeTarget();
-    if (target) return dispatch({ type: "setVariantElement", targetId: target.id, elementId: id, props });
+    // En una variante, 100 % es un valor propio (quitarlo heredaría la opacidad del base).
+    if (target) return dispatch({ type: "setVariantElement", targetId: target.id, elementId: id, props: "opacity" in props && props.opacity === undefined ? { ...props, opacity: 1 } : props });
     return dispatch({ type: "updateElement", id, props: props as never });
   }
   function editBackgroundLayout(props: { fit?: "cover" | "contain" | "fill"; pos?: { x: number; y: number } }): boolean {

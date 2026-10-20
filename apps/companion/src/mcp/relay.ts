@@ -8,6 +8,8 @@ export interface RelayOptions {
   token: string;
   /** Margen sobre el timeout del companion antes de abandonar la llamada. */
   callTimeoutMs?: number;
+  /** Idem para export_kdp_pdf; por encima del timeout del bridge (180 s). */
+  pdfCallTimeoutMs?: number;
   connectTimeoutMs?: number;
 }
 
@@ -23,6 +25,7 @@ const NO_COMPANION: ToolError = { kind: "editor_disconnected", reason: "no_compa
 export function createRelay(opts: RelayOptions): Relay {
   const base = opts.url.replace(/^http/, "ws").replace(/\/+$/, "");
   const callTimeout = opts.callTimeoutMs ?? 30_000;
+  const pdfCallTimeout = opts.pdfCallTimeoutMs ?? 190_000;
   const connectTimeout = opts.connectTimeoutMs ?? 5_000;
   let socket: Promise<WebSocket | null> | null = null;
   // El companion cerró el canal por token no válido.
@@ -90,7 +93,7 @@ export function createRelay(opts: RelayOptions): Relay {
         const timer = setTimeout(() => {
           pending.delete(id);
           resolve(fail({ kind: "editor_disconnected", reason: "timeout" }));
-        }, callTimeout);
+        }, tool === "export_kdp_pdf" ? pdfCallTimeout : callTimeout);
         pending.set(id, (o) => {
           clearTimeout(timer);
           resolve(o);

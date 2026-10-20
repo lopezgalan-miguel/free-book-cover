@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { browserMeasure } from "../canvas/measure";
 import { useExportServices } from "../export/exportContext";
+import { createCompanionClient, loadCompanionConfig } from "../export/companionClient";
 import { browserExportDeps } from "../export/exportImage";
+import { browserPrintRenderer } from "../export/printRender";
 import { useFonts } from "../fonts/fontContext";
 import { useStore } from "../store/react";
 import { createMcpBridge, type McpBridge, type McpBridgeDeps, type McpSnapshot } from "./bridge";
@@ -14,15 +16,24 @@ const Ctx = createContext<McpBridge | null>(null);
 export function McpBridgeProvider({ bridge, createSocket, children }: { bridge?: McpBridge; createSocket?: McpBridgeDeps["createSocket"]; children: ReactNode }) {
   const store = useStore();
   const fonts = useFonts();
-  // Solo deps: el objeto de servicios puede ser nuevo en cada render y recrearía el puente (y su conexión).
+  // Solo los campos deps y pdf: el objeto de servicios puede ser nuevo en cada render y recrearía el puente (y su conexión).
   const overrideDeps = useExportServices().deps;
+  const overridePdf = useExportServices().pdf;
   const own = useMemo(
     () => bridge ?? createMcpBridge({
       store, measure: browserMeasure, fonts,
       exportDeps: () => overrideDeps ?? browserExportDeps(fonts, () => store.getState().assets),
+      pdfDeps: () => {
+        const getAssets = () => store.getState().assets;
+        return {
+          fonts, missingAssets: browserExportDeps(fonts, getAssets).missingAssets,
+          renderer: overridePdf?.renderer ?? browserPrintRenderer(fonts, getAssets),
+          companion: overridePdf?.companion ?? createCompanionClient(), config: overridePdf?.config ?? loadCompanionConfig(),
+        };
+      },
       ...(createSocket ? { createSocket } : {}),
     }),
-    [bridge, store, createSocket, fonts, overrideDeps],
+    [bridge, store, createSocket, fonts, overrideDeps, overridePdf],
   );
   useEffect(() => {
     if (bridge) return;

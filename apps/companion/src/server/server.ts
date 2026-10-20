@@ -26,7 +26,7 @@ export interface ServerOptions {
   /** Sustituible en pruebas. */
   preflight?: typeof runPreflight;
   /** Ajustes del canal WebSocket del MCP (pruebas). */
-  bridge?: Partial<Pick<BridgeOptions, "callTimeoutMs" | "helloTimeoutMs" | "maxMessageBytes" | "maxPending">>;
+  bridge?: Partial<Pick<BridgeOptions, "callTimeoutMs" | "pdfCallTimeoutMs" | "helloTimeoutMs" | "maxMessageBytes" | "maxPending">>;
 }
 
 export interface CompanionServer {
@@ -150,7 +150,9 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
           void r.dispose();
         }
       } else void result.dispose();
-      return send(res, 200, { id, report: result.report, proofPng: result.proof ? result.proof.toString("base64") : null }, cors);
+      return send(res, 200, {
+        id, report: result.report, proofPng: result.proof ? result.proof.toString("base64") : null, gamutPng: result.gamut ? result.gamut.toString("base64") : null,
+      }, cors);
     }
 
     const m = req.method === "GET" ? /^\/preflight\/([\w-]+)\/pdf$/.exec(url.pathname) : null;

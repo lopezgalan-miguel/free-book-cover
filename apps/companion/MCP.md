@@ -28,7 +28,7 @@ Todas las entradas son `strict` (campos desconocidos se rechazan). Longitudes en
 | Herramienta | Entrada | Salida |
 | --- | --- | --- |
 | `get_canvas_state` | `projectId?` (por defecto el autorizado) | `projectId`, `name`, `mode`, `revision`, `canvas`, `elements[]`, `assets[]` |
-| `add_text_element` | `projectId`, `expectedRevision`, `text`, `x?`, `y?`, `width?`, `fontFamily?`, `fontSizePt?`, `weight?`, `italic?`, `underline?`, `uppercase?`, `color?`, `align?`, `lineHeight?`, `letterSpacing?` | `elementId`, `revision`, `saved` |
+| `add_text_element` | `projectId`, `expectedRevision`, `text` o `runs`, `x?`, `y?`, `width?`, `fontFamily?`, `fontSizePt?`, `weight?`, `italic?`, `underline?`, `uppercase?`, `color?`, `align?`, `lineHeight?`, `letterSpacing?` | `elementId`, `revision`, `saved` |
 | `update_element_style` | `projectId`, `expectedRevision`, `elementId`, `style` (propiedades permitidas según el tipo) | `element`, `revision`, `saved` |
 | `import_asset` | `projectId`, `expectedRevision?`, `kind: "image"`, `path` | `assetId`, `revision`, `mimeType`, `widthPx`, `heightPx`, `sizeBytes`, `saved` |
 | `apply_background` | `projectId`, `expectedRevision`, `assetId` o `color`, `fit?` (`cover`/`contain`/`fill`), `filters?` (solo con `assetId`) | `revision`, `background`, `fit`, `saved` |
@@ -37,24 +37,36 @@ Todas las entradas son `strict` (campos desconocidos se rechazan). Longitudes en
 | `add_shape_element` | `projectId`, `expectedRevision`, `shape` (`rect`/`ellipse`), `x`, `y`, `width`, `height`, `fill`, `stroke?`, `rotation?` | `elementId`, `revision`, `saved` |
 | `add_variant` | `projectId`, `expectedRevision`, `presetId` (preajuste o `custom` con `widthPx`, `heightPx`), `name?` | `targetId`, `widthPx`, `heightPx`, `revision`, `saved` |
 | `update_variant` | `projectId`, `expectedRevision`, `targetId`, `view?` (`x`, `y`, `zoom`), `background?`, `elements?` (ajustes por elemento) | `targetId`, `visibleArea`, `notInside[]`, `revision`, `saved` |
-| `set_print_setup` | `projectId`, `expectedRevision`, `trimWidthIn`, `trimHeightIn`, `pageCount`, `paperAndInk` | `revision`, `canvas`, `spineIn`, `back`, `spine`, `front`, `safeFront`, `safeBack`, `spineSafe`, `barcode`, `saved` |
+| `set_print_setup` | `projectId`, `expectedRevision`, `trimWidthIn`, `trimHeightIn`, `pageCount`, `paperAndInk`, `binding?` (`paperback` \| `hardcover`) | `revision`, `binding`, `canvas`, `spineIn`, `back`, `spine`, `front`, `hinges`, `safeFront`, `safeBack`, `spineSafe`, `barcode`, `saved` |
 | `set_canvas` | `projectId`, `expectedRevision`, `widthIn`, `heightIn` | `revision`, `canvas`, `saved` |
 | `set_background_filters` | `projectId`, `expectedRevision`, `filters` (`{ blur?, brightness?, saturation? }` o `null`) | `revision`, `filters`, `saved` |
-| `generate_texture` | `projectId`, `expectedRevision?`, `kind` (`cracked-marble`/`stone`/`paper`), `seed`, `sizePx?` (64–2048, por defecto 1024), `scale?`, `color?`, `cracks?` (`holes`/`lines`) | `assetId`, `widthPx`, `heightPx`, `revision`, `saved` |
+| `generate_texture` | `projectId`, `expectedRevision?`, `kind` (`cracked-marble`/`stone`/`paper`), `seed`, `sizePx?` (64–2048, por defecto 1024), `scale?`, `color?`, `cracks?` (`holes`/`lines`), `crackColor?`, `soften?` (0..8, desenfoque periódico del patrón) | `assetId`, `widthPx`, `heightPx`, `revision`, `saved` |
+| `rename_project` | `projectId`, `expectedRevision`, `name` (1–120 caracteres) | `revision`, `name`, `saved` |
+| `remove_element` | `projectId`, `expectedRevision`, `elementId` | `revision`, `saved` |
+| `reorder_element` | `projectId`, `expectedRevision`, `elementId`, `toIndex` (0 = fondo; si pasa del último, queda al frente) | `revision`, `order` (IDs del fondo al frente), `saved` |
 | `export_image` | `projectId`, `target?` (variante; sin él, el base a 300 ppp), `format` (`png`/`jpeg`/`webp`), `quality?` | `path`, `fileName`, `format`, `widthPx`, `heightPx`, `bytes` |
+| `export_kdp_pdf` | `projectId` | `state` (`ready`/`not_validated`), `path` (PDF; `null` si la preimpresión rechazó la entrada), `reportPath`, `checks` (`{ id, status }`), `widthIn`, `heightIn` |
 
 Los esquemas JSON de entrada y salida se publican en `tools/list` (generados con `z.toJSONSchema`). Notas:
 
 - `get_canvas_state.projectId` es opcional (desviación respecto a la tabla del SDD) para que un cliente pueda descubrir el proyecto autorizado; el resto lo exige.
+- Fragmentos con estilos distintos: `add_text_element` admite `runs` en lugar de `text` (exactamente uno de los dos), y `update_element_style` admite `style.runs`, que sustituye el texto entero. Cada fragmento es `{ text, fontFamily?, fontSizePt?, weight?, italic?, underline?, uppercase?, color? }`; los estilos del elemento (o de `style`) son el valor por defecto de cada fragmento y lo que indique el fragmento manda (en `style.runs`, lo que no indique nadie se hereda del primer fragmento actual). Sin peso, se elige el más próximo a 500 de la familia y cursiva del fragmento. `get_canvas_state` devuelve `runs` solo si el texto tiene más de un fragmento. Ejemplo:
+
+  ```json
+  { "italic": true, "runs": [{ "text": "La segunda entrega de " }, { "text": "Susurros de terror", "italic": false }] }
+  ```
 - `fontFamily` debe ser del catálogo del editor o una fuente subida al proyecto; otra cosa es `invalid_params` (el editor no sustituye fuentes en silencio).
 - `update_element_style`: en textos admite `fontFamily`, `fontSizePt`, `weight`, `italic`, `underline`, `uppercase`, `color` (se aplican a todos los fragmentos), `align`, `lineHeight`, `letterSpacing`, `shadow`, `outline`, `curvature`, `scaleX` (anchura de letra, 0,5–1,5; la caja se ensancha o estrecha en la misma proporción, con el centro o el borde de la alineación quieto, y las líneas no cambian, salvo que la misma llamada fije `width` o `x`), `texture` (`{ assetId, fit?: "cover" | "tile", tileIn?, pos? }`; `null` la quita), `mask` (máscara de recorte: como `texture` más `mode` `dark`/`light`/`alpha`, `threshold` 0..1 y `softness?`; `null` la quita), `innerShadow` (`{ on, color, opacity, angle, distance, blur }`, distancias en em; `null` la quita) y `stretch` (anchura `wdth` de una fuente variable **subida**; en otra fuente es `invalid_params`); `shadow` admite además `color`, `opacity`, `angle` (grados, 90 = abajo) y `distance` (em); en formas `fill` y `stroke`; en imágenes `fit`, `crop` y `filters` (`{ blur 0..100, brightness %, saturation % }`; `null` los quita); y en todos `x`, `y`, `width`, `height`, `rotation`, `visible` y `opacity` (0..1). `id`, `type` y `zIndex` no se pueden cambiar. Una propiedad que no aplica al tipo es `invalid_params`.
 - `update_variant` aplica encuadre, fondo y ajustes de elementos con un único comando (`updateVariant`): una revisión y un paso de deshacer. `view.x`/`view.y` (0..1, 0,5 = centrado) desplazan la zona visible del base y `view.zoom` (1..8) la amplía; fondo y elementos derivados se mueven juntos y los ajustes por elemento siguen siendo absolutos en pulgadas de la variante.
 - `set_print_setup` admite los 16 cortes oficiales de tapa blanda de KDP (`packages/core/src/kdp/sources.md`) con su máximo de páginas por papel; un tamaño personalizado o un papel que el corte no admite es `invalid_params`.
+- Con `binding: "hardcover"` (tapa dura, case laminate) admite 5,5 × 8,5, 6 × 9, 6,14 × 9,21, 7 × 10 y 8,25 × 11, de 76 a 550 páginas, en blanco y negro o color prémium. `back` y `front` son las tapas de cartón (el corte + 5 × 6 mm), la solapa de 15 mm rodea el lienzo y `hinges` da las dos líneas de bisagra (10 mm a cada lado del lomo): la zona segura termina en ellas. Si alguna imagen (fondo, capa de imagen o textura de texto) queda por debajo de 300 ppp con esa geometría, es `invalid_params` con una línea por imagen (`id: N ppp…`) y no cambia nada; después, el editor bloquea el PDF mientras alguna imagen siga por debajo.
 - Grietas huecas en un título: `generate_texture` con `cracked-marble` y, en el texto, `texture` y `mask` con el mismo `assetId`, `fit: "tile"`, el mismo `tileIn` y `mask.mode: "alpha"`. La sombra exterior y la interior siguen la letra ya recortada.
-- `export_image` comprueba fuentes y recursos como el diálogo *Exportar*. El editor entrega los bytes y el proceso MCP los escribe en `FBC_EXPORT_DIR` sin sobrescribir (añade `-2`, `-3`…); sin esa variable devuelve `invalid_params`. Un archivo de más de 28 MiB no cabe en el canal y se rechaza con el motivo. El PDF de KDP no se exporta por MCP (sigue en el diálogo).
+- `export_image` comprueba fuentes y recursos como el diálogo *Exportar*. El editor entrega los bytes y el proceso MCP los escribe en `FBC_EXPORT_DIR` sin sobrescribir (añade `-2`, `-3`…); sin esa variable devuelve `invalid_params`. Un archivo de más de 28 MiB no cabe en el canal y se rechaza con el motivo.
+- `export_kdp_pdf` genera el PDF de imprenta de una cubierta KDP (CMYK, 300 ppp) y el informe de preimpresión (`<nombre>-informe-preimpresion.txt`, en el idioma guardado del editor), ambos en `FBC_EXPORT_DIR`. Exige el editor conectado al companion de preimpresión (normalmente basta con conectar MCP: el panel guarda la misma configuración que el diálogo *Exportar → PDF*; si no está conectado es `invalid_params` y no se renderiza nada) y `FBC_EXPORT_DIR` (sin él es `invalid_params` y no se renderiza nada). Un proyecto que no es cubierta KDP es `invalid_params` (usa `set_print_setup`); en tapa dura, una imagen por debajo de 300 ppp también, con una línea por imagen. `state: "ready"` solo si todas las comprobaciones pasan; si no es `not_validated` y el PDF lleva `PRUEBA-NO-VALIDADA` en el nombre. Si el companion rechaza la entrada no hay PDF: `path` es `null` y solo se escribe el informe. PDF e informe comparten sufijo si ya existían (`-2`, `-3`…). Un PDF de más de 28 MiB no cabe en el canal y se rechaza tras renderizar (usa *Exportar → PDF* en el editor). El render a 300 ppp tarda: esta herramienta espera hasta 180 s (el resto, 20 s); si tu cliente MCP corta antes (muchos usan 60 s por defecto), sube su timeout de herramienta.
 - `get_canvas_state` incluye `printSetup` y `variants` cuando existen, y la familia de las fuentes subidas.
 - Un recurso o variante ausente es `not_found` con `resource` `asset` o `variant`.
 - `apply_background` aplica fondo y encuadre con un único comando (`setBackground` con `fit`): una revisión y un solo paso de deshacer.
+- `remove_element` es la única herramienta marcada `destructiveHint: true`: borra el elemento y también sus ajustes en las variantes, en un solo paso; deshacer en el editor lo recupera todo.
 - `saved`: el editor guarda el proyecto tras cada cambio; si el guardado falla, la edición sigue aplicada (se puede deshacer) y `saved` es `false`.
 
 ### Importación de recursos (`import_asset`)
@@ -98,7 +110,7 @@ Atomicidad: cada herramienta es un único comando de `core` (o, en `import_asset
 | `FBC_URL` / `FBC_PORT` | proceso MCP | Dirección del companion (por defecto `http://127.0.0.1:47321`). |
 | `FBC_IMPORT_DIRS` | proceso MCP | Directorios permitidos para `import_asset`. |
 | `FBC_MAX_IMPORT_BYTES` | proceso MCP | Máximo por archivo importado (por defecto 20 MiB). |
-| `FBC_EXPORT_DIR` | proceso MCP | Directorio donde `export_image` escribe los archivos. Sin él, no se exporta. |
+| `FBC_EXPORT_DIR` | proceso MCP | Directorio donde `export_image` y `export_kdp_pdf` escriben los archivos. Sin él, no se exporta. |
 | `FBC_ALLOWED_ORIGIN`, `FBC_PORT`, `FBC_TOKEN` | companion | Como en el Paso 7. |
 
 ## Pruebas automatizadas
@@ -145,5 +157,5 @@ Si algo falla: sin respuesta → revise que el companion esté en marcha y el to
 - Un único editor conectado a la vez (el más reciente gana) y un único proyecto autorizado.
 - El proceso MCP no se reconecta solo de forma proactiva: lo hace en la siguiente llamada.
 - `import_asset` e `import_font` solo admiten rutas locales dentro de `FBC_IMPORT_DIRS`.
-- `export_image` no genera el PDF de KDP; para el PDF se usa *Exportar → PDF* en el editor.
+- `export_kdp_pdf` necesita el editor conectado al companion de preimpresión (basta con la conexión de MCP); las pruebas visuales (PNG de prueba y mapa de gama) solo se ven en el editor.
 - Los tipos de informe/comprobación del companion siguen duplicados respecto a core (deuda del Paso 7, sin tocar).

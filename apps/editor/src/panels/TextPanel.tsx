@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
   FONT_CATALOG, TEXTURE_KINDS, applyStyleToRange, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, letterWidthPatch, nearestFace, rangeStyle, replaceText, runsToText,
-  type FontGroupId, type InnerShadow, type TextureKind, type TextureOptions, type RunStylePatch, type TextElement, type TextMask, type TextTexture,
+  type FontGroupId, type InnerShadow, TEXTURE_DEFAULTS, type TextureKind, type TextureOptions, type RunStylePatch, type TextElement, type TextMask, type TextTexture,
 } from "@free-book-cover/core";
 import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { useAssetUrl } from "../canvas/useImageSources";
@@ -419,12 +419,20 @@ function TextureFit({ texture, onChange }: { texture: TextTexture; onChange: (t:
 const KIND_KEY: Record<TextureKind, DictKey> = { "cracked-marble": "textureKindMarble", stone: "textureKindStone", paper: "textureKindPaper" };
 
 // Texturas incluidas: tipo y semilla (misma semilla, misma textura).
-function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Promise<void> }) {
+export function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Promise<void> }) {
   const { t } = useI18n();
   const id = useId();
   const [kind, setKind] = useState<TextureKind>("cracked-marble");
   const [seed, setSeed] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [scale, setScale] = useState(TEXTURE_DEFAULTS["cracked-marble"].scale);
+  const [color, setColor] = useState(TEXTURE_DEFAULTS["cracked-marble"].color);
+  const [soften, setSoften] = useState(0);
+  const changeKind = (k: TextureKind) => {
+    setKind(k);
+    setScale(TEXTURE_DEFAULTS[k].scale);
+    setColor(TEXTURE_DEFAULTS[k].color);
+  };
   const [cracks, setCracks] = useState<"holes" | "lines">("holes");
   const [crackColor, setCrackColor] = useState("#a8222a");
   const crackId = useId();
@@ -433,11 +441,19 @@ function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Pr
       <div className="mb-2 flex items-end gap-2">
         <div className="min-w-0 flex-[1.4]">
           <label htmlFor={id} className="mb-1 block text-[10px] text-muted">{t("textureKind")}</label>
-          <select id={id} className={`${fieldCls} font-sans`} value={kind} onChange={(e) => setKind(e.target.value as TextureKind)}>
+          <select id={id} className={`${fieldCls} font-sans`} value={kind} onChange={(e) => changeKind(e.target.value as TextureKind)}>
             {TEXTURE_KINDS.map((k) => <option key={k} value={k}>{t(KIND_KEY[k])}</option>)}
           </select>
         </div>
         <NumberField label={t("textureSeed")} value={seed} min={0} step={1} digits={0} onCommit={(v) => setSeed(Math.max(0, Math.round(v)))} />
+      </div>
+      <div className="mb-2 flex items-end gap-2">
+        <NumberField label={t("textureScale")} value={scale} min={1} max={32} step={1} digits={0} onCommit={(v) => setScale(Math.min(32, Math.max(1, Math.round(v))))} />
+        <NumberField label={t("textureSoften")} value={soften} min={0} max={8} step={1} digits={0} onCommit={(v) => setSoften(Math.min(8, Math.max(0, Math.round(v))))} />
+        <input
+          type="color" aria-label={t("textureColor")} value={color} onChange={(e) => setColor(e.target.value.toLowerCase())}
+          className="h-[34px] w-10 flex-none cursor-pointer rounded-lg border border-field bg-white p-[3px]"
+        />
       </div>
       {kind === "cracked-marble" && (
         <div className="mb-2 flex items-end gap-2">
@@ -463,7 +479,13 @@ function GenerateTexture({ onGenerate }: { onGenerate: (o: TextureOptions) => Pr
           onClick={async () => {
             setBusy(true);
             try {
-              await onGenerate(kind !== "cracked-marble" ? { kind, seed } : cracks === "holes" ? { kind, seed, cracks } : { kind, seed, cracks, crackColor });
+              const d = TEXTURE_DEFAULTS[kind];
+              const extra: Partial<TextureOptions> = {
+                ...(scale !== d.scale ? { scale } : {}),
+                ...(color !== d.color ? { color } : {}),
+                ...(soften > 0 ? { soften } : {}),
+              };
+              await onGenerate({ kind, seed, ...extra, ...(kind !== "cracked-marble" ? {} : cracks === "holes" ? { cracks } : { cracks, crackColor }) });
             } finally {
               setBusy(false);
             }

@@ -8,7 +8,7 @@ import { kdpReview } from "./review.js";
 // companion (sobre el PDF final). «Listo para KDP» solo si ninguna falla y el companion ha inspeccionado el PDF.
 export type CheckStatus = "pass" | "warn" | "fail";
 export type CompanionCheckId =
-  | "input" | "pages" | "size" | "ppi" | "cmyk" | "transparency" | "fonts" | "encryption" | "structure" | "weight" | "ink";
+  | "input" | "pages" | "size" | "ppi" | "cmyk" | "transparency" | "fonts" | "encryption" | "structure" | "weight" | "ink" | "gamut";
 export type PreflightCheckId = CompanionCheckId | "project" | "resolution" | "review";
 
 export interface PreflightCheck {
@@ -43,6 +43,13 @@ export interface PreflightSummary {
 // Tamaño en píxeles de la rasterización a 300 ppp: se redondea hacia arriba para no bajar de 300 ppp efectivos.
 export function printPixelSize(widthIn: number, heightIn: number): { widthPx: number; heightPx: number } {
   return { widthPx: Math.ceil(widthIn * TARGET_DPI - 1e-6), heightPx: Math.ceil(heightIn * TARGET_DPI - 1e-6) };
+}
+
+// Escala (px por pulgada) para pintar el lienzo en un tamaño de píxeles redondeado: la que cubre los dos ejes.
+// Con la del ancho, si el alto se redondeó más hacia arriba, la última fila quedaba a medio pintar (transparente
+// y rechazada por el companion; pasaba con la tapa dura). Lo que sobra por el otro eje es menos de un píxel.
+export function coverPxPerInch(widthIn: number, heightIn: number, widthPx: number, heightPx: number): number {
+  return Math.max(widthPx / widthIn, heightPx / heightIn);
 }
 
 const EPS = 1e-4;

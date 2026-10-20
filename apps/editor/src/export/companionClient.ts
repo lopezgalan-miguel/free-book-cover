@@ -15,6 +15,8 @@ export interface PreflightResponse {
   report: CompanionReport;
   // Prueba visual (PNG en base64) del PDF CMYK.
   proofPng: string | null;
+  // Mapa de los colores que cambian al imprimir (PNG en base64); ausente en companions anteriores.
+  gamutPng?: string | null;
 }
 
 export class CompanionError extends Error {

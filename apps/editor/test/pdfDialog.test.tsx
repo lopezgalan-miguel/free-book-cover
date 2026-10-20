@@ -60,6 +60,21 @@ describe("opción PDF del modal de exportación", () => {
     expect(within(dialog).getByTestId("pdf-disabled-reason")).toHaveTextContent("necesita el companion conectado");
     expect(within(dialog).getByText(/No se detecta el companion/)).toBeInTheDocument();
   });
+  it("tapa dura que pierde los 300 ppp: PDF deshabilitado con la imagen que falla", async () => {
+    const user = userEvent.setup();
+    const { store } = await mount(client("connected"), false);
+    act(() => {
+      store.dispatch({ type: "setPrintSetup", printSetup: { trimWidthIn: 5.5, trimHeightIn: 8.5, pageCount: 116, paperAndInk: "bw-cream", readingDirection: "ltr", binding: "hardcover" } });
+      store.dispatch({ type: "addAsset", asset: { id: "bg", kind: "image", mimeType: "image/png", metadata: { widthPx: 1600, heightPx: 2560 } } });
+      store.dispatch({ type: "setBackground", background: { assetId: "bg" } });
+    });
+    const dialog = await open(user);
+    await waitFor(() => expect(within(dialog).getByTestId("companion-status")).toHaveAttribute("data-status", "connected"));
+    expect(within(dialog).getByRole("radio", { name: /PDF/ })).toBeDisabled();
+    const reason = within(dialog).getByTestId("pdf-low-dpi");
+    expect(reason).toHaveTextContent("no llega al mínimo de 300 ppp");
+    expect(reason).toHaveTextContent("Imagen de fondo");
+  });
   it("proyecto no KDP: no aparece la opción PDF", async () => {
     const user = userEvent.setup();
     await mount(client("connected"), false);
@@ -96,6 +111,20 @@ describe("opción PDF del modal de exportación", () => {
     expect(download).toHaveBeenCalledWith(expect.any(Blob), expect.stringMatching(/-kdp-3743x2775\.pdf$/));
     await user.click(within(dialog).getByTestId("pdf-download-report"));
     expect(download).toHaveBeenLastCalledWith(expect.any(Blob), expect.stringMatching(/-informe-preimpresion\.txt$/));
+  });
+  it("aviso de gama: el informe lo explica y el interruptor cambia la prueba por el mapa de colores que cambian", async () => {
+    const user = userEvent.setup();
+    const c = client("connected", okReport({ checks: [{ id: "gamut", status: "warn", params: { percent: 4.3, threshold: 10 } }] }));
+    c.preflight.mockResolvedValue({ id: "r1", report: okReport({ checks: [{ id: "gamut", status: "warn", params: { percent: 4.3, threshold: 10 } }] }), proofPng: "UFJPT0Y=", gamutPng: "R0FNVVQ=" });
+    await mount(c);
+    const dialog = await open(user);
+    await user.click(await enabledPdf(dialog));
+    await user.click(within(dialog).getByRole("button", { name: "Generar PDF" }));
+    await within(dialog).findByTestId("pdf-report");
+    expect(within(dialog).getByTestId("check-gamut")).toHaveTextContent("4.3 %");
+    expect(within(dialog).getByTestId("pdf-proof")).toHaveAttribute("src", "data:image/png;base64,UFJPT0Y=");
+    await user.click(within(dialog).getByRole("switch", { name: "Ver colores que cambian al imprimir" }));
+    expect(within(dialog).getByTestId("pdf-proof")).toHaveAttribute("src", "data:image/png;base64,R0FNVVQ=");
   });
   it("con un fallo: «NO validado» y la descarga se ofrece como prueba", async () => {
     const user = userEvent.setup();

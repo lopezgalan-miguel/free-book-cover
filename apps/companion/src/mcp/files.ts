@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { open, realpath, writeFile } from "node:fs/promises";
+import { open, realpath, unlink, writeFile } from "node:fs/promises";
 import { basename, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { detectFontFormat, readImageHeader, type ToolError } from "@free-book-cover/core";
 
@@ -24,7 +24,7 @@ export type ExportFile = { ok: true; path: string } | { ok: false; error: ToolEr
  * el nombre de archivo, nunca una ruta; un archivo existente no se pisa (se añade -2, -3...).
  */
 export async function writeExportFile(dir: string | null, fileName: string, bytes: Uint8Array): Promise<ExportFile> {
-  if (!dir) return { ok: false, error: { kind: "invalid_params", issues: ["export_image necesita FBC_EXPORT_DIR en el proceso MCP"] } };
+  if (!dir) return { ok: false, error: { kind: "invalid_params", issues: ["la exportación necesita FBC_EXPORT_DIR en el proceso MCP"] } };
   const safe = basename(fileName).replace(/[^\p{L}\p{N}._-]+/gu, "-") || "portada";
   const ext = extname(safe);
   const stem = safe.slice(0, safe.length - ext.length) || "portada";
@@ -40,6 +40,38 @@ export async function writeExportFile(dir: string | null, fileName: string, byte
         return { ok: false, error: { kind: "internal" } };
       }
     }
+  }
+  return { ok: false, error: { kind: "internal" } };
+}
+
+/**
+ * Escribe varios archivos de una misma exportación con el mismo sufijo de colisión (-2, -3...): si alguno ya existe,
+ * se deshace lo escrito en ese intento y se prueba el siguiente número, para que el PDF y su informe vayan emparejados.
+ */
+export async function writeExportFiles(dir: string | null, files: { fileName: string; bytes: Uint8Array }[]): Promise<{ ok: true; paths: string[] } | { ok: false; error: ToolError }> {
+  if (!dir) return { ok: false, error: { kind: "invalid_params", issues: ["la exportación necesita FBC_EXPORT_DIR en el proceso MCP"] } };
+  const names = files.map((f) => {
+    const safe = basename(f.fileName).replace(/[^\p{L}\p{N}._-]+/gu, "-") || "portada";
+    const ext = extname(safe);
+    return { stem: safe.slice(0, safe.length - ext.length) || "portada", ext };
+  });
+  for (let n = 1; n < 1000; n++) {
+    const paths = names.map(({ stem, ext }) => join(dir, n === 1 ? `${stem}${ext}` : `${stem}-${n}${ext}`));
+    const written: string[] = [];
+    let taken = false;
+    for (const [i, path] of paths.entries()) {
+      try {
+        await writeFile(path, files[i]!.bytes, { flag: "wx" });
+        written.push(path);
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === "EEXIST") taken = true;
+        else console.error("no se pudo escribir la exportación", e);
+        for (const w of written) await unlink(w).catch(() => undefined);
+        if (taken) break;
+        return { ok: false, error: { kind: "internal" } };
+      }
+    }
+    if (!taken) return { ok: true, paths };
   }
   return { ok: false, error: { kind: "internal" } };
 }
