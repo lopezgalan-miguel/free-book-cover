@@ -302,7 +302,7 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         if (r.reason === "limit") return invalid("la fuente supera un límite del proyecto");
         return fail({ kind: "internal" });
       }
-      return { ok: true, data: { assetId: r.assetId, family: r.family, revision: doc().revision, sizeBytes: bytes.length, axes: readFontAxes(bytes), saved: await saved(store) } };
+      return { ok: true, data: { assetId: r.assetId, family: r.family, revision: doc().revision, sizeBytes: bytes.length, axes: readFontAxes(bytes), added: r.added, saved: await saved(store) } };
     }
 
     case "set_background_filters": {

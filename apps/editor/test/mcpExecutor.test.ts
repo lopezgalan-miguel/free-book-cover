@@ -295,7 +295,7 @@ describe("import_font", () => {
     withFonts();
     const out = ok(await run("import_font", { projectId: doc().id, name: "Mi Fuente.ttf", dataBase64: TTF_B64 }));
     MCP_TOOLS.import_font.output.parse(out);
-    expect(out).toMatchObject({ family: "Mi Fuente", saved: true });
+    expect(out).toMatchObject({ family: "Mi Fuente", saved: true, added: [{ family: "Mi Fuente", assetId: out.assetId }] });
     expect(doc().assets.find((a) => a.id === out.assetId)).toMatchObject({ kind: "font", metadata: { family: "Mi Fuente" } });
     await add({ fontFamily: "Mi Fuente" });
     expect((doc().elements[0] as TextElement).runs[0]!.fontFamily).toBe("Mi Fuente");

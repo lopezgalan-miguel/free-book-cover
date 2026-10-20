@@ -185,7 +185,7 @@ export const importFontInput = z
   .object({
     projectId,
     expectedRevision: expectedRevision.optional().describe("Opcional: si se indica y está obsoleta, no se importa nada."),
-    path: z.string().min(1).max(4096).describe("Ruta local de una fuente .ttf, .otf o .woff2 dentro de los directorios permitidos del companion. La licencia es responsabilidad de quien la aporta."),
+    path: z.string().min(1).max(4096).describe("Ruta local de una fuente .ttf, .otf, .woff2 o .ttc dentro de los directorios permitidos del companion. La licencia es responsabilidad de quien la aporta."),
   })
   .strict();
 export const importFontEditorInput = z
@@ -357,7 +357,7 @@ export const importAssetOutput = z
   .strict();
 const fontAxisOut = z.object({ tag: z.string(), min: z.number(), def: z.number(), max: z.number() }).strict();
 export const importFontOutput = z
-  .object({ assetId: z.string(), family: z.string(), revision: z.number().int(), sizeBytes: z.number(), axes: z.array(fontAxisOut).nullable().describe("Ejes de una fuente variable (wght se usa con weight y wdth con stretch); null si no es variable o es WOFF2."), saved })
+  .object({ assetId: z.string(), family: z.string(), revision: z.number().int(), sizeBytes: z.number(), axes: z.array(fontAxisOut).nullable().describe("Ejes de una fuente variable (wght se usa con weight y wdth con stretch); null si no es variable o es WOFF2."), added: z.array(z.object({ family: z.string(), assetId: z.string() }).strict()).optional().describe("Familias y recursos de todas las caras importadas (una .ttc aporta una por cara; family es la principal)."), saved })
   .strict();
 const filtersOut = z.object({ blur: z.number().optional(), brightness: z.number().optional(), saturation: z.number().optional() }).strict();
 export const setBackgroundFiltersOutput = z.object({ revision: z.number().int(), filters: filtersOut.nullable(), saved }).strict();
@@ -414,7 +414,7 @@ export const MCP_TOOLS = {
   update_element_style: { description: "Cambia propiedades permitidas de un elemento existente (tipografía, color, efectos, geometría).", input: updateElementStyleInput, output: updateElementStyleOutput, readOnly: false },
   import_asset: { description: "Importa una imagen local (dentro de los directorios permitidos y del límite de tamaño) como recurso del proyecto.", input: importAssetInput, output: importAssetOutput, readOnly: false },
   apply_background: { description: "Aplica como fondo un recurso importado (con política de ajuste) o un color liso.", input: applyBackgroundInput, output: applyBackgroundOutput, readOnly: false },
-  import_font: { description: "Importa una fuente local (.ttf, .otf, .woff2) al proyecto; devuelve la familia para usarla en fontFamily.", input: importFontInput, output: importFontOutput, readOnly: false },
+  import_font: { description: "Importa una fuente local (.ttf, .otf, .woff2, .ttc) al proyecto; devuelve la familia para usarla en fontFamily. Una colección .ttc añade cada cara como familia propia (campo added).", input: importFontInput, output: importFontOutput, readOnly: false },
   add_image_element: { description: "Añade una capa de imagen con un recurso importado (posición, tamaño, encaje y recorte).", input: addImageElementInput, output: addElementOutput, readOnly: false },
   add_shape_element: { description: "Añade un rectángulo o una elipse con relleno y borde opcional.", input: addShapeElementInput, output: addElementOutput, readOnly: false },
   add_variant: { description: "Añade una variante digital (preajuste de redes o tamaño propio) derivada del diseño base.", input: addVariantInput, output: addVariantOutput, readOnly: false },

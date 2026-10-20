@@ -32,7 +32,7 @@ Todas las entradas son `strict` (campos desconocidos se rechazan). Longitudes en
 | `update_element_style` | `projectId`, `expectedRevision`, `elementId`, `style` (propiedades permitidas según el tipo) | `element`, `revision`, `saved` |
 | `import_asset` | `projectId`, `expectedRevision?`, `kind: "image"`, `path` | `assetId`, `revision`, `mimeType`, `widthPx`, `heightPx`, `sizeBytes`, `saved` |
 | `apply_background` | `projectId`, `expectedRevision`, `assetId` o `color`, `fit?` (`cover`/`contain`/`fill`), `filters?` (solo con `assetId`) | `revision`, `background`, `fit`, `saved` |
-| `import_font` | `projectId`, `expectedRevision?`, `path` (.ttf/.otf/.woff2) | `assetId`, `family`, `revision`, `sizeBytes`, `axes` (ejes de una fuente variable o `null`), `saved` |
+| `import_font` | `projectId`, `expectedRevision?`, `path` (.ttf/.otf/.woff2/.ttc) | `assetId`, `family`, `revision`, `sizeBytes`, `axes` (ejes de una fuente variable o `null`), `added?` (familia y recurso de cada cara; una `.ttc` aporta una por cara y `family` es la principal), `saved` |
 | `add_image_element` | `projectId`, `expectedRevision`, `assetId`, `x?`, `y?`, `width?`+`height?`, `rotation?`, `fit?`, `crop?` | `elementId`, `revision`, `saved` |
 | `add_shape_element` | `projectId`, `expectedRevision`, `shape` (`rect`/`ellipse`), `x`, `y`, `width`, `height`, `fill`, `stroke?`, `rotation?` | `elementId`, `revision`, `saved` |
 | `add_variant` | `projectId`, `expectedRevision`, `presetId` (preajuste o `custom` con `widthPx`, `heightPx`), `name?` | `targetId`, `widthPx`, `heightPx`, `revision`, `saved` |

@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { open, realpath, unlink, writeFile } from "node:fs/promises";
 import { basename, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { detectFontFormat, readImageHeader, type ToolError } from "@free-book-cover/core";
+import { detectFontFormat, isFontCollection, readImageHeader, type ToolError } from "@free-book-cover/core";
 
 export interface ImportLimits {
   /** Directorios desde los que se puede importar (solo estos y sus subdirectorios). */
@@ -112,7 +112,7 @@ export async function readImportFile(path: string, limits: ImportLimits, kind: "
     if (bytesRead > limits.maxBytes) return bad(`el archivo supera el límite de ${limits.maxBytes} bytes`);
     const bytes = buf.subarray(0, bytesRead);
     if (kind === "image" && !readImageHeader(bytes)) return bad("formato de imagen no admitido (PNG, JPEG, WebP o GIF)");
-    if (kind === "font" && !detectFontFormat(bytes)) return bad("formato de fuente no admitido (.ttf, .otf o .woff2)");
+    if (kind === "font" && !detectFontFormat(bytes) && !isFontCollection(bytes)) return bad("formato de fuente no admitido (.ttf, .otf, .woff2 o .ttc)");
     return { ok: true, name: basename(real), bytes };
   } finally {
     await fh.close();
