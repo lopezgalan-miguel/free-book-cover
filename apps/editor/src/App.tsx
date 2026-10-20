@@ -45,7 +45,15 @@ export function App({ store, fonts, exportServices, mcpBridge }: { store: Editor
 function Layout() {
   useFontSync();
   useEscapeDeselects();
+  useLayerShortcuts();
   return useLayout() === "mobile" ? <MobileLayout /> : <DesktopLayout />;
+}
+
+// Foco en un campo de texto o diálogo modal abierto: los atajos de capa no actúan (el navegador conserva los suyos).
+function isTypingOrModal(e: KeyboardEvent): boolean {
+  const el = e.target instanceof HTMLElement ? e.target : null;
+  if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return true;
+  return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
 }
 
 // Escape fuera de un campo y sin un diálogo abierto quita la selección (el diálogo usa Escape para cerrarse).
@@ -53,11 +61,31 @@ function useEscapeDeselects() {
   const store = useStore();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      const el = e.target instanceof HTMLElement ? e.target : null;
-      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
-      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      if (e.key !== "Escape" || e.defaultPrevented || isTypingOrModal(e)) return;
       if (store.getState().selectedId !== null) store.select(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [store]);
+}
+
+// Ctrl/Cmd+C, V y D sobre la capa seleccionada. Solo se cancela el evento cuando el atajo actúa:
+// sin capa seleccionada o sin nada copiado, el navegador mantiene su copiar, pegar y marcador.
+function useLayerShortcuts() {
+  const store = useStore();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.defaultPrevented || isTypingOrModal(e)) return;
+      const key = e.key.toLowerCase();
+      const hasLayer = store.getState().selectedId !== null;
+      if (key === "c" && hasLayer) store.copySelection();
+      else if (key === "v" && store.canPaste()) {
+        e.preventDefault();
+        void store.paste();
+      } else if (key === "d" && hasLayer) {
+        e.preventDefault();
+        void store.duplicateSelection();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);

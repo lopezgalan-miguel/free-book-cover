@@ -54,6 +54,11 @@ export function GeometryPanel() {
         <button type="button" className={`${chipBtn} flex-1`} disabled={index < 0 || index === stack.length - 1} onClick={() => toIndex(stack.length - 1)}>{t("bringToFront")}</button>
         <button type="button" className={`${chipBtn} flex-1`} disabled={index <= 0} onClick={() => toIndex(0)}>{t("sendToBack")}</button>
       </div>
+      <div className="mt-1.5 flex gap-1.5">
+        <button type="button" className={`${chipBtn} flex-1`} onClick={() => store.copySelection()}>{t("copyLayer")}</button>
+        <button type="button" className={`${chipBtn} flex-1`} disabled={!store.canPaste()} onClick={() => void store.paste()}>{t("pasteLayer")}</button>
+        <button type="button" className={`${chipBtn} flex-1`} onClick={() => void store.duplicateSelection()}>{t("duplicateLayer")}</button>
+      </div>
       {el.type === "image" && (
         <>
           <div className="mt-3 text-[11px] text-muted">{t("cropTitle")}</div>

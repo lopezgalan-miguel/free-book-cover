@@ -7,6 +7,7 @@ import type { BackupPart } from "../storage/backup";
 import { createStateCell } from "./state";
 import { createViewActions, type StageTone } from "./view";
 import { createAssetActions } from "./assets";
+import { createClipboardActions } from "./clipboard";
 import { createProjectSession } from "./session";
 
 export type EditorError =
@@ -40,6 +41,8 @@ export interface EditorState {
   activeVariantId: string | null;
   // Guías de la cubierta KDP (vista; nunca se exportan).
   guidesVisible: boolean;
+  // Hay una capa copiada (el contenido vive en el cierre del almacén; esto solo avisa a la interfaz).
+  hasClipboard: boolean;
 }
 
 // Propiedades geométricas que se editan en el base o, con una variante activa, solo en ella.
@@ -68,7 +71,7 @@ export function createEditorStore(deps: EditorDeps) {
   const cell = createStateCell<EditorState>(
     {
       ready: false, history: fresh(), assets: [], savedRevision: null, status: "idle", error: null, backupParts: null, nearLimit: false,
-      selectedId: null, zoom: 1, stageTone: "charcoal", activeVariantId: null, guidesVisible: true,
+      selectedId: null, zoom: 1, stageTone: "charcoal", activeVariantId: null, guidesVisible: true, hasClipboard: false,
     },
     // Una variante que ya no existe (borrada, deshacer, otro proyecto) deja de estar activa.
     (s) => (s.activeVariantId && !s.history.present.digitalTargets?.some((t) => t.id === s.activeVariantId) ? { ...s, activeVariantId: null } : s),
@@ -135,13 +138,14 @@ export function createEditorStore(deps: EditorDeps) {
 
   const history = { dispatch, endGesture, applyRemote, undo, redo };
   const assets = createAssetActions(cell, deps, history);
+  const clipboard = createClipboardActions(cell, deps, history, assets);
   const session = createProjectSession(cell, deps, {
     purgeOrphans: assets.purgeOrphans, projectBytes: assets.projectBytes, setName, resetView: resetDisplayCache,
   });
   return {
     getState: cell.get, subscribe: cell.subscribe, newId: deps.newId,
     canUndo: () => canUndo(cell.get().history), canRedo: () => canRedo(cell.get().history),
-    ...viewApi, ...history, ...assets, ...session,
+    ...viewApi, ...history, ...assets, ...clipboard, ...session,
     editGeometry, editBackgroundLayout, setName, reportError, dismissError,
   };
 }
