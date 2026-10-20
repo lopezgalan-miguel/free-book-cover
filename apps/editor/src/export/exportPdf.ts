@@ -33,6 +33,7 @@ export interface PdfResult {
   // PDF generado; null si el companion rechazó la entrada. Si el estado no es «ready» es una prueba.
   pdf: Blob | null;
   proofPng: string | null;
+  gamutPng: string | null;
   fileName: string;
   reportFileName: string;
   via: RenderVia;
@@ -90,7 +91,7 @@ export async function runPdfExport(
   return {
     ok: true,
     result: {
-      summary, pdf, proofPng: resp.proofPng,
+      summary, pdf, proofPng: resp.proofPng, gamutPng: resp.gamutPng ?? null,
       // Una prueba nunca se llama como un archivo validado.
       fileName: summary.state === "ready" ? `${stem}.pdf` : `${stem}-PRUEBA-NO-VALIDADA.pdf`,
       reportFileName: `${stem}-informe-preimpresion.txt`,

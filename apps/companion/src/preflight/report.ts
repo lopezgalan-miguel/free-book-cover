@@ -1,3 +1,4 @@
+import { GAMUT_DELTA_E, GAMUT_WARN_PERCENT } from "./gamut.js";
 import { POINTS_PER_INCH, MIN_PPI } from "./toCmykPdf.js";
 import type { PdfInspection } from "./inspect.js";
 
@@ -11,7 +12,7 @@ export interface PreflightCheck {
 }
 
 export type CheckId =
-  | "input" | "pages" | "size" | "ppi" | "cmyk" | "transparency" | "fonts" | "encryption" | "structure" | "weight" | "ink";
+  | "input" | "pages" | "size" | "ppi" | "cmyk" | "transparency" | "fonts" | "encryption" | "structure" | "weight" | "ink" | "gamut";
 
 export const WEIGHT_TARGET_BYTES = 40 * 1024 * 1024;
 export const WEIGHT_MAX_BYTES = 200 * 1024 * 1024;
@@ -39,12 +40,14 @@ export interface ReportInput {
   maxInkPercent: number;
   expected: { widthIn: number; heightIn: number };
   encoding: string;
+  /** Porcentaje de píxeles que cambian de forma visible al pasar a CMYK; null o ausente si no se midió. */
+  gamutPercent?: number | null;
 }
 
 const st = (bad: boolean): CheckStatus => (bad ? "fail" : "pass");
 
 /** Evalúa la inspección contra la lista de comprobaciones de R-07. Función pura. */
-export function buildReport({ inspection: r, maxInkPercent, expected, encoding }: ReportInput): PreflightReport {
+export function buildReport({ inspection: r, maxInkPercent, expected, encoding, gamutPercent }: ReportInput): PreflightReport {
   const w = expected.widthIn * POINTS_PER_INCH;
   const h = expected.heightIn * POINTS_PER_INCH;
   const sizeBad = Math.abs(r.pageSizePt.width - w) > SIZE_TOLERANCE_PT || Math.abs(r.pageSizePt.height - h) > SIZE_TOLERANCE_PT;
@@ -71,6 +74,10 @@ export function buildReport({ inspection: r, maxInkPercent, expected, encoding }
     { id: "weight", status: weight, params: { bytes: r.fileSizeBytes, target: WEIGHT_TARGET_BYTES, max: WEIGHT_MAX_BYTES } },
     { id: "ink", status: maxInkPercent > INK_LIMIT_PERCENT ? "warn" : "pass", params: { percent: Math.round(maxInkPercent), limit: INK_LIMIT_PERCENT } },
   ];
+  // Gama: aviso, nunca fallo (el color impreso depende de la imprenta).
+  if (gamutPercent != null) {
+    checks.push({ id: "gamut", status: gamutPercent > GAMUT_WARN_PERCENT ? "warn" : "pass", params: { percent: Math.round(gamutPercent * 10) / 10, threshold: GAMUT_DELTA_E } });
+  }
   return {
     ok: checks.every((c) => c.status !== "fail"),
     checks,

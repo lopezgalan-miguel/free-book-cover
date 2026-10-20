@@ -8,7 +8,7 @@ import { kdpReview } from "./review.js";
 // companion (sobre el PDF final). «Listo para KDP» solo si ninguna falla y el companion ha inspeccionado el PDF.
 export type CheckStatus = "pass" | "warn" | "fail";
 export type CompanionCheckId =
-  | "input" | "pages" | "size" | "ppi" | "cmyk" | "transparency" | "fonts" | "encryption" | "structure" | "weight" | "ink";
+  | "input" | "pages" | "size" | "ppi" | "cmyk" | "transparency" | "fonts" | "encryption" | "structure" | "weight" | "ink" | "gamut";
 export type PreflightCheckId = CompanionCheckId | "project" | "resolution" | "review";
 
 export interface PreflightCheck {

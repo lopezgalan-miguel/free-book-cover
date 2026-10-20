@@ -4,6 +4,7 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { inspectPdf } from "./inspect.js";
 import { measureMaxInk } from "./ink.js";
+import { gamutMap } from "./gamut.js";
 import { renderProof } from "./proof.js";
 import { WEIGHT_TARGET_BYTES, buildReport, inputFailureReport, type PreflightReport } from "./report.js";
 import { PreflightInputError, toCmykPdf, type ImageEncoding } from "./toCmykPdf.js";
@@ -21,6 +22,8 @@ export interface PreflightResult {
   pdfPath: string | null;
   /** Prueba visual PNG (sRGB) del PDF CMYK. */
   proof: Buffer | null;
+  /** Mapa PNG de los colores que cambian al imprimir (tamaño de la prueba). */
+  gamut: Buffer | null;
   /** Directorio temporal a borrar con `dispose`. */
   dispose(): Promise<void>;
 }
@@ -42,10 +45,11 @@ export interface PreflightSteps {
   inspect: typeof inspectPdf;
   measureInk: typeof measureMaxInk;
   proof: typeof renderProof;
+  gamut: typeof gamutMap;
 }
 
 export const defaultPreflightSteps: PreflightSteps = {
-  flatten: flattenOpaque, toPdf: toCmykPdf, inspect: inspectPdf, measureInk: measureMaxInk, proof: renderProof,
+  flatten: flattenOpaque, toPdf: toCmykPdf, inspect: inspectPdf, measureInk: measureMaxInk, proof: renderProof, gamut: gamutMap,
 };
 
 /** Cadena completa: PNG -> PDF CMYK (Flate; JPEG si pasa del objetivo de peso) -> inspección -> tinta -> prueba visual. */
@@ -66,9 +70,11 @@ export async function runPreflight(req: PreflightRequest, steps: PreflightSteps 
       inspection = await steps.inspect(pdfPath);
     }
     const [maxInkPercent, proof] = await Promise.all([steps.measureInk(pdfPath), steps.proof(pdfPath)]);
-    return { report: buildReport({ inspection, maxInkPercent, expected, encoding }), pdfPath, proof, dispose };
+    // Gama: la imagen enviada (RGB) frente a la prueba del PDF CMYK.
+    const gamut = await steps.gamut(image, proof);
+    return { report: buildReport({ inspection, maxInkPercent, expected, encoding, gamutPercent: gamut.percent }), pdfPath, proof, gamut: gamut.png, dispose };
   } catch (e) {
-    if (e instanceof PreflightInputError) return { report: inputFailureReport(expected, e.message), pdfPath: null, proof: null, dispose };
+    if (e instanceof PreflightInputError) return { report: inputFailureReport(expected, e.message), pdfPath: null, proof: null, gamut: null, dispose };
     await dispose();
     throw e;
   }

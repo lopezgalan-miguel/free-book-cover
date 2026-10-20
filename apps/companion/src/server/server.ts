@@ -150,7 +150,9 @@ export async function startServer(opts: ServerOptions): Promise<CompanionServer>
           void r.dispose();
         }
       } else void result.dispose();
-      return send(res, 200, { id, report: result.report, proofPng: result.proof ? result.proof.toString("base64") : null }, cors);
+      return send(res, 200, {
+        id, report: result.report, proofPng: result.proof ? result.proof.toString("base64") : null, gamutPng: result.gamut ? result.gamut.toString("base64") : null,
+      }, cors);
     }
 
     const m = req.method === "GET" ? /^\/preflight\/([\w-]+)\/pdf$/.exec(url.pathname) : null;

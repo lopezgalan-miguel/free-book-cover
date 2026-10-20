@@ -13,6 +13,7 @@ const steps = (sizes: number[]): PreflightSteps => ({
   inspect: vi.fn(async () => inspection(sizes.shift()!)),
   measureInk: vi.fn(async () => 250),
   proof: vi.fn(async () => Buffer.from("png")),
+  gamut: vi.fn(async () => ({ percent: 0, maxDeltaE: 0, png: Buffer.from("map") })),
 });
 const req = { image: Buffer.from("x"), widthIn: 12, heightIn: 9 };
 

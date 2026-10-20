@@ -49,6 +49,7 @@ Valores CMYK leídos del flujo de la imagen:
 ## Decisiones de la entrega 7
 
 - **Tinta total máxima:** se mide en el inspector renderizando el PDF final a CMYK (`gs -sDEVICE=pamcmyk32`, 150 ppp) y tomando la suma C+M+Y+K máxima por píxel. Umbral **300 %**; superarlo es un **aviso**, no bloquea «listo para KDP». El negro puro (296 %) queda justo por debajo. Se mantiene `default_cmyk.icc`.
+- **Colores que cambian al imprimir (gama):** se compara la imagen enviada (sRGB) con la prueba visual del PDF CMYK (Ghostscript a sRGB, 100 ppp), píxel a píxel en Lab D65 (ΔE76). Los píxeles con **ΔE > 10** se cuentan y se pintan en magenta en un mapa (`gamutPng` en la respuesta de `/preflight`; en el editor, interruptor «Ver colores que cambian al imprimir»). Más del **1 %** de la cubierta es un **aviso**, nunca un fallo: el resultado real depende del perfil de la imprenta de KDP. No hay ajuste automático de «rojo imprimible».
 - **Prueba visual (R-07):** el PDF CMYK se rasteriza de nuevo con `gs -sDEVICE=png16m -r100` y el PNG vuelve al editor junto al informe, para comparar con el diseño.
 - **Entrada desde el navegador:** el canvas exporta PNG RGBA; se acepta si el alfa es 255 en todos los píxeles y se aplana. Si hay alfa real se rechaza (informe `input`).
 - **Peso:** se genera con Flate; si pasa de 40 MB se regenera con JPEG (QFactor 0,15). Aviso por encima de 40 MB y fallo por encima de 200 MB.

@@ -209,7 +209,7 @@ describe("tope de la cola de preimpresión", () => {
     await s.close();
     s = await startServer({
       token: TOKEN, allowedOrigins: [ORIGIN], port: 0, maxQueue: 2,
-      preflight: async () => { calls.push(1); await gate; return { report: { ok: true, checks: [], measured: { pageSizePt: null, expectedSizePt: { width: 1, height: 1 }, minPpi: 300, bytes: 1, maxInkPercent: 1, encoding: "flate" } }, pdfPath: null, proof: null, dispose: async () => undefined }; },
+      preflight: async () => { calls.push(1); await gate; return { report: { ok: true, checks: [], measured: { pageSizePt: null, expectedSizePt: { width: 1, height: 1 }, minPpi: 300, bytes: 1, maxInkPercent: 1, encoding: "flate" } }, pdfPath: null, proof: null, gamut: null, dispose: async () => undefined }; },
     });
     const post = () => fetch(`${s.url}/preflight?widthIn=1&heightIn=1`, { method: "POST", body: "x", headers: { authorization: `Bearer ${TOKEN}` } });
     const a = post();

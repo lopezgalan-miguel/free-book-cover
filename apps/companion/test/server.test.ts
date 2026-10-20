@@ -19,12 +19,12 @@ beforeAll(async () => {
     token: "secreto", allowedOrigins: [ORIGIN], port: 0,
     preflight: vi.fn(async ({ image, widthIn, heightIn }): Promise<PreflightResult> => {
       calls.push({ size: image.length, widthIn, heightIn });
-      if (image.toString() === "mal") return { report: inputFailureReport({ widthIn, heightIn }, "x"), pdfPath: null, proof: null, dispose: async () => void disposed.push("fail") };
+      if (image.toString() === "mal") return { report: inputFailureReport({ widthIn, heightIn }, "x"), pdfPath: null, proof: null, gamut: null, dispose: async () => void disposed.push("fail") };
       const p = join(dir, `${calls.length}.pdf`);
       await writeFile(p, "%PDF-fake");
       return {
         report: { ok: true, checks: [], measured: { pageSizePt: null, expectedSizePt: { width: 1, height: 1 }, minPpi: 300, bytes: 9, maxInkPercent: 1, encoding: "flate" } },
-        pdfPath: p, proof: Buffer.from("PNG"), dispose: async () => void disposed.push(p),
+        pdfPath: p, proof: Buffer.from("PNG"), gamut: Buffer.from("MAP"), dispose: async () => void disposed.push(p),
       };
     }),
   });
@@ -81,6 +81,7 @@ describe("servidor local del companion", () => {
     const j = await r.json();
     expect(j.report.ok).toBe(true);
     expect(Buffer.from(j.proofPng, "base64").toString()).toBe("PNG");
+    expect(Buffer.from(j.gamutPng, "base64").toString()).toBe("MAP");
     expect(calls.at(-1)).toEqual({ size: 9, widthIn: 12.4752, heightIn: 9.25 });
     const pdf = await f(`/preflight/${j.id}/pdf`);
     expect(pdf.headers.get("content-type")).toBe("application/pdf");

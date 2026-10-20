@@ -56,6 +56,11 @@ test("tapa dura: un fondo pequeño la deshabilita; con fondo liso se aplica con 
   await dialog.getByRole("button", { name: "Generar PDF" }).click();
   await expect(dialog.getByTestId("pdf-report")).toHaveAttribute("data-state", "ready", { timeout: 120_000 });
   await expect(dialog.getByTestId("check-size")).toHaveAttribute("data-status", "pass");
+  // Gama medida por el companion real (Ghostscript + sharp): un azul oscuro liso no cambia al imprimir.
+  await expect(dialog.getByTestId("check-gamut")).toHaveAttribute("data-status", "pass");
+  const proofSrc = await dialog.getByTestId("pdf-proof").getAttribute("src");
+  await dialog.getByRole("switch", { name: "Ver colores que cambian al imprimir" }).click();
+  await expect(dialog.getByTestId("pdf-proof")).not.toHaveAttribute("src", proofSrc!);
   const [dl] = await Promise.all([page.waitForEvent("download"), dialog.getByTestId("pdf-download").click()]);
   const info = execFileSync("pdfinfo", [(await dl.path())!], { encoding: "utf8" });
   const m = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(info)!;

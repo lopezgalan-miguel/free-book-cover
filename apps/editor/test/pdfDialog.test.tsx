@@ -112,6 +112,20 @@ describe("opción PDF del modal de exportación", () => {
     await user.click(within(dialog).getByTestId("pdf-download-report"));
     expect(download).toHaveBeenLastCalledWith(expect.any(Blob), expect.stringMatching(/-informe-preimpresion\.txt$/));
   });
+  it("aviso de gama: el informe lo explica y el interruptor cambia la prueba por el mapa de colores que cambian", async () => {
+    const user = userEvent.setup();
+    const c = client("connected", okReport({ checks: [{ id: "gamut", status: "warn", params: { percent: 4.3, threshold: 10 } }] }));
+    c.preflight.mockResolvedValue({ id: "r1", report: okReport({ checks: [{ id: "gamut", status: "warn", params: { percent: 4.3, threshold: 10 } }] }), proofPng: "UFJPT0Y=", gamutPng: "R0FNVVQ=" });
+    await mount(c);
+    const dialog = await open(user);
+    await user.click(await enabledPdf(dialog));
+    await user.click(within(dialog).getByRole("button", { name: "Generar PDF" }));
+    await within(dialog).findByTestId("pdf-report");
+    expect(within(dialog).getByTestId("check-gamut")).toHaveTextContent("4.3 %");
+    expect(within(dialog).getByTestId("pdf-proof")).toHaveAttribute("src", "data:image/png;base64,UFJPT0Y=");
+    await user.click(within(dialog).getByRole("switch", { name: "Ver colores que cambian al imprimir" }));
+    expect(within(dialog).getByTestId("pdf-proof")).toHaveAttribute("src", "data:image/png;base64,R0FNVVQ=");
+  });
   it("con un fallo: «NO validado» y la descarga se ofrece como prueba", async () => {
     const user = userEvent.setup();
     const { download } = await mount(client("connected", okReport({ ok: false, checks: [{ id: "cmyk", status: "fail", params: { space: "rgb" } }] })));
