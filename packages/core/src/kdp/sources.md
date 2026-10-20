@@ -1,4 +1,4 @@
-# Fuentes y valores KDP / plataformas — contrastados el 2026-10-02 (cortes y máximos de páginas: 2026-10-19)
+# Fuentes y valores KDP / plataformas — contrastados el 2026-10-02 (cortes y máximos de páginas: 2026-10-19; tapa dura: 2026-10-20)
 
 Volver a contrastar antes de cada versión. Si hay discrepancias, manda la plantilla oficial del [calculador de cubiertas](https://kdp.amazon.com/cover-calculator).
 
@@ -42,6 +42,30 @@ Mínimo de 24 páginas (72 en color estándar). Máximo por corte y papel (B/N b
 Fuente: [Groundwood Paper](https://kdp.amazon.com/en_US/help/topic/G99WKT9FARBGHBJF)
 
 - No se publica el grosor por página. A partir de 350 páginas (crema) o 525 (blanco) el lomo cambia. **No se admite en v1.**
+
+## KDP tapa dura (case laminate) — contrastada el 2026-10-20
+
+Fuentes:
+- Plantillas oficiales generadas por KDP `CASE_LAMINATE_5.500x8.500_116_BW_CREAM` y `CASE_LAMINATE_5.500x8.500_128_BW_WHITE`: medidas leídas de los vectores del PDF (rectángulos de corte y zona segura, líneas de pliegue y bisagra, recuadro del código de barras).
+- Configuración embebida de la [calculadora de cubiertas](https://kdp.amazon.com/en_US/cover-calculator) (`CASE_LAMINATE`): cortes por defecto y páginas mínimas y máximas.
+- [Create a Hardcover Cover](https://kdp.amazon.com/en_US/help/topic/GDTKFJPNQCBTMRV6), [Hardcover](https://kdp.amazon.com/en_US/help/topic/GAVW3FZZAKA2KY3B) y [Hardcover Print Elements](https://kdp.amazon.com/en_US/help/topic/GKZVNAAFYWVKZWL8).
+
+| Dato | Valor | Origen |
+| --- | --- | --- |
+| Cortes | 5,5 × 8,5; 6 × 9; 6,14 × 9,21; 7 × 10; 8,25 × 11 | calculadora (`HARDCOVER_TRIMS`) |
+| Páginas | 76–550 | calculadora; la ayuda dice 75–550 (se usa 76, lo que acepta el generador de plantillas) |
+| Papel | B/N blanco, B/N crema, color prémium | sin color estándar en tapa dura |
+| Solapa (*wrap*) | 15 mm (0,5906 in) en los cuatro lados | plantilla; la ayuda escribe «0,51″ (15 mm)», que no cuadra con 15 mm |
+| Tapa de cartón | corte + 5 mm de ancho, + 6 mm de alto | plantilla |
+| Lomo | páginas × grosor del papel + 4,8 mm | plantilla (116 crema: 0,479 in; 128 blanco: 0,477 in) |
+| Bisagra | 10 mm (0,3937 in) a cada lado del lomo | plantilla y ayuda («0.4″ (10 mm)») |
+| Zona segura | tapa − 0,125 in; en el lado del lomo, hasta la línea de bisagra | plantilla |
+| Texto del lomo | lomo − 0,0625 in a cada lado | plantilla |
+| Código de barras | 2 × 1,2 in; a 0,25 in de la bisagra y 0,375 in del borde inferior de la tapa | plantilla |
+| Resolución | **300 ppp en todas las imágenes** (regla del producto, más estricta que el aviso de tapa blanda) | decisión del usuario, 2026-10-20 |
+
+- `printSetup.binding = "hardcover"`; sin `binding`, tapa blanda (documentos anteriores). `kdpLayout` devuelve las tapas como `back`/`front`, la solapa como `bleedIn` y las bisagras en `hinges`.
+- La calculadora no expone su fórmula (la pide al servidor). Los otros cuatro cortes usan las mismas medidas en milímetros; **falta contrastarlos con su plantilla** (ver `VERIFICACION.md`).
 
 ## Redes sociales (imagen estática)
 
