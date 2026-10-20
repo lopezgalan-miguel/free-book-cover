@@ -352,6 +352,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
           </div>
         )}
         <GenerateTexture
+          key={el.texture?.assetId ?? "none"}
           initial={generatorOptionsOf(doc.assets.find((a) => a.id === el.texture?.assetId))}
           onGenerate={async (opts) => {
             const r = await generateTextureAsset(store, opts);

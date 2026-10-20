@@ -275,4 +275,25 @@ describe("panel de texto: fuentes", () => {
     act(() => store.select("A"));
     await waitFor(() => expect(scale()).toBe("7"));
   });
+
+  it("si cambia la textura de la capa seleccionada, el generador muestra los ajustes de la nueva", async () => {
+    const { store } = await mount();
+    const gen = (id: string, scale: number, color: string) => ({ id, kind: "image" as const, mimeType: "image/png", metadata: { widthPx: 8, heightPx: 8, generator: { kind: "cracked-marble", seed: 7, scale, color } } });
+    store.dispatch({ type: "addAsset", asset: gen("g1", 7, "#e4dfd9") });
+    store.dispatch({ type: "addAsset", asset: gen("g2", 3, "#112233") });
+    store.dispatch({
+      type: "addElement", element: {
+        id: "A", type: "text", x: 1, y: 1, width: 3, height: 1, rotation: 0, zIndex: 0, visible: true, texture: { assetId: "g1" },
+        runs: [{ text: "A", fontFamily: "Lora", fontSizePt: 24, weight: 500, italic: false, underline: false, uppercase: false, color: "#f4efe6" }],
+        align: "center", lineHeight: 1.2, letterSpacing: 0.02,
+        shadow: { on: false, intensity: 40 }, outline: { on: false, width: 3, color: "#1a1712" }, curvature: 0,
+      },
+    });
+    const scale = () => (screen.getByLabelText("Escala") as HTMLInputElement).value;
+    act(() => store.select("A"));
+    await waitFor(() => expect(scale()).toBe("7"));
+    store.dispatch({ type: "updateElement", id: "A", props: { texture: { assetId: "g2" } } });
+    await waitFor(() => expect(scale()).toBe("3"));
+    expect((screen.getByLabelText("Color base") as HTMLInputElement).value).toBe("#112233");
+  });
 });
