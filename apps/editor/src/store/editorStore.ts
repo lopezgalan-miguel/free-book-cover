@@ -1,5 +1,5 @@
 import {
-  canRedo, endMerge, canUndo, createHistory, createProject, execute, redo as redoHistory, undo as undoHistory,
+  amendPresent, canRedo, endMerge, canUndo, createHistory, createProject, execute, redo as redoHistory, undo as undoHistory,
   type Command, type LimitError, type CommandError, type ElementOverride, type History, type Project,
 } from "@free-book-cover/core";
 import type { ProjectStorage, StoredAsset } from "../storage/projectStorage";
@@ -105,6 +105,13 @@ export function createEditorStore(deps: EditorDeps) {
     set({ history: r.history, status: "idle" });
     return { ok: true, revision: r.history.present.revision };
   }
+  // Ajuste automático (caja de texto): aplica los comandos al presente sin abrir un paso de deshacer.
+  function amend(cmds: Command[]): boolean {
+    const r = amendPresent(cell.get().history, cmds);
+    if (!r.ok) return false;
+    set({ history: r.history, status: "idle" });
+    return true;
+  }
   function undo() {
     const r = undoHistory(cell.get().history, doc().revision);
     if (r.ok) set({ history: r.history, status: "idle" });
@@ -146,7 +153,7 @@ export function createEditorStore(deps: EditorDeps) {
     getState: cell.get, subscribe: cell.subscribe, newId: deps.newId,
     canUndo: () => canUndo(cell.get().history), canRedo: () => canRedo(cell.get().history),
     ...viewApi, ...history, ...assets, ...clipboard, ...session,
-    editGeometry, editBackgroundLayout, setName, reportError, dismissError,
+    amend, editGeometry, editBackgroundLayout, setName, reportError, dismissError,
   };
 }
 

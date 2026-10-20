@@ -142,7 +142,7 @@ export function LayersPanel() {
         }
       >
         {images.length === 0 ? (
-          <p className="text-xs text-muted">{t("bgNone")}</p>
+          <p className="text-xs text-muted">{t("imagesNone")}</p>
         ) : (
           <ul className="flex flex-col gap-[5px]">
             {images.map((l) => {

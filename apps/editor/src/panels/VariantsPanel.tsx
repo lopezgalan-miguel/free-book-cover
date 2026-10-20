@@ -3,7 +3,7 @@ import {
   DIGITAL_PRESETS, MAX_TARGET_PX, MAX_VARIANT_ZOOM, customTarget, elementVisibility, isResolvedTarget, overridesOf, targetFromPreset, visibleArea,
   type Element, type ResolvedTarget, type ViewOverride,
 } from "@free-book-cover/core";
-import { browserMeasure, textHeightIn } from "../canvas/measure";
+import { browserMeasure, fitScaledText } from "../canvas/measure";
 import { useI18n } from "../i18n";
 import { useDisplayDoc, useEditorState, useStore } from "../store/react";
 import { gcdRatio, presetLabel, targetLabel } from "./variantLabels";
@@ -115,8 +115,8 @@ function ActiveVariant({ target }: { target: ResolvedTarget }) {
     const next = pct / 100;
     const prev = selOv?.fontScale ?? 1;
     const m = browserMeasure();
-    const height = m ? textHeightIn({ ...sel, runs: sel.runs.map((r) => ({ ...r, fontSizePt: (r.fontSizePt * next) / prev })) }, m) : undefined;
-    store.dispatch({ type: "setVariantElement", targetId: target.id, elementId: sel.id, props: { fontScale: next, ...(height !== undefined ? { height } : {}) } });
+    const fit = m ? fitScaledText(sel, next, prev, m) : undefined;
+    store.dispatch({ type: "setVariantElement", targetId: target.id, elementId: sel.id, props: { fontScale: next, ...fit } });
   };
 
   return (

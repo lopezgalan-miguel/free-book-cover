@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { TextElement } from "@free-book-cover/core";
 import { App } from "../src/App";
@@ -251,5 +251,49 @@ describe("panel de texto: fuentes", () => {
     const broken = await mount({ reuse: true, env: { addFace: async () => { throw new Error("no"); }, loadCatalog: async () => true } });
     await waitFor(() => expect(broken.fonts.stateOf("Mia")).toBe("failed"));
     expect(await screen.findByTestId("font-warning")).toHaveTextContent("«Mia»");
+  });
+
+  it("al volver a una capa con mármol generado, el generador muestra sus ajustes", async () => {
+    const { store } = await mount();
+    const base = (id: string): TextElement => ({
+      id, type: "text", x: 1, y: 1, width: 3, height: 1, rotation: 0, zIndex: 0, visible: true,
+      runs: [{ text: id, fontFamily: "Lora", fontSizePt: 24, weight: 500, italic: false, underline: false, uppercase: false, color: "#f4efe6" }],
+      align: "center", lineHeight: 1.2, letterSpacing: 0.02,
+      shadow: { on: false, intensity: 40 }, outline: { on: false, width: 3, color: "#1a1712" }, curvature: 0,
+    });
+    store.dispatch({ type: "addAsset", asset: { id: "gen", kind: "image", mimeType: "image/png", metadata: { widthPx: 8, heightPx: 8, generator: { kind: "cracked-marble", seed: 7, scale: 7, color: "#e4dfd9" } } } });
+    store.dispatch({ type: "addElement", element: { ...base("A"), texture: { assetId: "gen" } } });
+    store.dispatch({ type: "addElement", element: base("B") });
+    const scale = () => (screen.getByLabelText("Escala") as HTMLInputElement).value;
+    const color = () => (screen.getByLabelText("Color base") as HTMLInputElement).value;
+    act(() => store.select("A"));
+    await waitFor(() => expect(scale()).toBe("7"));
+    expect(color()).toBe("#e4dfd9");
+    act(() => store.select("B"));
+    await waitFor(() => expect(scale()).toBe("10"));
+    expect(color()).toBe("#f4cfb3");
+    act(() => store.select("A"));
+    await waitFor(() => expect(scale()).toBe("7"));
+  });
+
+  it("si cambia la textura de la capa seleccionada, el generador muestra los ajustes de la nueva", async () => {
+    const { store } = await mount();
+    const gen = (id: string, scale: number, color: string) => ({ id, kind: "image" as const, mimeType: "image/png", metadata: { widthPx: 8, heightPx: 8, generator: { kind: "cracked-marble", seed: 7, scale, color } } });
+    store.dispatch({ type: "addAsset", asset: gen("g1", 7, "#e4dfd9") });
+    store.dispatch({ type: "addAsset", asset: gen("g2", 3, "#112233") });
+    store.dispatch({
+      type: "addElement", element: {
+        id: "A", type: "text", x: 1, y: 1, width: 3, height: 1, rotation: 0, zIndex: 0, visible: true, texture: { assetId: "g1" },
+        runs: [{ text: "A", fontFamily: "Lora", fontSizePt: 24, weight: 500, italic: false, underline: false, uppercase: false, color: "#f4efe6" }],
+        align: "center", lineHeight: 1.2, letterSpacing: 0.02,
+        shadow: { on: false, intensity: 40 }, outline: { on: false, width: 3, color: "#1a1712" }, curvature: 0,
+      },
+    });
+    const scale = () => (screen.getByLabelText("Escala") as HTMLInputElement).value;
+    act(() => store.select("A"));
+    await waitFor(() => expect(scale()).toBe("7"));
+    store.dispatch({ type: "updateElement", id: "A", props: { texture: { assetId: "g2" } } });
+    await waitFor(() => expect(scale()).toBe("3"));
+    expect((screen.getByLabelText("Color base") as HTMLInputElement).value).toBe("#112233");
   });
 });

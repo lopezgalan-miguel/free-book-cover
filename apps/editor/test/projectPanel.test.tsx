@@ -44,6 +44,27 @@ describe("diálogo de proyecto (I-5)", () => {
     store.undo();
     expect(store.getState().history.present.name).toBe("");
   });
+  it("Escape en el nombre lo guarda y cierra el diálogo", async () => {
+    const user = userEvent.setup();
+    const store = await mount();
+    const dlg = await openDialog(user);
+    await user.click(within(dlg).getByRole("button", { name: "Nuevo proyecto" }));
+    await waitFor(() => expect(store.getState().history.present.name).toBe(""));
+    await user.type(within(dlg).getByLabelText("Nombre del proyecto"), "El lamento del terror (réplica)");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Proyecto" })).toBeNull();
+    expect(store.getState().history.present.name).toBe("El lamento del terror (réplica)");
+  });
+  it("Nuevo proyecto y luego nombre: se guarda al cerrar con Cerrar", async () => {
+    const user = userEvent.setup();
+    const store = await mount();
+    const dlg = await openDialog(user);
+    await user.click(within(dlg).getByRole("button", { name: "Nuevo proyecto" }));
+    await waitFor(() => expect(store.getState().history.present.name).toBe(""));
+    await user.type(within(dlg).getByLabelText("Nombre del proyecto"), "Otro título");
+    await user.click(within(dlg).getByRole("button", { name: "Cerrar" }));
+    expect(store.getState().history.present.name).toBe("Otro título");
+  });
   it("crea un proyecto nuevo y abre de nuevo el anterior desde la lista", async () => {
     const user = userEvent.setup();
     const store = await mount();

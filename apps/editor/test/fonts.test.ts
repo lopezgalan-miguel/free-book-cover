@@ -125,6 +125,19 @@ describe("importFont", () => {
     const clash = await importFont(store, reg, file("Lora.otf", Uint8Array.from([..."OTTO"].map((c) => c.charCodeAt(0)))));
     expect(clash).toMatchObject({ ok: true, family: "Lora 2" });
   });
+  it("una subida correcta quita el aviso de fuente anterior", async () => {
+    const { store, reg } = await mk(fakeEnv());
+    await importFont(store, reg, file("a.woff", ttf()));
+    expect(store.getState().error).toEqual({ kind: "unsupported_font" });
+    expect(await importFont(store, reg, file("Mi Fuente.ttf", ttf(10)))).toMatchObject({ ok: true });
+    expect(store.getState().error).toBeNull();
+  });
+  it("una subida correcta no quita errores de otro tipo", async () => {
+    const { store, reg } = await mk(fakeEnv());
+    store.reportError({ kind: "save" });
+    expect(await importFont(store, reg, file("Mi Fuente.ttf", ttf(10)))).toMatchObject({ ok: true });
+    expect(store.getState().error).toEqual({ kind: "save" });
+  });
   it("rechaza extensiones y firmas no admitidas sin guardar nada", async () => {
     const { store, reg } = await mk(fakeEnv());
     expect(await importFont(store, reg, file("a.woff", ttf()))).toEqual({ ok: false, reason: "unsupported" });

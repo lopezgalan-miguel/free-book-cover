@@ -48,6 +48,9 @@ export async function importFont(store: FontPort, registry: FontRegistry, file: 
     const e = store.getState().error;
     return { ok: false, reason: e?.kind === "limit" ? "limit" : "command" };
   }
+  // Una subida correcta quita el aviso de fuente anterior; los demás errores se quedan.
+  const prev = store.getState().error;
+  if (prev && (prev.kind === "unsupported_font" || prev.kind === "font_load_failed" || (prev.kind === "limit" && prev.error.kind === "font_too_large"))) store.dismissError();
   return { ok: true, family, assetId: asset.id };
 }
 

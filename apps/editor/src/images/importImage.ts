@@ -31,6 +31,12 @@ export const browserThumbnail: ThumbnailMaker = async (file, maxPx) => {
   }
 };
 
+// Una subida correcta quita el aviso de imagen anterior; los demás errores se quedan.
+function clearImageError(store: ImagePort): void {
+  const e = store.getState().error;
+  if (e && (e.kind === "unsupported_image" || (e.kind === "limit" && (e.error.kind === "image_too_large" || e.error.kind === "image_too_many_megapixels")))) store.dismissError();
+}
+
 // Importa una imagen: cabecera -> límites (80 Mpx sin decodificar) -> original -> miniatura -> colocación.
 export async function importImage(
   store: ImagePort,
@@ -38,6 +44,7 @@ export async function importImage(
   target: ImportTarget,
   makeThumbnail: ThumbnailMaker = browserThumbnail,
   expectedRevision?: number,
+  extraMetadata?: Record<string, unknown>,
 ): Promise<ImportResult> {
   const head = new Uint8Array(await file.slice(0, HEADER_BYTES).arrayBuffer());
   const header = readImageHeader(head);
@@ -56,6 +63,7 @@ export async function importImage(
       ...(header.orientation ? { orientation: header.orientation } : {}),
       sizeBytes: file.size,
       ...("name" in file && typeof file.name === "string" ? { name: file.name } : {}),
+      ...(extraMetadata ?? {}),
     },
   };
   const stored = new Blob([file], { type: header.mimeType });
@@ -65,11 +73,14 @@ export async function importImage(
   const thumb = await makeThumbnail(file, THUMB_MAX_PX);
   if (thumb) await store.addDerivedBlob(thumbId(asset.id), thumb);
 
-  if (target === "asset") return { ok: true, assetId: asset.id };
+  if (target === "asset") {
+    clearImageError(store);
+    return { ok: true, assetId: asset.id };
+  }
   if (target === "background") {
-    return store.dispatch({ type: "setBackground", background: { assetId: asset.id } })
-      ? { ok: true, assetId: asset.id }
-      : { ok: false, reason: "command" };
+    if (!store.dispatch({ type: "setBackground", background: { assetId: asset.id } })) return { ok: false, reason: "command" };
+    clearImageError(store);
+    return { ok: true, assetId: asset.id };
   }
   const { widthIn, heightIn } = store.getState().history.present.canvas;
   // Caja con la proporción de la imagen, hasta el 80 % del lienzo y centrada.
@@ -83,5 +94,6 @@ export async function importImage(
   };
   if (!store.dispatch({ type: "addElement", element })) return { ok: false, reason: "command" };
   store.select(element.id);
+  clearImageError(store);
   return { ok: true, assetId: asset.id, elementId: element.id };
 }

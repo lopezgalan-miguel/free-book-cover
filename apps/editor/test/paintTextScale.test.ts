@@ -12,7 +12,7 @@ const item = (scaleX?: number): TextItem => ({
     ...(scaleX !== undefined ? { scaleX } : {}),
   },
   // La maquetación ya viene estrechada: 4 letras de 10 px + 4 × 4 px de espaciado.
-  layout: { heightPx: 40, glyphs: null, lines: [{ top: 0, height: 40, baseline: 32, width: 56, pieces: [{ text: "Hola", x: 10, width: 56, style }] }] },
+  layout: { heightPx: 40, minWidthPx: 80, glyphs: null, lines: [{ top: 0, height: 40, baseline: 32, width: 56, pieces: [{ text: "Hola", x: 10, width: 56, style }] }] },
   effects: { shadow: null, outline: null, innerShadow: null },
   texture: null,
   mask: null,

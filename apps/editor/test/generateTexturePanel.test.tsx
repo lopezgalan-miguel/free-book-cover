@@ -2,12 +2,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nProvider } from "../src/i18n";
+import type { TextureOptions } from "@free-book-cover/core";
 import { GenerateTexture } from "../src/panels/TextPanel";
 
 afterEach(cleanup);
-const mount = () => {
+const mount = (initial?: TextureOptions) => {
   const onGenerate = vi.fn(async () => undefined);
-  render(<I18nProvider><GenerateTexture onGenerate={onGenerate} /></I18nProvider>);
+  render(<I18nProvider><GenerateTexture onGenerate={onGenerate} initial={initial ?? null} /></I18nProvider>);
   return onGenerate;
 };
 const generate = () => fireEvent.click(screen.getByRole("button", { name: "Generar textura" }));
@@ -43,5 +44,16 @@ describe("generador de texturas: escala, color y suavizado", () => {
     generate();
     await waitFor(() => expect(onGenerate).toHaveBeenCalled());
     expect(onGenerate).toHaveBeenCalledWith({ kind: "stone", seed: 1 });
+  });
+  it("arranca con los ajustes de la capa", async () => {
+    const initial: TextureOptions = { kind: "cracked-marble", seed: 7, scale: 7, color: "#e4dfd9", soften: 4, cracks: "holes" };
+    const onGenerate = mount(initial);
+    expect((screen.getByLabelText("Semilla") as HTMLInputElement).value).toBe("7");
+    expect((screen.getByLabelText("Escala") as HTMLInputElement).value).toBe("7");
+    expect((screen.getByLabelText("Suavizado") as HTMLInputElement).value).toBe("4");
+    expect((screen.getByLabelText("Color base") as HTMLInputElement).value).toBe("#e4dfd9");
+    generate();
+    await waitFor(() => expect(onGenerate).toHaveBeenCalled());
+    expect(onGenerate).toHaveBeenCalledWith(initial);
   });
 });

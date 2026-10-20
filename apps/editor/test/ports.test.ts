@@ -14,6 +14,7 @@ describe("ImagePort", () => {
       getState: () => ({ history, error: null }) as never,
       newId: () => `id${++n}`,
       reportError: vi.fn(),
+      dismissError: vi.fn(),
       addAsset: vi.fn(async () => true),
       addDerivedBlob: vi.fn(async () => true),
       dispatch: vi.fn(() => true),

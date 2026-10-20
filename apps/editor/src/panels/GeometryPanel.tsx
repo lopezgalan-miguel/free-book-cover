@@ -45,7 +45,7 @@ export function GeometryPanel() {
       </div>
       <div className="mt-2 flex gap-2">
         <NumberField label={t("sizeW")} value={el.width} min={0} step={0.01} onCommit={(width) => width >= 0 && set({ width })} />
-        <NumberField label={t("sizeH")} value={el.height} min={0} step={0.01} onCommit={(height) => height >= 0 && set({ height })} />
+        <NumberField label={t("sizeH")} value={el.height} min={0} {...(el.type === "text" ? { disabled: true, title: t("sizeHAuto") } : {})} step={0.01} onCommit={(height) => height >= 0 && set({ height })} />
       </div>
       <div className="mt-2 flex gap-2">
         <NumberField label={t("rotation")} value={el.rotation} step={1} onCommit={(rotation) => set({ rotation })} />

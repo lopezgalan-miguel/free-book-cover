@@ -39,6 +39,20 @@ describe("importImage", () => {
     expect(loaded.ok && loaded.assets.map((a) => a.id).sort()).toEqual(["id2", thumbId("id2")]);
   });
 
+  it("una subida correcta quita el aviso de imagen anterior", async () => {
+    const { store } = await mk();
+    await importImage(store, new Blob([new Uint8Array([1, 2, 3, 4])]), "layer", thumb);
+    expect(store.getState().error).toEqual({ kind: "unsupported_image" });
+    expect((await importImage(store, png(100, 100), "layer", thumb)).ok).toBe(true);
+    expect(store.getState().error).toBeNull();
+  });
+  it("una subida correcta no quita errores de otro tipo", async () => {
+    const { store } = await mk();
+    store.reportError({ kind: "save" });
+    expect((await importImage(store, png(100, 100), "layer", thumb)).ok).toBe(true);
+    expect(store.getState().error).toEqual({ kind: "save" });
+  });
+
   it("añade una capa de imagen con la proporción del original y la selecciona", async () => {
     const { store } = await mk();
     const r = await importImage(store, png(1000, 2000), "layer", thumb);

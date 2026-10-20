@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ShapeElement } from "@free-book-cover/core";
+import type { ImageElement, ShapeElement, TextElement } from "@free-book-cover/core";
 import { App } from "../src/App";
 import { I18nProvider } from "../src/i18n";
 import { createEditorStore } from "../src/store/editorStore";
@@ -211,5 +211,27 @@ describe("U-10 y U-12 detalles", () => {
     await user.click(await within(dialog).findByRole("button", { name: "Abrir Primero" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(doc(store).name).toBe("Primero");
+  });
+});
+
+describe("E-04 alto del texto", () => {
+  const text: TextElement = {
+    id: "t", type: "text", x: 1, y: 1, width: 3, height: 1, rotation: 0, zIndex: 0, visible: true,
+    runs: [{ text: "Hola", fontFamily: "Georgia", fontSizePt: 24, weight: 400, italic: false, underline: false, uppercase: false, color: "#ffffff" }],
+    align: "left", lineHeight: 1.2, letterSpacing: 0, shadow: { on: false, intensity: 40 }, outline: { on: false, width: 3, color: "#000000" }, curvature: 0,
+  };
+  const image: ImageElement = { id: "i", type: "image", assetRef: { assetId: "a" }, fit: "cover", x: 1, y: 1, width: 2, height: 2, rotation: 0, zIndex: 1, visible: true, crop: { x: 0, y: 0, width: 1, height: 1 } };
+  it("Alto (in) está deshabilitado en texto y habilitado en imagen", async () => {
+    const store = await mount();
+    store.dispatch({ type: "addAsset", asset: { id: "a", kind: "image", mimeType: "image/png", metadata: {} } });
+    expect(store.dispatch({ type: "addElement", element: text })).toBe(true);
+    expect(store.dispatch({ type: "addElement", element: image })).toBe(true);
+    act(() => store.select("t"));
+    const h = await screen.findByLabelText("Alto (in)");
+    expect(h).toBeDisabled();
+    expect(h).toHaveAttribute("title", "El alto lo marca el texto");
+    expect(screen.getByLabelText("Ancho (in)")).toBeEnabled();
+    act(() => store.select("i"));
+    expect(screen.getByLabelText("Alto (in)")).toBeEnabled();
   });
 });

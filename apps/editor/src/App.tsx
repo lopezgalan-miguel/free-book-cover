@@ -1,3 +1,4 @@
+import { useTextFit } from "./canvas/useTextFit";
 import { useEffect } from "react";
 import { Header } from "./components/Header";
 import { LeftPanel } from "./components/LeftPanel";
@@ -44,6 +45,7 @@ export function App({ store, fonts, exportServices, mcpBridge }: { store: Editor
 // El breakpoint solo elige el contenedor; los paneles son los mismos.
 function Layout() {
   useFontSync();
+  useTextFit();
   useEscapeDeselects();
   useLayerShortcuts();
   return useLayout() === "mobile" ? <MobileLayout /> : <DesktopLayout />;

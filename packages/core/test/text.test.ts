@@ -96,9 +96,17 @@ describe("maquetación", () => {
     expect(l.lines).toHaveLength(1);
     expect(l.lines[0]!.pieces.map((p) => [p.text, p.x, p.style.font.includes("700")])).toEqual([["ab", 0, false], ["cd", 72, true]]);
   });
-  it("una palabra más ancha que la caja se parte en trozos", () => {
-    const l = layoutText(el({ width: 1, runs: [run("abcdef")] }), 72, measure); // 72 px: 2 letras
-    expect(l.lines.map((x) => x.pieces.map((p) => p.text).join(""))).toEqual(["ab", "cd", "ef"]);
+  it("una palabra más ancha que la caja no se parte: ocupa su línea y sobresale", () => {
+    const text = (l: ReturnType<typeof layoutText>) => l.lines.map((x) => x.pieces.map((p) => p.text).join(""));
+    const l = layoutText(el({ width: 1, runs: [run("abcdef")] }), 72, measure); // caja de 72 px, palabra de 216
+    expect(text(l)).toEqual(["abcdef"]);
+    expect(l.minWidthPx).toBe(216);
+    expect(text(layoutText(el({ width: 1, runs: [run("ab abcdef cd")] }), 72, measure))).toEqual(["ab", "abcdef", "cd"]);
+    expect(layoutText(el({ runs: [run("")] }), 72, measure).minWidthPx).toBe(0);
+  });
+  it("minWidthPx sigue la anchura de letra y el espaciado", () => {
+    expect(layoutText(el({ scaleX: 0.5, runs: [run("abcdef")] }), 72, measure).minWidthPx).toBe(108);
+    expect(layoutText(el({ scaleX: 0.5, letterSpacing: 0.1, runs: [run("abcdef")] }), 72, measure).minWidthPx).toBeCloseTo(108 + 6 * 7.2);
   });
   it("alineación, justificado e interlineado", () => {
     const text = [run("ab cd ef")];
