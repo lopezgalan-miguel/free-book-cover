@@ -67,13 +67,16 @@ describe("paintTextItem: efectos", () => {
     afterEach(() => vi.unstubAllGlobals());
     const light = { dx: 0, dy: 5, blur: 2, color: "rgba(255,255,255,0.6)" };
     const dark = { dx: 0, dy: -5, blur: 2, color: "rgba(0,0,0,0.5)" };
+    // Cada OffscreenCanvas creado queda registrado (en orden) para distinguir capa, silueta y lienzos auxiliares.
+    const made: object[] = [];
     const layered = () => {
+      made.length = 0;
       const r = withScale(1);
       const rec = r.ctx as unknown as Record<string, unknown>;
       rec.canvas = { width: 1000, height: 1000 };
       rec.createPattern = () => ({ setTransform: () => undefined });
       rec.getImageData = () => ({ data: new Uint8ClampedArray(4) });
-      vi.stubGlobal("OffscreenCanvas", class { getContext() { return r.ctx; } });
+      vi.stubGlobal("OffscreenCanvas", class { constructor() { made.push(this); } getContext() { return r.ctx; } });
       vi.stubGlobal("DOMMatrix", class { translate() { return this; } scale() { return this; } });
       return r;
     };
@@ -90,15 +93,22 @@ describe("paintTextItem: efectos", () => {
       expect(c.indexOf(light.color)).toBeGreaterThanOrEqual(0);
       expect(c.indexOf(light.color)).toBeLessThan(c.indexOf(dark.color));
     });
-    it("con máscara o textura con huecos las dos pasadas usan la silueta opaca", () => {
+    it("con máscara o textura con huecos, sombra interior y las dos pasadas del bisel usan la misma silueta opaca, no la capa", () => {
       const { ctx, calls } = layered();
       const it0 = item(null);
+      it0.effects.innerShadow = { dx: 0, dy: 4, blur: 6, color: "rgba(1,2,3,1)" } as never;
       it0.effects.bevel = { light, dark };
       it0.mask = maskOf();
       paintTextItem(ctx, it0, new Map([["m", { image: {}, scale: 1 }]]) as never);
-      // La silueta se pinta en negro opaco sin textura: una pasada de relleno "#000".
-      expect(calls.some(([k, v]) => k === "set:fillStyle" && v === "#000")).toBe(true);
-      expect(calls.filter(([k, v]) => k === "set:globalCompositeOperation" && v === "destination-out").length).toBe(2);
+      // El drawImage que sigue a cada destination-out recorta el negativo con la forma de la letra.
+      const shapes = calls.flatMap((c, i) => (c[0] === "set:globalCompositeOperation" && c[1] === "destination-out" && calls[i + 1]?.[0] === "drawImage" ? [calls[i + 1]![1]] : []));
+      expect(shapes.length).toBe(3);
+      expect(new Set(shapes).size).toBe(1);
+      const silhouette = shapes[0] as object;
+      expect(made).toContain(silhouette);
+      // made[0] es la capa principal.
+      expect(silhouette).not.toBe(made[0]);
+      expect(made.indexOf(silhouette)).toBe(1);
     });
     it("el orden es sombra interior, bisel y después máscara", () => {
       const { ctx, calls } = layered();
