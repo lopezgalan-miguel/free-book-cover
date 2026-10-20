@@ -20,7 +20,7 @@ interface Op {
 // de exportación, por eso la forma, la curva, la textura y los efectos coinciden.
 //
 // Con máscara, sombra interior u opacidad, las letras se componen primero en una capa (relleno,
-// recorte y sombra interior) y la capa se vuelca con la sombra exterior: así la sombra es la de la
+// sombra interior y recorte) y la capa se vuelca con la sombra exterior: así la sombra es la de la
 // letra ya recortada y la opacidad no deja ver la sombra a través del relleno.
 export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sources: ImageSources): void {
   const layout = item.layout;
@@ -37,8 +37,10 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
     const layer = openLayer(ctx, { x: 0, y: 0, width: item.box.width, height: item.box.height }, margin);
     if (!layer) return;
     paintGlyphs(layer.ctx, item, ops, sources, null);
-    if (item.mask) applyMask(layer.ctx, item, sources);
+    // La sombra interior va antes que la máscara: sigue el contorno de la letra y no marca como líneas
+    // oscuras los bordes que la máscara abre (p. ej. las grietas de un mármol).
     if (item.effects.innerShadow) applyInnerShadow(layer, scaleShadow(item.effects.innerShadow, layer.k));
+    if (item.mask) applyMask(layer.ctx, item, sources);
     const shadow = item.effects.shadow && scaleShadow(item.effects.shadow, layer.k);
     compositeLayer(ctx, layer, { opacity: item.opacity, shadow });
     return;
