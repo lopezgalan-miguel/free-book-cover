@@ -78,6 +78,21 @@ describe("MCP: acabado de letras", () => {
     expect(t.innerShadow).toBeUndefined();
     expect(t.mask).toBeUndefined();
   });
+  it("update_element_style guarda shadow.spread (get_canvas_state no expone la sombra)", async () => {
+    const id = await text();
+    const shadow = { on: true, intensity: 40, distance: 0, spread: 0.12, color: "#000000" };
+    ok(await run("update_element_style", mut({ elementId: id, style: { shadow } })));
+    expect((doc().elements[0] as TextElement).shadow).toMatchObject(shadow);
+    expect((doc().elements[0] as TextElement).shadow?.spread).toBe(0.12);
+  });
+  it("update_element_style aplica el bisel y bevel null lo quita", async () => {
+    const id = await text();
+    const bevel = { on: true, depth: 0.025, angle: 90, soften: 0.02, highlight: "#ffffff", highlightOpacity: 0.6, shade: "#000000", shadeOpacity: 0.5 };
+    ok(await run("update_element_style", mut({ elementId: id, style: { bevel } })));
+    expect((doc().elements[0] as TextElement).bevel).toEqual(bevel);
+    ok(await run("update_element_style", mut({ elementId: id, style: { bevel: null } })));
+    expect((doc().elements[0] as TextElement).bevel).toBeUndefined();
+  });
   it("una máscara con un recurso inexistente es not_found y filtros en un texto es invalid_params", async () => {
     const id = await text();
     expect(err(await run("update_element_style", mut({ elementId: id, style: { mask: { assetId: "nope", mode: "dark", threshold: 0.4 } } })))).toMatchObject({ kind: "not_found", resource: "asset" });

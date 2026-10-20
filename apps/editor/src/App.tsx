@@ -100,13 +100,16 @@ function DesktopLayout() {
     <>
       <div className="flex h-screen w-full flex-col overflow-hidden bg-bg">
         <Header />
-        <Notices />
         <div className="flex min-h-0 flex-1">
           {/* relative: los <input> ocultos (sr-only, absolutos) quedan dentro del panel y no alargan la página. */}
           <aside className="relative w-[264px] flex-none overflow-y-auto border-r border-line bg-panel" aria-label={t("layers")}>
             <LeftPanel />
           </aside>
-          <Stage />
+          {/* Los avisos empujan solo al lienzo; los paneles laterales no se mueven. */}
+          <div className="relative flex min-w-0 flex-1 flex-col">
+            <Notices />
+            <Stage />
+          </div>
           <aside className="relative w-[300px] flex-none overflow-y-auto border-l border-line bg-panel" aria-label={t("style")}>
             <RightPanel />
           </aside>

@@ -7,6 +7,8 @@ import { readImportFile, writeExportFile } from "../src/mcp/files.js";
 // PNG mínimo de 1x1.
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const TTF = Buffer.from([0, 1, 0, 0, 1, 2, 3, 4]);
+// Cabecera mínima de una colección .ttc (firma «ttcf», versión 1.0, 0 fuentes): basta para la firma.
+const TTC = Buffer.from([0x74, 0x74, 0x63, 0x66, 0, 1, 0, 0, 0, 0, 0, 0]);
 let root: string;
 let allowed: string;
 let outside: string;
@@ -23,6 +25,7 @@ beforeAll(async () => {
   await writeFile(join(allowed, "grande.png"), Buffer.concat([PNG, Buffer.alloc(5000)]));
   await writeFile(join(outside, "secreto.png"), PNG);
   await writeFile(join(allowed, "f.ttf"), TTF);
+  await writeFile(join(allowed, "c.ttc"), TTC);
   await symlink(join(outside, "secreto.png"), join(allowed, "enlace.png"));
 });
 afterAll(() => rm(root, { recursive: true, force: true }));
@@ -71,6 +74,9 @@ describe("readImportFile: fuentes", () => {
     expect(r).toMatchObject({ ok: true, name: "f.ttf" });
     expect((await readImportFile(join(allowed, "a.png"), limits(), "font")).ok).toBe(false);
     expect((await readImportFile(join(allowed, "f.ttf"), limits())).ok).toBe(false);
+  });
+  it("con kind font acepta también una colección .ttc", async () => {
+    expect(await readImportFile(join(allowed, "c.ttc"), limits(), "font")).toMatchObject({ ok: true, name: "c.ttc" });
   });
 });
 

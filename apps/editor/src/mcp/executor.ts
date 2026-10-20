@@ -1,6 +1,6 @@
 import {
   DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, FONT_CATALOG, availableFaces, availableWeights, hasFace, MAX_EXPORT_BYTES, MCP_TOOLS, assetDims, customTarget, defaultTextElement, documentFontFamilies,
-  editableKeys, elementVisibility, findPreset, readFontAxes, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, letterWidthPatch, lowDpiForSetup, needsRelayout, overridesOf,
+  editableKeys, elementVisibility, findPreset, readFontAxes, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, lowDpiForSetup, needsRelayout, overridesOf,
   normalizeRuns, TEXT_RUN_KEYS, styleToPatch, targetFromPreset, validatePrintSetup, variantDocument, visibleArea,
   type CommandError, type ElementSummary, type PrintSetup, type Project, type RunInput, type ResolvedTarget, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
 } from "@free-book-cover/core";
@@ -207,7 +207,7 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         patch.runs = normalizeRuns(newRuns.map(({ text, ...own }: RunInput) => buildRun(doc(), defaults as Run, own, text, rest.weight as number | undefined, first)), first);
       }
       // null quita textura, máscara, sombra interior o filtros: updateElement elimina las claves con valor undefined.
-      for (const key of ["texture", "mask", "innerShadow", "filters"]) if (style[key] === null) patch[key] = undefined;
+      for (const key of ["texture", "mask", "innerShadow", "bevel", "filters"]) if (style[key] === null) patch[key] = undefined;
       // La anchura es de una fuente variable concreta: null la quita, y cambiar de familia sin indicarla también.
       if (el.type === "text" && (style.stretch === null || (style.fontFamily !== undefined && style.stretch === undefined))) {
         patch.runs = ((patch.runs as TextElement["runs"] | undefined) ?? el.runs).map(({ stretch: _s, ...r }) => r);
@@ -219,10 +219,6 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         const own = documentFontFamilies(doc());
         const notUploaded = next.runs.find((r) => r.stretch !== undefined && !own.has(r.fontFamily));
         if (notUploaded) return invalid(`style.stretch: solo se aplica a una fuente variable subida al proyecto («${notUploaded.fontFamily}» no lo es)`);
-      }
-      // La anchura de letra no reparte las líneas de nuevo: la caja se ensancha con ella, salvo que el cliente fije width o x.
-      if (el.type === "text" && typeof style.scaleX === "number" && style.width === undefined && style.x === undefined) {
-        Object.assign(patch, letterWidthPatch({ ...el, align: (style.align as TextElement["align"] | undefined) ?? el.align }, style.scaleX));
       }
       // La caja sigue al texto salvo que el cliente fije la altura.
       if (el.type === "text" && style.height === undefined && (needsRelayout(style) || newRuns !== undefined)) {
@@ -301,12 +297,12 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       }
       const r = await importFont(store, deps.fonts, new File([bytes as BlobPart], args.name, {}));
       if (!r.ok) {
-        if (r.reason === "unsupported") return invalid("formato de fuente no admitido (.ttf, .otf o .woff2)");
+        if (r.reason === "unsupported") return invalid("formato de fuente no admitido (.ttf, .otf, .woff2 o .ttc)");
         if (r.reason === "load") return invalid("el navegador no pudo cargar la fuente");
         if (r.reason === "limit") return invalid("la fuente supera un límite del proyecto");
         return fail({ kind: "internal" });
       }
-      return { ok: true, data: { assetId: r.assetId, family: r.family, revision: doc().revision, sizeBytes: bytes.length, axes: readFontAxes(bytes), saved: await saved(store) } };
+      return { ok: true, data: { assetId: r.assetId, family: r.family, revision: doc().revision, sizeBytes: bytes.length, axes: readFontAxes(bytes), added: r.added, saved: await saved(store) } };
     }
 
     case "set_background_filters": {

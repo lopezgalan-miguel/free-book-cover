@@ -7,13 +7,13 @@ export interface FontGroup {
   names: readonly string[];
 }
 export const FONT_CATALOG: readonly FontGroup[] = [
-  { id: "serif", names: ["Playfair Display", "Cormorant Garamond", "EB Garamond", "Libre Baskerville", "Lora", "Spectral", "Marcellus"] },
-  { id: "sans", names: ["Montserrat", "Josefin Sans", "Archivo"] },
-  { id: "display", names: ["Bebas Neue", "Oswald", "Cinzel"] },
+  { id: "serif", names: ["Playfair Display", "Cormorant Garamond", "EB Garamond", "Libre Baskerville", "Lora", "Spectral", "Marcellus", "Roboto Slab", "Zilla Slab", "Rokkitt"] },
+  { id: "sans", names: ["Montserrat", "Josefin Sans", "Archivo", "Barlow Condensed", "Roboto Condensed"] },
+  { id: "display", names: ["Bebas Neue", "Oswald", "Cinzel", "Alfa Slab One"] },
   { id: "system", names: ["Georgia", "Times New Roman", "Arial", "Helvetica", "Verdana"] },
 ];
 
-const SERIF = new Set(["Playfair Display", "Cormorant Garamond", "EB Garamond", "Libre Baskerville", "Lora", "Spectral", "Marcellus", "Cinzel", "Georgia", "Times New Roman"]);
+const SERIF = new Set(["Playfair Display", "Cormorant Garamond", "EB Garamond", "Libre Baskerville", "Lora", "Spectral", "Marcellus", "Roboto Slab", "Zilla Slab", "Rokkitt", "Alfa Slab One", "Cinzel", "Georgia", "Times New Roman"]);
 
 // Caras realmente publicadas (peso + cursiva) de cada familia, las mismas que pide el editor al cargar el
 // catálogo. Si el diseño pide otra, el navegador sintetizaría negrita/cursiva o elegiría la más próxima:
@@ -41,6 +41,12 @@ export const CATALOG_FACES: Readonly<Record<string, readonly FontFaceSpec[]>> = 
   "Bebas Neue": faces([400]),
   Oswald: faces([300, 400, 500, 600, 700]),
   Cinzel: faces([400, 600, 700, 800]),
+  "Roboto Slab": faces([400, 500, 600, 700, 800, 900]),
+  "Zilla Slab": faces([400, 500, 600, 700], [400]),
+  Rokkitt: faces([400, 500, 600, 700, 800, 900]),
+  "Alfa Slab One": faces([400]),
+  "Barlow Condensed": faces([400, 500, 600, 700, 800], [400]),
+  "Roboto Condensed": faces([400, 500, 600, 700], [400]),
 };
 // Una fuente subida es un único archivo registrado con rango de pesos 100-900 y estilo normal.
 const UPLOAD_FACES = faces([400]);
@@ -97,7 +103,7 @@ export function fontCss(f: { family: string; weight: number; italic: boolean; px
 
 // Formatos de fuente admitidos para subir (SDD R-04), detectados por la firma del archivo.
 export type FontFormat = "ttf" | "otf" | "woff2";
-export const FONT_EXTENSIONS = [".ttf", ".otf", ".woff2"] as const;
+export const FONT_EXTENSIONS = [".ttf", ".otf", ".woff2", ".ttc"] as const;
 
 export function detectFontFormat(bytes: Uint8Array): FontFormat | null {
   if (bytes.length < 4) return null;

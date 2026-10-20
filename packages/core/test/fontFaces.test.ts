@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableFaces, availableWeights, checkFontsReady, hasFace, nearestFace, type Project, type TextRun } from "../src/index.js";
+import { availableFaces, availableWeights, catalogGroup, checkFontsReady, fontStack, hasFace, nearestFace, type Project, type TextRun } from "../src/index.js";
 import { baseProject, textEl } from "./fixtures.js";
 
 const run = (text: string, over: Partial<TextRun> = {}): TextRun => ({ text, fontFamily: "Lora", fontSizePt: 72, weight: 400, italic: false, underline: false, uppercase: false, color: "#ffffff", ...over });
@@ -53,5 +53,12 @@ describe("caras disponibles por familia (R-04)", () => {
   it("una fuente fallida se informa como failed antes que por sus caras", () => {
     const r = checkFontsReady(doc([run("a", { fontFamily: "Oswald", italic: true })]), () => "failed");
     expect(!r.ok && r.problems[0]?.reason).toBe("failed");
+  });
+  it("catálogo ampliado: slab y condensadas", () => {
+    expect(availableFaces("Roboto Slab")).toContainEqual({ weight: 900, italic: false });
+    expect(availableWeights("Barlow Condensed", true)).toEqual([400]);
+    expect(catalogGroup("Alfa Slab One")).toBe("display");
+    expect(fontStack("Zilla Slab").endsWith("serif")).toBe(true);
+    expect(fontStack("Roboto Condensed").endsWith("sans-serif")).toBe(true);
   });
 });

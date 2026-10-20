@@ -5,10 +5,17 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import type { TextElement } from "@free-book-cover/core";
 import { App } from "../src/App";
+import * as measureModule from "../src/canvas/measure";
 import { FontRegistry, type FontEnv } from "../src/fonts/fontRegistry";
 import { I18nProvider } from "../src/i18n";
 import { createEditorStore } from "../src/store/editorStore";
 import { openStorage } from "../src/storage/projectStorage";
+
+// jsdom no tiene canvas 2D: el medidor del panel se sustituye en la prueba de «Ajustar al ancho».
+vi.mock("../src/canvas/measure", async (orig) => {
+  const actual = await orig<typeof import("../src/canvas/measure")>();
+  return { ...actual, browserMeasure: vi.fn(actual.browserMeasure) };
+});
 
 const be32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
 const png = (w: number, h: number) =>
@@ -132,22 +139,19 @@ describe("panel de texto: controles", () => {
     expect(textOf(store).shadow.on).toBe(false);
   });
 
-  it("anchura de letra: la caja se ensancha con las letras y conserva el centro, en un solo paso", async () => {
+  it("la anchura de letra no mueve ni redimensiona la caja", async () => {
     const user = userEvent.setup();
     const { store } = await mount();
     await addAndWrite(user, store, "LAMENTOS");
-    const before = textOf(store);
-    const center = before.x + before.width / 2;
-    const steps = store.getState().history.past.length;
-    fireEvent.change(screen.getByLabelText("Anchura de letra"), { target: { value: "1.25" } });
-    const after = textOf(store);
-    expect(after.scaleX).toBe(1.25);
-    expect(after.width).toBeCloseTo(before.width * 1.25);
-    expect(after.x + after.width / 2).toBeCloseTo(center);
-    expect(store.getState().history.past.length).toBe(steps + 1);
-    fireEvent.change(screen.getByLabelText("Anchura de letra"), { target: { value: "0.5" } });
-    expect(textOf(store).width).toBeCloseTo(before.width * 0.5);
-    expect(textOf(store).x + textOf(store).width / 2).toBeCloseTo(center);
+    for (const align of ["center", "right"] as const) {
+      store.dispatch({ type: "updateElement", id: textOf(store).id, props: { x: 1, width: 3, align } });
+      const steps = store.getState().history.past.length;
+      fireEvent.change(screen.getByLabelText("Anchura de letra"), { target: { value: "0.7" } });
+      expect(textOf(store)).toMatchObject({ x: 1, width: 3, scaleX: 0.7 });
+      expect(store.getState().history.past.length).toBe(steps + 1);
+      fireEvent.change(screen.getByLabelText("Anchura de letra"), { target: { value: "1.2" } });
+      expect(textOf(store)).toMatchObject({ x: 1, width: 3, scaleX: 1.2 });
+    }
   });
 
   it("textura: subir la imagen, quedarse con el recurso en el documento y quitarla", async () => {
@@ -295,5 +299,27 @@ describe("panel de texto: fuentes", () => {
     store.dispatch({ type: "updateElement", id: "A", props: { texture: { assetId: "g2" } } });
     await waitFor(() => expect(scale()).toBe("3"));
     expect((screen.getByLabelText("Color base") as HTMLInputElement).value).toBe("#112233");
+  });
+});
+
+describe("panel de texto: ajustar al ancho", () => {
+  it("Ajustar al ancho cambia el cuerpo y está deshabilitado en texto curvo", async () => {
+    // 0,5 × cuerpo por carácter, como el medidor de las pruebas de core.
+    vi.mocked(measureModule.browserMeasure).mockReturnValue((text, css) => text.length * Number(/([\d.]+)px/.exec(css)![1]) * 0.5);
+    try {
+      const user = userEvent.setup();
+      const { store } = await mount();
+      await addAndWrite(user, store, "abcd");
+      const before = textOf(store);
+      store.dispatch({ type: "updateElement", id: before.id, props: { width: 4, letterSpacing: 0, runs: before.runs.map((r) => ({ ...r, fontSizePt: 72 })) } });
+      const btn = screen.getByRole("button", { name: "Ajustar al ancho" });
+      expect(btn).toBeEnabled();
+      await user.click(btn);
+      expect(textOf(store).runs.map((r) => r.fontSizePt)).toEqual([144]);
+      fireEvent.change(screen.getByLabelText("Curvatura"), { target: { value: "30" } });
+      expect(screen.getByRole("button", { name: "Ajustar al ancho" })).toBeDisabled();
+    } finally {
+      vi.mocked(measureModule.browserMeasure).mockReset();
+    }
   });
 });

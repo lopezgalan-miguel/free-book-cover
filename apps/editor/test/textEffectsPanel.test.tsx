@@ -88,6 +88,20 @@ describe("panel de texto: acabado de las letras", () => {
     fireEvent.change(screen.getByLabelText("Opacidad de la sombra"), { target: { value: "90" } });
     fireEvent.change(screen.getByLabelText("Color de la sombra"), { target: { value: "#330000" } });
     expect(textOf(store).shadow).toEqual({ on: true, intensity: 40, angle: 45, distance: 0.1, opacity: 0.9, color: "#330000" });
+    fireEvent.change(screen.getByLabelText("Expansión de la sombra"), { target: { value: "0.12" } });
+    expect(textOf(store).shadow?.spread).toBe(0.12);
+  });
+
+  it("Relieve pone los valores por defecto y la profundidad cambia bevel.depth", async () => {
+    const user = userEvent.setup();
+    const store = await mount();
+    await user.click(screen.getByRole("button", { name: "Añadir capa de texto" }));
+    await user.click(screen.getByRole("switch", { name: "Relieve" }));
+    expect(textOf(store).bevel).toEqual({ on: true, depth: 0.025, angle: 90, soften: 0.02, highlight: "#ffffff", highlightOpacity: 0.6, shade: "#000000", shadeOpacity: 0.5 });
+    fireEvent.change(screen.getByLabelText("Profundidad del relieve"), { target: { value: "0.1" } });
+    expect(textOf(store).bevel?.depth).toBe(0.1);
+    await user.click(screen.getByRole("switch", { name: "Relieve" }));
+    expect(textOf(store).bevel).toBeUndefined();
   });
 
   it("una máscara propia se sube aparte y no sigue a la textura", async () => {

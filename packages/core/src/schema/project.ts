@@ -82,6 +82,20 @@ export const innerShadowSchema = z
   .object({ on: z.boolean(), color: colorSchema, opacity: finite.min(0).max(1), angle: finite, distance: em, blur: em })
   .strict();
 
+// Relieve: dos sombras interiores, la luz del lado del ángulo y la sombra del contrario. depth y soften en em.
+export const bevelSchema = z
+  .object({
+    on: z.boolean(),
+    depth: finite.min(0).max(0.3),
+    angle: finite,
+    soften: finite.min(0).max(0.3),
+    highlight: colorSchema,
+    highlightOpacity: finite.min(0).max(1),
+    shade: colorSchema,
+    shadeOpacity: finite.min(0).max(1),
+  })
+  .strict();
+
 export const textElementSchema = z
   .object({
     ...elementBase,
@@ -99,9 +113,12 @@ export const textElementSchema = z
         opacity: finite.min(0).max(1).optional(),
         angle: finite.optional(),
         distance: em.optional(),
+        // Expansión de la sombra (em): con distancia 0 hace un resplandor. Sin ella, sombra normal.
+        spread: finite.min(0).max(0.3).optional(),
       })
       .strict(),
     innerShadow: innerShadowSchema.optional(),
+    bevel: bevelSchema.optional(),
     outline: z.object({ on: z.boolean(), width: finite.min(0), color: colorSchema }).strict(),
     curvature: finite.min(-100).max(100),
     // Anchura de las letras (escala horizontal); sin valor, 1. No afecta al espaciado ni a la altura.
@@ -293,6 +310,7 @@ export type AssetRef = z.infer<typeof assetRefSchema>;
 export type TextRun = z.infer<typeof textRunSchema>;
 export type TextTexture = z.infer<typeof textTextureSchema>;
 export type TextMask = z.infer<typeof textMaskSchema>;
+export type Bevel = z.infer<typeof bevelSchema>;
 export type InnerShadow = z.infer<typeof innerShadowSchema>;
 export type ImageFilters = z.infer<typeof imageFiltersSchema>;
 export type TextElement = z.infer<typeof textElementSchema>;

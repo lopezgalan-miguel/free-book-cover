@@ -30,23 +30,36 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
     : layout.lines.flatMap((l) => l.pieces.map((p) => ({ text: p.text, x: p.x, y: l.baseline, rotation: 0, dx: 0, width: p.width, style: p.style })));
   if (ops.length === 0) return;
 
-  const layered = (item.mask !== null || item.effects.innerShadow !== null || item.opacity < 1) && layerSupported(ctx);
+  // Con expansión, la sombra sale de una silueta ensanchada en su propia capa: exige capas.
+  const spread = item.effects.shadow?.spread ?? 0;
+  const layered = (item.mask !== null || item.effects.innerShadow !== null || item.effects.bevel !== null || item.opacity < 1 || spread > 0) && layerSupported(ctx);
   if (layered) {
     // Margen de un cuerpo (más el contorno) alrededor de la caja: rasgos y letras sobre arco que sobresalen.
     const margin = Math.max(...ops.map((o) => o.style.fontPx)) + (item.effects.outline?.width ?? 0);
     const layer = openLayer(ctx, { x: 0, y: 0, width: item.box.width, height: item.box.height }, margin);
     if (!layer) return;
+    // Expansión: la silueta ensanchada (sin textura ni máscara) proyecta la sombra bajo las letras.
+    if (spread > 0 && item.effects.shadow) {
+      const halo = paintSilhouette(ctx, item, ops, sources, margin + spread, spread);
+      if (halo) castShadowOnly(ctx, halo, scaleShadow(item.effects.shadow, layer.k), item.opacity);
+    }
     paintGlyphs(layer.ctx, item, ops, sources, null);
     // La sombra interior va antes que la máscara: sigue el contorno de la letra y no marca como líneas
     // oscuras los bordes que la máscara abre (p. ej. las grietas de un mármol).
     // Con textura o máscara, la forma de la sombra sale de la silueta opaca de la letra: los huecos de una
     // textura con alfa (mármol «con huecos») no cuentan como borde de la letra.
-    if (item.effects.innerShadow) {
+    // El relieve (luz y luego sombra) son dos sombras interiores más, con la misma silueta.
+    const { innerShadow, bevel } = item.effects;
+    if (innerShadow || bevel) {
       const silhouette = item.texture || item.mask ? paintSilhouette(ctx, item, ops, sources, margin) : null;
-      applyInnerShadow(layer, scaleShadow(item.effects.innerShadow, layer.k), silhouette);
+      if (innerShadow) applyInnerShadow(layer, scaleShadow(innerShadow, layer.k), silhouette);
+      if (bevel) {
+        applyInnerShadow(layer, scaleShadow(bevel.light, layer.k), silhouette);
+        applyInnerShadow(layer, scaleShadow(bevel.dark, layer.k), silhouette);
+      }
     }
     if (item.mask) applyMask(layer.ctx, item, sources);
-    const shadow = item.effects.shadow && scaleShadow(item.effects.shadow, layer.k);
+    const shadow = item.effects.shadow && spread === 0 ? scaleShadow(item.effects.shadow, layer.k) : null;
     compositeLayer(ctx, layer, { opacity: item.opacity, shadow });
     return;
   }
@@ -59,17 +72,19 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
 }
 
 // Letras (con su contorno) en un lienzo aparte, en color opaco y sin textura: la forma de la letra sin los
-// huecos que la textura pueda tener. null si no queda nada visible.
-function paintSilhouette(ctx: CanvasRenderingContext2D, item: TextItem, ops: Op[], sources: ImageSources, margin: number): Layer | null {
+// huecos que la textura pueda tener. Con `spread` (unidades locales) la forma se ensancha con un trazo de
+// 2 x spread. null si no queda nada visible.
+function paintSilhouette(ctx: CanvasRenderingContext2D, item: TextItem, ops: Op[], sources: ImageSources, margin: number, spread = 0): Layer | null {
   const layer = openLayer(ctx, { x: 0, y: 0, width: item.box.width, height: item.box.height }, margin);
   if (!layer) return null;
   const solid = ops.map((o) => ({ ...o, style: { ...o.style, color: "#000" } }));
-  paintGlyphs(layer.ctx, { ...item, texture: null }, solid, sources, null);
+  paintGlyphs(layer.ctx, { ...item, texture: null }, solid, sources, null, spread);
   return layer;
 }
 
-// Sombra (si se pide), contorno y relleno con subrayado, en este orden, sobre `ctx`.
-function paintGlyphs(ctx: Ctx2D, item: TextItem, ops: Op[], sources: ImageSources, shadow: ShadowPx | null): void {
+// Sombra (si se pide), contorno y relleno con subrayado, en este orden, sobre `ctx`. Con `spread` > 0 solo
+// se pinta, además del relleno, un trazo redondeado que ensancha la silueta `spread` por cada lado.
+function paintGlyphs(ctx: Ctx2D, item: TextItem, ops: Op[], sources: ImageSources, shadow: ShadowPx | null, spread = 0): void {
   const base = ctx.getTransform?.();
   const { outline } = item.effects;
   const tex = item.texture && sources.get(item.texture.assetId);
@@ -98,6 +113,21 @@ function paintGlyphs(ctx: Ctx2D, item: TextItem, ops: Op[], sources: ImageSource
   };
 
   ctx.save();
+  if (spread > 0) {
+    // Ensanchamiento: el trazo se suma al del contorno (centrado en el borde), así la expansión cuenta desde fuera.
+    for (const op of ops) {
+      place(op, () => {
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 2 * spread + (outline?.width ?? 0);
+        ctx.strokeStyle = op.style.color;
+        ctx.fillStyle = op.style.color;
+        ctx.strokeText(op.text, op.dx / sx, 0);
+        ctx.fillText(op.text, op.dx / sx, 0);
+      });
+    }
+    ctx.restore();
+    return;
+  }
   // 1) Sombra de la silueta completa (contorno incluido), bajo todo lo demás.
   if (shadow) {
     ctx.shadowColor = shadow.color;
@@ -145,6 +175,20 @@ function paintGlyphs(ctx: Ctx2D, item: TextItem, ops: Op[], sources: ImageSource
       }
     });
   }
+  ctx.restore();
+}
+
+// Vuelca `layer` en `ctx` dejando solo su sombra (color, desenfoque y desplazamiento ya en px de dispositivo):
+// se dibuja muy desplazada y la sombra compensa el desplazamiento, como en la sombra interior.
+function castShadowOnly(ctx: Ctx2D, layer: Layer, s: ShadowPx, opacity: number): void {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha *= opacity;
+  ctx.shadowColor = s.color;
+  ctx.shadowBlur = s.blur;
+  ctx.shadowOffsetX = s.dx + FAR;
+  ctx.shadowOffsetY = s.dy;
+  ctx.drawImage(layer.canvas as CanvasImageSource, layer.x - FAR, layer.y);
   ctx.restore();
 }
 

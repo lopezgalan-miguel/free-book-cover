@@ -270,15 +270,12 @@ describe("update_element_style: anchura, textura y recorte", () => {
     ok(await run("update_element_style", mut({ elementId, style: { texture: null } })));
     expect("texture" in doc().elements[0]!).toBe(false);
   });
-  it("scaleX ensancha la caja con las letras y conserva el centro, salvo que se indique width o x", async () => {
+  it("scaleX no mueve ni redimensiona la caja, salvo que se indique width o x", async () => {
     withFonts();
     const { elementId } = await add();
     const el0 = doc().elements[0]!;
-    const center = el0.x + el0.width / 2;
     ok(await run("update_element_style", mut({ elementId, style: { scaleX: 1.2 } })));
-    const el1 = doc().elements[0]!;
-    expect(el1.width).toBeCloseTo(el0.width * 1.2);
-    expect(el1.x + el1.width / 2).toBeCloseTo(center);
+    expect(doc().elements[0]).toMatchObject({ scaleX: 1.2, x: el0.x, width: el0.width });
     ok(await run("update_element_style", mut({ elementId, style: { scaleX: 0.6, width: 2, x: 0.25 } })));
     expect(doc().elements[0]).toMatchObject({ scaleX: 0.6, width: 2, x: 0.25 });
   });
@@ -298,7 +295,7 @@ describe("import_font", () => {
     withFonts();
     const out = ok(await run("import_font", { projectId: doc().id, name: "Mi Fuente.ttf", dataBase64: TTF_B64 }));
     MCP_TOOLS.import_font.output.parse(out);
-    expect(out).toMatchObject({ family: "Mi Fuente", saved: true });
+    expect(out).toMatchObject({ family: "Mi Fuente", saved: true, added: [{ family: "Mi Fuente", assetId: out.assetId }] });
     expect(doc().assets.find((a) => a.id === out.assetId)).toMatchObject({ kind: "font", metadata: { family: "Mi Fuente" } });
     await add({ fontFamily: "Mi Fuente" });
     expect((doc().elements[0] as TextElement).runs[0]!.fontFamily).toBe("Mi Fuente");

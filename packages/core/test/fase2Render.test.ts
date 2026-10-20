@@ -17,6 +17,13 @@ describe("efectos de texto en px", () => {
     const fx = textEffects(textEl("t", { runs: [big], shadow: { on: true, intensity: 40, color: "#ff8000", opacity: 0.5, angle: 0, distance: 0.1 } }), PPI);
     expect(fx.shadow).toEqual({ dx: 10, dy: 0, blur: 6.4, color: "rgba(255,128,0,0.5)" });
   });
+  it("bisel: luz del lado del ángulo y sombra del contrario; apagado es null", () => {
+    const bevel = { on: true, depth: 0.05, angle: 90, soften: 0.02, highlight: "#ffffff", highlightOpacity: 0.6, shade: "#000000", shadeOpacity: 0.5 };
+    const fx = textEffects(textEl("t", { runs: [big], bevel }), PPI);
+    expect(fx.bevel).toEqual({ light: { dx: 0, dy: 5, blur: 2, color: "rgba(255,255,255,0.6)" }, dark: { dx: 0, dy: -5, blur: 2, color: "rgba(0,0,0,0.5)" } });
+    expect(textEffects(textEl("t", { runs: [big], bevel: { ...bevel, on: false } }), PPI).bevel).toBeNull();
+    expect(textEffects(textEl("t", { runs: [big] }), PPI).bevel).toBeNull();
+  });
   it("sombra interior en px", () => {
     const fx = textEffects(textEl("t", { runs: [big], innerShadow: { on: true, color: "#000000", opacity: 0.6, angle: 270, distance: 0.03, blur: 0.06 } }), PPI);
     expect(fx.innerShadow).toEqual({ dx: 0, dy: -3, blur: 6, color: "rgba(0,0,0,0.6)" });

@@ -48,12 +48,16 @@ export interface ShadowPx {
   dy: number;
   blur: number;
   color: string;
+  // Expansión (px) de la sombra exterior; solo aparece si es positiva.
+  spread?: number;
 }
 export interface TextEffects {
   shadow: ShadowPx | null;
   outline: { width: number; color: string } | null;
   // Sombra proyectada dentro de la letra (relieve hundido o bordes oscurecidos).
   innerShadow: ShadowPx | null;
+  // Relieve: luz del lado del ángulo y sombra del contrario, ambas como sombras interiores.
+  bevel: { light: ShadowPx; dark: ShadowPx } | null;
 }
 
 const ASCENT = 0.8;
@@ -85,12 +89,19 @@ export function textEffects(el: TextElement, ppi: number): TextEffects {
   const base = baseFontPx(el, ppi);
   const s = el.shadow;
   const inner = el.innerShadow;
+  const bv = el.bevel;
   return {
     shadow: s.on
-      ? { ...offset(s.angle ?? 90, (s.distance ?? 0.05) * base), blur: base * 0.08 * (s.intensity / 50), color: rgba(s.color ?? "#000000", s.opacity ?? 0.6) }
+      ? { ...offset(s.angle ?? 90, (s.distance ?? 0.05) * base), blur: base * 0.08 * (s.intensity / 50), color: rgba(s.color ?? "#000000", s.opacity ?? 0.6), ...((s.spread ?? 0) > 0 ? { spread: s.spread! * base } : {}) }
       : null,
     outline: el.outline.on && el.outline.width > 0 ? { width: (base * el.outline.width) / 120, color: el.outline.color } : null,
     innerShadow: inner?.on ? { ...offset(inner.angle, inner.distance * base), blur: inner.blur * base, color: rgba(inner.color, inner.opacity) } : null,
+    bevel: bv?.on
+      ? {
+          light: { ...offset(bv.angle, bv.depth * base), blur: bv.soften * base, color: rgba(bv.highlight, bv.highlightOpacity) },
+          dark: { ...offset(bv.angle + 180, bv.depth * base), blur: bv.soften * base, color: rgba(bv.shade, bv.shadeOpacity) },
+        }
+      : null,
   };
 }
 

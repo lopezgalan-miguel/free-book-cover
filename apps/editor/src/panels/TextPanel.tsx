@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
-  FONT_CATALOG, TEXTURE_KINDS, applyStyleToRange, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, letterWidthPatch, nearestFace, rangeStyle, replaceText, runsToText,
-  type FontGroupId, type InnerShadow, TEXTURE_DEFAULTS, type TextureKind, type TextureOptions, type RunStylePatch, type TextElement, type TextMask, type TextTexture,
+  FONT_CATALOG, TEXTURE_KINDS, applyStyleToRange, fitFontToWidth, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, nearestFace, rangeStyle, replaceText, runsToText,
+  type Bevel, type FontGroupId, type InnerShadow, TEXTURE_DEFAULTS, type TextureKind, type TextureOptions, type RunStylePatch, type TextElement, type TextMask, type TextTexture,
 } from "@free-book-cover/core";
 import { browserMeasure, textHeightIn } from "../canvas/measure";
 import { useAssetUrl } from "../canvas/useImageSources";
@@ -14,17 +14,18 @@ import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";
 import type { TextSection } from "../layout/mobileTabs";
-import { NumberField, Section, Slider, Switch, fieldCls, toggleBtn } from "./ui";
+import { NumberField, Section, Slider, Switch, chipBtn, fieldCls, toggleBtn } from "./ui";
 
 const ALL_SECTIONS: readonly TextSection[] = ["text", "font", "style", "color", "fx"];
 
 const GROUP_KEY: Record<FontGroupId, DictKey> = { serif: "fontGroupSerif", sans: "fontGroupSans", display: "fontGroupDisplay", system: "fontGroupSystem" };
 const WEIGHTS = [
-  [300, "weight300"], [400, "weight400"], [500, "weight500"], [600, "weight600"], [700, "weight700"], [800, "weight800"],
+  [300, "weight300"], [400, "weight400"], [500, "weight500"], [600, "weight600"], [700, "weight700"], [800, "weight800"], [900, "weight900"],
 ] as const satisfies ReadonlyArray<readonly [number, DictKey]>;
 const SWATCHES = ["#FFFFFF", "#F4EFE6", "#C2B6A1", "#8C6F47", "#2B2824", "#1A1712", "#B4453A", "#3E5C4B"];
 const HEX = /^[0-9a-fA-F]{6}$/;
 const uploadBtn = "cursor-pointer text-[11px] font-medium text-accent-dark hover:text-ink";
+const DEFAULT_BEVEL: Bevel = { on: true, depth: 0.025, angle: 90, soften: 0.02, highlight: "#ffffff", highlightOpacity: 0.6, shade: "#000000", shadeOpacity: 0.5 };
 const DEFAULT_INNER: InnerShadow = { on: true, color: "#000000", opacity: 0.6, angle: 90, distance: 0.03, blur: 0.06 };
 const MASK_DEFAULTS = { mode: "dark", threshold: 0.35, softness: 0.1 } as const;
 const colorInput = "mb-3 h-[30px] w-9 flex-none cursor-pointer rounded-[7px] border border-field bg-white p-0.5";
@@ -67,6 +68,13 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
     const measure = browserMeasure();
     const next = { ...cur, ...props };
     store.dispatch({ type: "updateElement", id, props: measure ? { ...props, height: textHeightIn(next, measure) } : props }, mergeKey ? { mergeKey: `${id}:${mergeKey}` } : {});
+  };
+  // Escala todos los cuerpos para que la línea más ancha llene la caja (no en texto curvo).
+  const fitWidth = () => {
+    const cur = latest();
+    const measure = browserMeasure();
+    const runs = cur && measure ? fitFontToWidth(cur, measure) : null;
+    if (runs) commit({ runs });
   };
   // Cambia la textura y, si la máscara está enlazada, le copia el mismo encaje en el mismo paso.
   const setTexture = (texture: TextTexture) => {
@@ -167,7 +175,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
             <label className={uploadBtn}>
               {t("upload")}
               <input
-                type="file" accept=".ttf,.otf,.woff2" className="sr-only" aria-label={t("uploadFont")}
+                type="file" accept=".ttf,.otf,.woff2,.ttc" className="sr-only" aria-label={t("uploadFont")}
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
                   e.target.value = "";
@@ -246,9 +254,10 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
         <div className="-mt-1 mb-3 flex">
           <NumberField label={t("sizeExact")} value={cur.fontSizePt ?? first?.fontSizePt ?? 24} min={1} max={1000} step={0.1} digits={1} onCommit={(v) => v > 0 && style({ fontSizePt: v })} />
         </div>
+        <button type="button" className={`${chipBtn} -mt-1 mb-3`} disabled={el.curvature !== 0} onClick={fitWidth}>{t("fitWidth")}</button>
         <Slider label={t("lineH")} min={0.8} max={2.4} step={0.05} value={el.lineHeight} format={(v) => v.toFixed(2)} onCommit={(lineHeight) => commit({ lineHeight })} />
         <Slider label={t("letterS")} min={-0.05} max={0.5} step={0.01} value={el.letterSpacing} format={(v) => `${v.toFixed(2)}em`} onCommit={(letterSpacing) => commit({ letterSpacing })} />
-        <Slider label={t("scaleX")} min={0.5} max={1.5} step={0.01} value={el.scaleX ?? 1} format={(v) => `${Math.round(v * 100)} %`} onCommit={(scaleX) => { const cur = latest(); if (cur) commit(letterWidthPatch(cur, scaleX)); }} />
+        <Slider label={t("scaleX")} min={0.5} max={1.5} step={0.01} value={el.scaleX ?? 1} format={(v) => `${Math.round(v * 100)} %`} onCommit={(scaleX) => commit({ scaleX })} />
       </Section>}
 
       {show("color") && <Section title={t("color")}>
@@ -298,10 +307,13 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
             </div>
             <Slider label={t("shadowAngle")} min={0} max={360} step={1} value={el.shadow.angle ?? 90} format={(v) => `${v}°`} onCommit={(angle) => commit({ shadow: { ...el.shadow, angle } })} />
             <Slider label={t("shadowDistance")} min={0} max={0.5} step={0.005} value={el.shadow.distance ?? 0.05} format={(v) => `${v.toFixed(3)} em`} onCommit={(distance) => commit({ shadow: { ...el.shadow, distance } })} />
+            <Slider label={t("shadowSpread")} min={0} max={0.3} step={0.005} value={el.shadow.spread ?? 0} format={(v) => `${v.toFixed(3)} em`} onCommit={(spread) => commit({ shadow: { ...el.shadow, spread } })} />
           </>
         )}
         <Switch label={t("innerShadow")} checked={!!el.innerShadow?.on} onChange={(on) => commit({ innerShadow: on ? { ...(el.innerShadow ?? DEFAULT_INNER), on: true } : undefined })} />
         {el.innerShadow?.on && <InnerShadowControls value={el.innerShadow} onChange={(innerShadow, mk) => commit({ innerShadow }, mk)} onEnd={() => store.endGesture()} />}
+        <Switch label={t("bevel")} checked={!!el.bevel?.on} onChange={(on) => commit({ bevel: on ? { ...(el.bevel ?? DEFAULT_BEVEL), on: true } : undefined })} />
+        {el.bevel?.on && <BevelControls value={el.bevel} onChange={(bevel, mk) => commit({ bevel }, mk)} onEnd={() => store.endGesture()} />}
         <Switch label={t("outline")} checked={el.outline.on} onChange={(on) => commit({ outline: { ...el.outline, on } })} />
         {el.outline.on && (
           <div className="mb-3.5 flex items-end gap-2.5">
@@ -497,6 +509,35 @@ export function GenerateTexture({ onGenerate, initial }: { onGenerate: (o: Textu
         </button>
       </div>
     </div>
+  );
+}
+
+function BevelControls({ value, onChange, onEnd }: { value: Bevel; onChange: (v: Bevel, mergeKey?: string) => void; onEnd: () => void }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <Slider label={t("bevelDepth")} min={0} max={0.3} step={0.005} value={value.depth} format={(v) => `${v.toFixed(3)} em`} onCommit={(depth) => onChange({ ...value, depth })} />
+      <Slider label={t("bevelAngle")} min={0} max={360} step={1} value={value.angle} format={(v) => `${v}°`} onCommit={(angle) => onChange({ ...value, angle })} />
+      <Slider label={t("bevelSoften")} min={0} max={0.3} step={0.005} value={value.soften} format={(v) => `${v.toFixed(3)} em`} onCommit={(soften) => onChange({ ...value, soften })} />
+      <div className="flex items-end gap-2.5">
+        <div className="min-w-0 flex-1">
+          <Slider label={t("bevelLight")} min={0} max={100} step={1} value={Math.round(value.highlightOpacity * 100)} format={(v) => `${v} %`} onCommit={(v) => onChange({ ...value, highlightOpacity: v / 100 })} />
+        </div>
+        <input
+          type="color" aria-label={t("bevelLightColor")} value={value.highlight} className={colorInput}
+          onChange={(e) => onChange({ ...value, highlight: e.target.value.toLowerCase() }, "bevel-light")} onBlur={onEnd}
+        />
+      </div>
+      <div className="flex items-end gap-2.5">
+        <div className="min-w-0 flex-1">
+          <Slider label={t("bevelShade")} min={0} max={100} step={1} value={Math.round(value.shadeOpacity * 100)} format={(v) => `${v} %`} onCommit={(v) => onChange({ ...value, shadeOpacity: v / 100 })} />
+        </div>
+        <input
+          type="color" aria-label={t("bevelShadeColor")} value={value.shade} className={colorInput}
+          onChange={(e) => onChange({ ...value, shade: e.target.value.toLowerCase() }, "bevel-shade")} onBlur={onEnd}
+        />
+      </div>
+    </>
   );
 }
 

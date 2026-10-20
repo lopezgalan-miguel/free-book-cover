@@ -7,6 +7,7 @@ import type { ImageElement, ShapeElement, TextElement } from "@free-book-cover/c
 import { App } from "../src/App";
 import { I18nProvider } from "../src/i18n";
 import { createEditorStore } from "../src/store/editorStore";
+import { recordingContext } from "./helpers/recordingContext";
 import { openStorage } from "../src/storage/projectStorage";
 
 // Arreglos de la interfaz encontrados al montar portadas desde Chrome (plan U-01 a U-12).
@@ -233,5 +234,37 @@ describe("E-04 alto del texto", () => {
     expect(screen.getByLabelText("Ancho (in)")).toBeEnabled();
     act(() => store.select("i"));
     expect(screen.getByLabelText("Alto (in)")).toBeEnabled();
+  });
+});
+
+describe("M-10 y M-09 escenario y avisos", () => {
+  it("un clic en el escenario fuera de la portada quita la selección", async () => {
+    // jsdom no trae canvas 2D: se simula su presencia para que Stage monte el escenario.
+    vi.stubGlobal("CanvasRenderingContext2D", class {});
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => recordingContext().ctx) as never);
+    try {
+      const user = userEvent.setup();
+      const store = await mount();
+      await user.click(screen.getByRole("button", { name: "Añadir rectángulo" }));
+      expect(store.getState().selectedId).not.toBeNull();
+      const canvas = screen.getByTestId("cover-canvas");
+      fireEvent.pointerDown(canvas);
+      expect(store.getState().selectedId).not.toBeNull();
+      fireEvent.pointerDown(canvas.parentElement!);
+      expect(store.getState().selectedId).toBeNull();
+    } finally {
+      getContext.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+  it("los avisos van en la columna del lienzo", async () => {
+    const store = await mount();
+    act(() => store.reportError({ kind: "unsupported_font" }));
+    const alert = await screen.findByRole("alert");
+    const main = screen.getByRole("main");
+    const asides = screen.getAllByRole("complementary");
+    const column = alert.parentElement!;
+    expect(column).toBe(main.parentElement);
+    expect(asides.every((a) => !column.contains(a))).toBe(true);
   });
 });

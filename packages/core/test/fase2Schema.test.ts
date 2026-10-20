@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customTarget, editableKeys, needsRelayout, projectSchema, unusedAssetIds, variantDocument, type Project } from "../src/index.js";
+import { bevelSchema, customTarget, textElementSchema, editableKeys, needsRelayout, projectSchema, unusedAssetIds, variantDocument, type Project } from "../src/index.js";
 import { baseProject, imageEl, shapeEl, textEl } from "./fixtures.js";
 
 const run0 = { text: "Hola", fontFamily: "Lora", fontSizePt: 24, weight: 500, italic: false, underline: false, uppercase: false, color: "#f4efe6" };
@@ -29,6 +29,14 @@ function doc(): Project {
 const ok = (p: unknown) => projectSchema.safeParse(p).success;
 
 describe("esquema de la fase 2", () => {
+  it("bisel: uno válido pasa, depth 0,5 falla y sin bisel sigue validando", () => {
+    const bevel = { on: true, depth: 0.025, angle: 90, soften: 0.02, highlight: "#ffffff", highlightOpacity: 0.6, shade: "#000000", shadeOpacity: 0.5 };
+    expect(bevelSchema.safeParse(bevel).success).toBe(true);
+    expect(bevelSchema.safeParse({ ...bevel, depth: 0.5 }).success).toBe(false);
+    expect(textElementSchema.safeParse(textEl("t", { bevel })).success).toBe(true);
+    expect(textElementSchema.safeParse(textEl("t", { bevel: { ...bevel, depth: 0.5 } })).success).toBe(false);
+    expect(textElementSchema.safeParse(textEl("t")).success).toBe(true);
+  });
   it("acepta opacidad, filtros, sombras configurables, máscara y anchura de fuente", () => {
     const r = projectSchema.safeParse(doc());
     expect(r.success ? [] : r.error.issues).toEqual([]);

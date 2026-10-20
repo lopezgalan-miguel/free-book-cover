@@ -5,6 +5,7 @@ import { FontRegistry, type FontEnv } from "../src/fonts/fontRegistry";
 import { importFont } from "../src/fonts/importFont";
 import { createEditorStore } from "../src/store/editorStore";
 import { openStorage } from "../src/storage/projectStorage";
+import { boldItalic, buildTtc, regular } from "./ttcHelper";
 
 const run = (family: string, over = {}) => ({ text: "x", fontFamily: family, fontSizePt: 24, weight: 400, italic: false, underline: false, uppercase: false, color: "#ffffff", ...over });
 const textEl = (id: string, family: string): TextElement => ({
@@ -116,7 +117,7 @@ describe("importFont", () => {
   it("carga, guarda el blob como recurso de fuente y fija una familia única", async () => {
     const { store, reg } = await mk(fakeEnv());
     const r = await importFont(store, reg, file("Mi Fuente.ttf", ttf(10)));
-    expect(r).toEqual({ ok: true, family: "Mi Fuente", assetId: "id2" });
+    expect(r).toEqual({ ok: true, family: "Mi Fuente", assetId: "id2", added: [{ family: "Mi Fuente", assetId: "id2" }] });
     const doc = store.getState().history.present;
     expect(doc.assets[0]).toMatchObject({ kind: "font", mimeType: "font/ttf", metadata: { family: "Mi Fuente", name: "Mi Fuente.ttf", format: "ttf" } });
     expect(store.getState().assets.find((a) => a.id === "id2")!.blob.size).toBe(14);
@@ -151,6 +152,61 @@ describe("importFont", () => {
     expect(store.getState().error).toEqual({ kind: "font_load_failed", family: "Rota" });
     expect(store.getState().assets).toHaveLength(0);
     expect(store.getState().history.present.assets).toHaveLength(0);
+  });
+  it("una .ttc añade cada cara como fuente subida y devuelve la regular como principal", async () => {
+    const { store, reg } = await mk(fakeEnv());
+    const ttc = buildTtc([{ tables: boldItalic }, { tables: regular }]);
+    const r = await importFont(store, reg, file("Prueba.ttc", ttc));
+    expect(r).toMatchObject({ ok: true, family: "Prueba" });
+    const fonts = store.getState().history.present.assets.filter((a) => a.kind === "font");
+    expect(fonts.map((a) => a.metadata.family).sort()).toEqual(["Prueba", "Prueba Bold Italic"]);
+    expect(fonts[0]!.metadata).toMatchObject({ format: "ttf", name: expect.stringContaining("Prueba.ttc · ") });
+    if (!r.ok) return;
+    expect(r.added).toHaveLength(2);
+    expect(r.added.find((x) => x.family === "Prueba")!.assetId).toBe(r.assetId);
+  });
+  it("una .ttc con más de 16 caras no sube nada", async () => {
+    const { store, reg } = await mk(fakeEnv());
+    const ttc = buildTtc(Array.from({ length: 17 }, () => ({ tables: regular })));
+    const r = await importFont(store, reg, file("Muchas.ttc", ttc));
+    expect(r.ok).toBe(false);
+    expect(store.getState().error).toEqual({ kind: "collection_too_many" });
+    expect(store.getState().history.present.assets).toHaveLength(0);
+  });
+  it("si una cara de la colección no carga, no queda ninguna", async () => {
+    const { store, reg } = await mk(fakeEnv({ addOk: (f) => f !== "Prueba Bold Italic" }));
+    const r = await importFont(store, reg, file("Prueba.ttc", buildTtc([{ tables: regular }, { tables: boldItalic }])));
+    expect(r).toEqual({ ok: false, reason: "load" });
+    expect(store.getState().error).toEqual({ kind: "font_load_failed", family: "Prueba Bold Italic" });
+    expect(store.getState().history.present.assets.filter((a) => a.kind === "font")).toHaveLength(0);
+    expect(store.getState().assets).toHaveLength(0);
+    expect(reg.stateOf("Prueba")).toBeUndefined();
+  });
+  it("una .ttc que no cabe en el proyecto no añade ninguna cara", async () => {
+    const { store, reg } = await mk(fakeEnv());
+    await fill(store);
+    const big = { ...regular, glyf: new Uint8Array(3 * 1024 * 1024) };
+    const big2 = { ...boldItalic, glyf: new Uint8Array(3 * 1024 * 1024) };
+    const r = await importFont(store, reg, file("Grande.ttc", buildTtc([{ tables: big }, { tables: big2 }])));
+    expect(r).toEqual({ ok: false, reason: "limit" });
+    expect(store.getState().error).toMatchObject({ kind: "limit", error: { kind: "project_too_large" } });
+    expect(store.getState().history.present.assets.filter((a) => a.kind === "font")).toHaveLength(0);
+    expect(reg.stateOf("Prueba")).toBeUndefined();
+  });
+  it("si falla el guardado de la segunda cara, la primera sigue registrada y la segunda no", async () => {
+    const { store, reg } = await mk(fakeEnv());
+    let calls = 0;
+    const port = { ...store, addAsset: (a: Parameters<typeof store.addAsset>[0], b: Blob) => (++calls === 2 ? Promise.resolve(false) : store.addAsset(a, b)) };
+    const r = await importFont(port, reg, file("Prueba.ttc", buildTtc([{ tables: regular }, { tables: boldItalic }])));
+    expect(r.ok).toBe(false);
+    expect(store.getState().history.present.assets.filter((a) => a.kind === "font").map((a) => a.metadata.family)).toEqual(["Prueba"]);
+    expect(reg.stateOf("Prueba")).toBe("loaded");
+    expect(reg.stateOf("Prueba Bold Italic")).toBeUndefined();
+  });
+  it("una .ttc corrupta se informa como formato no admitido", async () => {
+    const { store, reg } = await mk(fakeEnv());
+    expect(await importFont(store, reg, file("Mala.ttc", new Uint8Array([0x74, 0x74, 0x63, 0x66, 0, 1])))).toEqual({ ok: false, reason: "unsupported" });
+    expect(store.getState().error).toEqual({ kind: "unsupported_font" });
   });
   it("respeta el límite de 20 MB antes de leer el archivo", async () => {
     const { store, reg } = await mk(fakeEnv());
