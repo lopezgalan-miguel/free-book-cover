@@ -11,7 +11,7 @@ describe("contrato MCP", () => {
       expect(toolJsonSchema(n, "input")).not.toHaveProperty("$schema");
     }
     const add = toolJsonSchema("add_text_element", "input") as { required: string[]; additionalProperties: boolean };
-    expect(add.required).toEqual(expect.arrayContaining(["projectId", "expectedRevision", "text"]));
+    expect(add.required).toEqual(expect.arrayContaining(["projectId", "expectedRevision"]));
     expect(add.additionalProperties).toBe(false);
   });
   it("las mutaciones exigen projectId y expectedRevision (salvo import_asset, opcional)", () => {

@@ -67,17 +67,35 @@ const textStyle = {
 };
 export const TEXT_STYLE_KEYS = Object.keys(textStyle);
 
+// Fragmento con estilo propio; lo que no indique lo toma del estilo del elemento.
+export const runInputSchema = z
+  .object({
+    text: z.string().max(5000),
+    fontFamily: textStyle.fontFamily,
+    fontSizePt: textStyle.fontSizePt,
+    weight: textStyle.weight,
+    italic: textStyle.italic,
+    underline: textStyle.underline,
+    uppercase: textStyle.uppercase,
+    color: textStyle.color,
+  })
+  .strict();
+export type RunInput = z.infer<typeof runInputSchema>;
+const runsInput = z.array(runInputSchema).min(1).max(200);
+
 export const addTextElementInput = z
   .object({
     projectId,
     expectedRevision,
-    text: z.string().min(1).max(5000),
+    text: z.string().min(1).max(5000).optional(),
+    runs: runsInput.optional().describe("Fragmentos con estilos distintos (alternativa a text); los estilos del elemento son el valor por defecto de cada uno."),
     x: finite.optional().describe("Pulgadas desde la izquierda del lienzo."),
     y: finite.optional().describe("Pulgadas desde arriba."),
     width: finite.positive().max(100).optional().describe("Ancho de la caja en pulgadas."),
     ...textStyle,
   })
-  .strict();
+  .strict()
+  .refine((a) => (a.text === undefined) !== (a.runs === undefined), { message: "indica exactamente uno de text o runs" });
 
 const unit = finite.min(0).max(1);
 const cropSchema = z.object({ x: unit, y: unit, width: finite.positive().max(1), height: finite.positive().max(1) }).strict();
@@ -88,6 +106,7 @@ const size = finite.positive().max(100);
 export const elementStyleSchema = z
   .object({
     ...textStyle,
+    runs: runsInput.optional().describe("Solo textos: sustituye el texto entero por fragmentos. Las claves de fragmento de style son el valor por defecto de cada uno; lo que nadie indica se hereda del primer fragmento actual."),
     shadow: z
       .object({
         on: z.boolean(),
@@ -284,6 +303,7 @@ export const elementSummarySchema = z
     fontFamily: z.string().optional(),
     fontSizePt: z.number().optional(),
     color: z.string().optional(),
+    runs: z.array(z.object({ text: z.string(), fontFamily: z.string(), fontSizePt: z.number(), weight: z.number(), italic: z.boolean(), color: z.string() }).strict()).optional(),
     assetId: z.string().optional(),
     fill: z.string().optional(),
   })

@@ -61,7 +61,7 @@ describe("servidor MCP: descubrimiento", () => {
       expect(t.description).toBeTruthy();
     }
     const add = tools.find((t) => t.name === "add_text_element")!;
-    expect(add.inputSchema.required).toEqual(expect.arrayContaining(["projectId", "expectedRevision", "text"]));
+    expect(add.inputSchema.required).toEqual(expect.arrayContaining(["projectId", "expectedRevision"]));
     expect(tools.find((t) => t.name === "get_canvas_state")!.annotations?.readOnlyHint).toBe(true);
     expect(add.annotations?.readOnlyHint).toBe(false);
   });

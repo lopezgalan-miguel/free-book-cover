@@ -1,8 +1,8 @@
 import {
   DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, FONT_CATALOG, availableFaces, availableWeights, hasFace, MAX_EXPORT_BYTES, MCP_TOOLS, assetDims, customTarget, defaultTextElement, documentFontFamilies,
   editableKeys, elementVisibility, findPreset, readFontAxes, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, letterWidthPatch, lowDpiForSetup, needsRelayout, overridesOf,
-  styleToPatch, targetFromPreset, validatePrintSetup, variantDocument, visibleArea,
-  type CommandError, type ElementSummary, type PrintSetup, type Project, type ResolvedTarget, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
+  normalizeRuns, TEXT_RUN_KEYS, styleToPatch, targetFromPreset, validatePrintSetup, variantDocument, visibleArea,
+  type CommandError, type ElementSummary, type PrintSetup, type Project, type RunInput, type ResolvedTarget, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
 } from "@free-book-cover/core";
 import { textHeightIn } from "../canvas/measure";
 import { runExport, type ExportDeps } from "../export/exportImage";
@@ -46,7 +46,10 @@ export function summarize(doc: Project): ElementSummary[] {
     const base = { id: e.id, type: e.type, x: e.x, y: e.y, width: e.width, height: e.height, rotation: e.rotation, zIndex: e.zIndex, visible: e.visible };
     if (e.type === "text") {
       const r = e.runs[0];
-      return { ...base, text: e.runs.map((x) => x.text).join(""), ...(r ? { fontFamily: r.fontFamily, fontSizePt: r.fontSizePt, color: r.color } : {}) };
+      return {
+        ...base, text: e.runs.map((x) => x.text).join(""), ...(r ? { fontFamily: r.fontFamily, fontSizePt: r.fontSizePt, color: r.color } : {}),
+        ...(e.runs.length > 1 ? { runs: e.runs.map((x) => ({ text: x.text, fontFamily: x.fontFamily, fontSizePt: x.fontSizePt, weight: x.weight, italic: x.italic, color: x.color })) } : {}),
+      };
     }
     if (e.type === "image") return { ...base, assetId: e.assetRef.assetId };
     return { ...base, fill: e.fill };
@@ -144,11 +147,23 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       const d = doc();
       const family = args.fontFamily ?? "Lora";
       if (!fontKnown(d, family)) return invalid(`fontFamily: la fuente «${family}» no está en el catálogo ni en el proyecto`);
+      if ((args.text === undefined) === (args.runs === undefined)) return invalid("indica exactamente uno de text o runs");
+      for (const [i, r] of (args.runs ?? []).entries()) {
+        if (r.fontFamily !== undefined && !fontKnown(d, r.fontFamily)) return invalid(`runs.${i}.fontFamily: la fuente «${r.fontFamily}» no está en el catálogo ni en el proyecto`);
+      }
       const draft = defaultTextElement({
-        id: store.newId(), text: args.text, canvas: d.canvas, x: args.x, y: args.y, width: args.width,
+        id: store.newId(), text: args.text ?? "", canvas: d.canvas, x: args.x, y: args.y, width: args.width,
         // Sin peso: el publicado más próximo al de por defecto, en el estilo pedido.
         style: { ...args, fontFamily: family, weight: args.weight ?? nearestWeight(d, family, args.italic ?? false) },
       });
+      if (args.runs) {
+        const [first] = draft.runs;
+        draft.runs = normalizeRuns((args.runs as RunInput[]).map(({ text, ...own }) => {
+          const base = { ...first!, ...Object.fromEntries(Object.entries(own).filter(([, v]) => v !== undefined)), text };
+          // Sin peso propio ni del elemento: el más próximo al de por defecto en la familia y cursiva del fragmento.
+          return { ...base, weight: own.weight ?? args.weight ?? nearestWeight(d, base.fontFamily, base.italic) };
+        }), first);
+      }
       const face = missingFace(d, draft);
       if (face) return invalid(face);
       const r = store.applyRemote({ type: "addElement", element: { ...draft, height: textHeight(deps, draft) } }, args.expectedRevision);
@@ -166,11 +181,21 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       if (wrong.length) return invalid(...wrong.map((k) => `style.${k}: no aplicable a un elemento de tipo ${el.type}`));
       const family = style.fontFamily;
       if (el.type === "text" && typeof family === "string" && !fontKnown(doc(), family)) return invalid(`style.fontFamily: la fuente «${family}» no está en el catálogo ni en el proyecto`);
+      const newRuns = el.type === "text" ? args.style.runs : undefined;
+      for (const [i, r] of (newRuns ?? []).entries()) {
+        if (r.fontFamily !== undefined && !fontKnown(doc(), r.fontFamily)) return invalid(`style.runs.${i}.fontFamily: la fuente «${r.fontFamily}» no está en el catálogo ni en el proyecto`);
+      }
       for (const key of ["texture", "mask"] as const) {
         const ref = style[key] as { assetId: string } | null | undefined;
         if (ref && !imageAsset(doc(), ref.assetId)) return fail({ kind: "not_found", resource: "asset", id: ref.assetId });
       }
-      const patch = styleToPatch(el, style);
+      const { runs: _r, ...rest } = style;
+      const patch = styleToPatch(el, rest);
+      if (newRuns && el.type === "text") {
+        const [first] = el.runs;
+        const defaults = { ...first, ...Object.fromEntries(Object.entries(rest).filter(([k, v]) => v !== undefined && TEXT_RUN_KEYS.includes(k))) };
+        patch.runs = normalizeRuns(newRuns.map(({ text, ...own }: RunInput) => ({ ...defaults, ...Object.fromEntries(Object.entries(own).filter(([, v]) => v !== undefined)), text }) as TextElement["runs"][number]), first);
+      }
       // null quita textura, máscara, sombra interior o filtros: updateElement elimina las claves con valor undefined.
       for (const key of ["texture", "mask", "innerShadow", "filters"]) if (style[key] === null) patch[key] = undefined;
       // La anchura es de una fuente variable concreta: null la quita, y cambiar de familia sin indicarla también.
@@ -190,7 +215,7 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         Object.assign(patch, letterWidthPatch({ ...el, align: (style.align as TextElement["align"] | undefined) ?? el.align }, style.scaleX));
       }
       // La caja sigue al texto salvo que el cliente fije la altura.
-      if (el.type === "text" && style.height === undefined && needsRelayout(style)) {
+      if (el.type === "text" && style.height === undefined && (needsRelayout(style) || newRuns !== undefined)) {
         patch.height = textHeight(deps, { ...el, ...patch } as TextElement);
       }
       const r = store.applyRemote({ type: "updateElement", id: el.id, props: patch as never }, args.expectedRevision);
