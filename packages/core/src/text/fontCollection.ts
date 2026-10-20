@@ -69,13 +69,21 @@ function rebuildFace(bytes: Uint8Array, dv: DataView, dirOffset: number): Collec
   if (numTables === 0 || dirOffset + 12 + numTables * 16 > bytes.length) return null;
 
   const records: TableRecord[] = [];
+  // Defensa de memoria: tablas que apuntan al mismo trozo del archivo no pueden sumar más que el archivo
+  // ni repetir etiqueta (se copian con slice).
+  let totalLength = 0;
+  const tags = new Set<string>();
   for (let i = 0; i < numTables; i++) {
     const r = dirOffset + 12 + i * 16;
     const offset = dv.getUint32(r + 8);
     const length = dv.getUint32(r + 12);
     if (offset + length > bytes.length) return null;
+    const tag = String.fromCharCode(bytes[r]!, bytes[r + 1]!, bytes[r + 2]!, bytes[r + 3]!);
+    totalLength += length;
+    if (tags.has(tag) || totalLength > bytes.length) return null;
+    tags.add(tag);
     records.push({
-      tag: String.fromCharCode(bytes[r]!, bytes[r + 1]!, bytes[r + 2]!, bytes[r + 3]!),
+      tag,
       checksum: dv.getUint32(r + 4),
       data: bytes.slice(offset, offset + length),
     });

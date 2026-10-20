@@ -212,6 +212,31 @@ describe("splitFontCollection", () => {
     expect(splitFontCollection(ttc.subarray(0, 30))).toEqual({ ok: false, reason: "corrupt" });
   });
 
+  it("una cara con tablas que apuntan al archivo entero y suman más que él: corrupt", () => {
+    const bad = buildTtc([{ tables: { ...regular, aaaa: new Uint8Array(8), bbbb: new Uint8Array(8) } }]);
+    const dv = new DataView(bad.buffer);
+    // Directorio de la cara en 16; registros desde 28. Se apuntan aaaa y bbbb al archivo entero.
+    for (const tag of ["aaaa", "bbbb"]) {
+      for (let i = 0; i < 5; i++) {
+        const r = 28 + i * 16;
+        if (String.fromCharCode(...bad.subarray(r, r + 4)) === tag) {
+          dv.setUint32(r + 8, 0);
+          dv.setUint32(r + 12, bad.length);
+        }
+      }
+    }
+    expect(splitFontCollection(bad)).toEqual({ ok: false, reason: "corrupt" });
+  });
+
+  it("una cara con etiquetas de tabla repetidas: corrupt", () => {
+    const bad = buildTtc([{ tables: { ...regular, aaaa: new Uint8Array(8), bbbb: new Uint8Array(8) } }]);
+    for (let i = 0; i < 5; i++) {
+      const r = 28 + i * 16;
+      if (String.fromCharCode(...bad.subarray(r, r + 4)) === "bbbb") bad.set([0x61, 0x61, 0x61, 0x61], r);
+    }
+    expect(splitFontCollection(bad)).toEqual({ ok: false, reason: "corrupt" });
+  });
+
   it("un ttf normal: not_collection", () => {
     const ttf = buildSfnt(regular);
     expect(isFontCollection(ttf)).toBe(false);
