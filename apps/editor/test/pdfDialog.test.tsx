@@ -60,6 +60,21 @@ describe("opción PDF del modal de exportación", () => {
     expect(within(dialog).getByTestId("pdf-disabled-reason")).toHaveTextContent("necesita el companion conectado");
     expect(within(dialog).getByText(/No se detecta el companion/)).toBeInTheDocument();
   });
+  it("tapa dura que pierde los 300 ppp: PDF deshabilitado con la imagen que falla", async () => {
+    const user = userEvent.setup();
+    const { store } = await mount(client("connected"), false);
+    act(() => {
+      store.dispatch({ type: "setPrintSetup", printSetup: { trimWidthIn: 5.5, trimHeightIn: 8.5, pageCount: 116, paperAndInk: "bw-cream", readingDirection: "ltr", binding: "hardcover" } });
+      store.dispatch({ type: "addAsset", asset: { id: "bg", kind: "image", mimeType: "image/png", metadata: { widthPx: 1600, heightPx: 2560 } } });
+      store.dispatch({ type: "setBackground", background: { assetId: "bg" } });
+    });
+    const dialog = await open(user);
+    await waitFor(() => expect(within(dialog).getByTestId("companion-status")).toHaveAttribute("data-status", "connected"));
+    expect(within(dialog).getByRole("radio", { name: /PDF/ })).toBeDisabled();
+    const reason = within(dialog).getByTestId("pdf-low-dpi");
+    expect(reason).toHaveTextContent("no llega al mínimo de 300 ppp");
+    expect(reason).toHaveTextContent("Imagen de fondo");
+  });
   it("proyecto no KDP: no aparece la opción PDF", async () => {
     const user = userEvent.setup();
     await mount(client("connected"), false);

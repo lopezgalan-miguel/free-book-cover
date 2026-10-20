@@ -1,6 +1,6 @@
 import {
-  buildPreflightSummary, checkExportSize, exportFileName, printPixelSize,
-  type FontProblem, type PreflightSummary, type Project,
+  buildPreflightSummary, checkExportSize, exportFileName, hardcoverLowDpi, printPixelSize,
+  type DpiEntry, type FontProblem, type PreflightSummary, type Project,
 } from "@free-book-cover/core";
 import { CompanionError, type CompanionClient, type CompanionConfig } from "./companionClient";
 import type { ExportDeps } from "./exportImage";
@@ -20,6 +20,8 @@ export interface PdfExportDeps {
 
 export type PdfError =
   | { kind: "not_kdp" }
+  // Tapa dura con alguna imagen por debajo de 300 ppp: no se genera el PDF.
+  | { kind: "low_dpi"; entries: DpiEntry[] }
   | { kind: "limit"; megapixels: number; limitMegapixels: number }
   | { kind: "fonts"; problems: FontProblem[] }
   | { kind: "missing_assets"; assetIds: string[] }
@@ -47,6 +49,8 @@ export async function runPdfExport(
   doc: Project, projectName: string, deps: PdfExportDeps, onStage: (s: PdfStage) => void = () => {},
 ): Promise<PdfOutcome> {
   if (doc.mode !== "kdp-paperback" || !doc.printSetup) return { ok: false, error: { kind: "not_kdp" } };
+  const low = hardcoverLowDpi(doc);
+  if (low.length) return { ok: false, error: { kind: "low_dpi", entries: low } };
   const size = printPixelSize(doc.canvas.widthIn, doc.canvas.heightIn);
   const limit = checkExportSize(size.widthPx, size.heightPx);
   if (!limit.ok && limit.error.kind === "export_too_many_megapixels") {

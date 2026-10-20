@@ -373,6 +373,23 @@ describe("set_print_setup", () => {
     expect(out.canvas.widthIn).toBeCloseTo(10.547264, 6);
     expect(out.front.x).toBeCloseTo(5.422264, 6);
   });
+  it("tapa dura: binding, bisagras y lienzo de la plantilla oficial", async () => {
+    const out = ok(await run("set_print_setup", mut({ trimWidthIn: 5.5, trimHeightIn: 8.5, pageCount: 116, paperAndInk: "bw-cream", binding: "hardcover" })));
+    MCP_TOOLS.set_print_setup.output.parse(out);
+    expect(out.binding).toBe("hardcover");
+    expect(out.canvas.widthIn).toBeCloseTo(939.8721 / 72, 5);
+    expect(out.hinges[0]).toBeCloseTo(424.3464 / 72, 5);
+    expect(doc().printSetup?.binding).toBe("hardcover");
+  });
+  it("tapa dura con una imagen por debajo de 300 ppp es invalid_params con la imagen y sus ppp", async () => {
+    const { assetId } = ok(await run("import_asset", { projectId: doc().id, kind: "image", dataBase64: PNG_B64 }));
+    ok(await run("apply_background", mut({ assetId })));
+    const before = doc();
+    const e = err(await run("set_print_setup", mut({ trimWidthIn: 5.5, trimHeightIn: 8.5, pageCount: 116, paperAndInk: "bw-cream", binding: "hardcover" })));
+    if (e.kind !== "invalid_params") throw new Error(e.kind);
+    expect(e.issues.join(" ")).toMatch(/background: \d+ ppp.*300/);
+    expect(doc()).toBe(before);
+  });
   it("un corte no admitido es invalid_params y no cambia nada", async () => {
     const before = doc();
     expect(err(await run("set_print_setup", mut({ trimWidthIn: 7, trimHeightIn: 9, pageCount: 116, paperAndInk: "bw-white" }))).kind).toBe("invalid_params");

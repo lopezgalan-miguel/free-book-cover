@@ -227,6 +227,7 @@ export const setPrintSetupInput = z
     trimHeightIn: finite.positive().max(100),
     pageCount: z.number().int().positive().max(10000),
     paperAndInk: z.enum(PAPERS.map((p) => p.id) as [string, ...string[]]),
+    binding: z.enum(["paperback", "hardcover"]).optional().describe("Encuadernación; por defecto tapa blanda. La tapa dura exige 300 ppp en todas las imágenes."),
   })
   .strict();
 
@@ -331,8 +332,11 @@ export const updateVariantOutput = z
 export const setPrintSetupOutput = z
   .object({
     revision: z.number().int(),
+    binding: z.enum(["paperback", "hardcover"]),
     canvas: z.object({ widthIn: z.number(), heightIn: z.number() }).strict(),
     spineIn: z.number(),
+    // Solo tapa dura: x de las dos líneas de bisagra (no poner texto entre ellas y el lomo).
+    hinges: z.tuple([z.number(), z.number()]).nullable(),
     back: rectOut,
     spine: rectOut,
     front: rectOut,
@@ -361,7 +365,7 @@ export const MCP_TOOLS = {
   add_shape_element: { description: "Añade un rectángulo o una elipse con relleno y borde opcional.", input: addShapeElementInput, output: addElementOutput, readOnly: false },
   add_variant: { description: "Añade una variante digital (preajuste de redes o tamaño propio) derivada del diseño base.", input: addVariantInput, output: addVariantOutput, readOnly: false },
   update_variant: { description: "Ajusta una variante en un solo paso: encuadre (zona visible y zoom), fondo y ajustes por elemento. Devuelve el área visible y los elementos cortados.", input: updateVariantInput, output: updateVariantOutput, readOnly: false },
-  set_print_setup: { description: "Configura la cubierta KDP de tapa blanda (corte, páginas, papel): ajusta el lienzo y devuelve la geometría (lomo, caras, zonas seguras, código de barras) en pulgadas.", input: setPrintSetupInput, output: setPrintSetupOutput, readOnly: false },
+  set_print_setup: { description: "Configura la cubierta KDP de tapa blanda o dura (corte, páginas, papel, encuadernación): ajusta el lienzo y devuelve la geometría (lomo, caras, bisagras, zonas seguras, código de barras) en pulgadas. En tapa dura, si alguna imagen queda por debajo de 300 ppp, es invalid_params con la lista.", input: setPrintSetupInput, output: setPrintSetupOutput, readOnly: false },
   set_canvas: { description: "Cambia el tamaño del lienzo (pulgadas) en modo libre o digital; los elementos no se mueven. En una cubierta KDP el tamaño lo fija set_print_setup.", input: setCanvasInput, output: setCanvasOutput, readOnly: false },
   set_background_filters: { description: "Desenfoca, oscurece o desatura el fondo (filtros de imagen del lienzo) sin preparar la imagen fuera.", input: setBackgroundFiltersInput, output: setBackgroundFiltersOutput, readOnly: false },
   generate_texture: { description: "Genera una textura incluida y sin costuras (mármol agrietado, piedra o papel) como recurso de imagen, para usarla en texture o mask de un texto en mosaico.", input: generateTextureInput, output: generateTextureOutput, readOnly: false },

@@ -45,6 +45,7 @@ export function CompanionConnect({ conn }: { conn: CompanionConnection }) {
 function errorText(t: ReturnType<typeof useI18n>["t"], e: PdfError): string {
   switch (e.kind) {
     case "not_kdp": return t("pdfErrNotKdp");
+    case "low_dpi": return `${t("pdfLowDpi")} ${t("lowDpiFix")}`;
     case "limit": return t("pdfErrLimit", { mp: e.megapixels.toFixed(1), limit: e.limitMegapixels });
     case "fonts": return `${t("exFontsBlocked")} ${e.problems.map((p) => p.family).join(", ")}`;
     case "missing_assets": return t("exAssetsMissing", { n: e.assetIds.length });

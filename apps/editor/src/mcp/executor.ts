@@ -1,8 +1,8 @@
 import {
   DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, FONT_CATALOG, availableFaces, availableWeights, hasFace, MAX_EXPORT_BYTES, MCP_TOOLS, assetDims, customTarget, defaultTextElement, documentFontFamilies,
-  editableKeys, elementVisibility, findPreset, readFontAxes, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, letterWidthPatch, needsRelayout, overridesOf,
-  styleToPatch, targetFromPreset, variantDocument, visibleArea,
-  type CommandError, type ElementSummary, type Project, type ResolvedTarget, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
+  editableKeys, elementVisibility, findPreset, readFontAxes, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, letterWidthPatch, lowDpiForSetup, needsRelayout, overridesOf,
+  styleToPatch, targetFromPreset, validatePrintSetup, variantDocument, visibleArea,
+  type CommandError, type ElementSummary, type PrintSetup, type Project, type ResolvedTarget, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
 } from "@free-book-cover/core";
 import { textHeightIn } from "../canvas/measure";
 import { runExport, type ExportDeps } from "../export/exportImage";
@@ -358,14 +358,22 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
     }
 
     case "set_print_setup": {
-      const printSetup = { trimWidthIn: args.trimWidthIn, trimHeightIn: args.trimHeightIn, pageCount: args.pageCount, paperAndInk: args.paperAndInk, readingDirection: "ltr" as const };
+      const printSetup: PrintSetup = {
+        trimWidthIn: args.trimWidthIn, trimHeightIn: args.trimHeightIn, pageCount: args.pageCount, paperAndInk: args.paperAndInk, readingDirection: "ltr",
+        ...(args.binding === "hardcover" ? { binding: "hardcover" as const } : {}),
+      };
+      // La tapa dura exige 300 ppp: se dice qué imagen falla (core lo rechaza igualmente con printSetup: low_dpi).
+      if (printSetup.binding === "hardcover" && validatePrintSetup(printSetup).ok) {
+        const low = lowDpiForSetup(doc(), printSetup);
+        if (low.length) return invalid(...low.map((e) => `${e.id}: ${Math.floor(e.dpi)} ppp, por debajo del mínimo de 300 ppp de la tapa dura (sube una imagen más grande o redúcela)`));
+      }
       const r = store.applyRemote({ type: "setPrintSetup", printSetup }, args.expectedRevision);
       if (!r.ok) return fail(fromCommand(r.error, "element"));
       const l = kdpLayout(printSetup);
       return {
         ok: true,
         data: {
-          revision: r.revision, canvas: { widthIn: l.widthIn, heightIn: l.heightIn }, spineIn: l.spineIn, back: l.back, spine: l.spine, front: l.front,
+          revision: r.revision, binding: l.binding, hinges: l.hinges, canvas: { widthIn: l.widthIn, heightIn: l.heightIn }, spineIn: l.spineIn, back: l.back, spine: l.spine, front: l.front,
           safeFront: l.safe.front, safeBack: l.safe.back, spineSafe: l.spineSafe, barcode: l.barcode, saved: await saved(store),
         },
       };

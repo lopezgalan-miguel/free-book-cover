@@ -49,6 +49,18 @@ describe("flujo del PDF de imprenta", () => {
     expect(stages).toEqual(["companion", "download"]);
     expect(out.result.proofPng).toBe("UE5H");
   });
+  it("tapa dura con imágenes por debajo de 300 ppp: bloquea sin renderizar y dice cuáles", async () => {
+    const hard: PrintSetup = { trimWidthIn: 5.5, trimHeightIn: 8.5, pageCount: 116, paperAndInk: "bw-cream", readingDirection: "ltr", binding: "hardcover" };
+    const HL = kdpLayout(hard);
+    const doc = kdp({ printSetup: hard, assets: [img(1600, 2560)], canvas: { widthIn: HL.widthIn, heightIn: HL.heightIn, background: { assetId: "a" } } });
+    const { d } = deps();
+    const out = await runPdfExport(doc, "x", d);
+    expect(out).toMatchObject({ ok: false, error: { kind: "low_dpi", entries: [{ id: "background" }] } });
+    expect(d.renderer.render).not.toHaveBeenCalled();
+    // La misma imagen en tapa blanda no bloquea (solo la marca la preimpresión).
+    const soft = await runPdfExport(kdp({ assets: [img(1600, 2560)], canvas: { widthIn: L.widthIn, heightIn: L.heightIn, background: { assetId: "a" } } }), "x", deps().d);
+    expect(soft.ok).toBe(true);
+  });
   it("no es una cubierta KDP: error sin renderizar", async () => {
     const { d } = deps();
     expect(await runPdfExport({ ...kdp(), mode: "freeform" }, "x", d)).toEqual({ ok: false, error: { kind: "not_kdp" } });
