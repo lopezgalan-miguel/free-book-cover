@@ -110,7 +110,14 @@ export function Stage() {
   return (
     <main className={`relative flex min-w-0 flex-1 overflow-hidden ${TONE_CLASS[stageTone]}`}>
       {supported ? (
-        <div ref={scroller} className="flex min-h-0 min-w-0 flex-1 overflow-auto p-6">
+        <div
+          ref={scroller}
+          className="flex min-h-0 min-w-0 flex-1 overflow-auto p-6"
+          // Un clic en el escenario, fuera de la portada, quita la selección.
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) store.select(null);
+          }}
+        >
           <div ref={host} data-testid="cover-canvas" className="m-auto flex-none shadow-[0_18px_60px_rgba(0,0,0,.45)]" />
         </div>
       ) : (
