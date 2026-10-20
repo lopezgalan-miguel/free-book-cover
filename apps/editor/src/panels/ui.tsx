@@ -21,8 +21,8 @@ export function Section({ title, action, children, last }: { title: string; acti
 
 // Campo numérico con etiqueta asociada; confirma al salir del campo o con Enter (no en cada tecla).
 export function NumberField({
-  label, value, onCommit, min, max, step = "any", digits = 3,
-}: { label: string; value: number; onCommit: (v: number) => void; min?: number; max?: number; step?: number | "any"; digits?: number }) {
+  label, value, onCommit, min, max, step = "any", digits = 3, disabled, title,
+}: { disabled?: boolean; title?: string; label: string; value: number; onCommit: (v: number) => void; min?: number; max?: number; step?: number | "any"; digits?: number }) {
   const id = useId();
   const shown = String(Number(value.toFixed(digits)));
   const [draft, setDraft] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export function NumberField({
     <div className="min-w-0 flex-1">
       <label htmlFor={id} className="mb-1 block text-[10px] text-muted">{label}</label>
       <input
-        id={id} type="number" className={fieldCls} min={min} max={max} step={step}
+        id={id} type="number" className={fieldCls} disabled={disabled} title={title} min={min} max={max} step={step}
         value={draft ?? shown}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
