@@ -185,6 +185,29 @@ describe("pegado seguro", () => {
     expect(s.getState().error).toBeNull();
     expect(s.getState().nearLimit).toBe(false);
   });
+  it("sin sitio en el destino (límite de 500 MB): error de límite, documento intacto y sin blobs escritos", async () => {
+    const mem: ProjectStorage = { ...storage, putAsset: async () => ({ ok: true as const }), deleteAsset: async () => undefined };
+    const s = mk(mem);
+    await s.init();
+    await s.addAsset(tex, fake(90));
+    s.dispatch({ type: "addElement", element: text("t", { texture: { assetId: "tx" } }) });
+    s.select("t");
+    s.copySelection();
+    await s.newProject();
+    // 420 MB referenciados por capas del destino: no son huérfanos y no se pueden purgar.
+    for (const id of ["g1", "g2", "g3", "g4", "g5"]) {
+      await s.addAsset({ id, kind: "image", mimeType: "image/png", metadata: {} }, fake(id === "g5" ? 20 : 100));
+      s.dispatch({ type: "addElement", element: text(`e${id}`, { texture: { assetId: id } }) });
+    }
+    const rev = s.getState().history.present.revision;
+    const put = vi.spyOn(mem, "putAsset");
+    expect(await s.paste()).toBe(false);
+    expect(s.getState().error).toMatchObject({ kind: "limit" });
+    expect(s.getState().history.present.revision).toBe(rev);
+    expect(els(s)).toHaveLength(5);
+    expect(ids(s)).toEqual(["g1", "g2", "g3", "g4", "g5"]);
+    expect(put).not.toHaveBeenCalled();
+  });
   it("avisa de proyecto casi lleno tras pegar", async () => {
     const mem: ProjectStorage = { ...storage, putAsset: async () => ({ ok: true as const }), deleteAsset: async () => undefined };
     const s = mk(mem);
