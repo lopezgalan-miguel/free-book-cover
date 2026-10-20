@@ -40,7 +40,7 @@ Todas las entradas son `strict` (campos desconocidos se rechazan). Longitudes en
 | `set_print_setup` | `projectId`, `expectedRevision`, `trimWidthIn`, `trimHeightIn`, `pageCount`, `paperAndInk`, `binding?` (`paperback` \| `hardcover`) | `revision`, `binding`, `canvas`, `spineIn`, `back`, `spine`, `front`, `hinges`, `safeFront`, `safeBack`, `spineSafe`, `barcode`, `saved` |
 | `set_canvas` | `projectId`, `expectedRevision`, `widthIn`, `heightIn` | `revision`, `canvas`, `saved` |
 | `set_background_filters` | `projectId`, `expectedRevision`, `filters` (`{ blur?, brightness?, saturation? }` o `null`) | `revision`, `filters`, `saved` |
-| `generate_texture` | `projectId`, `expectedRevision?`, `kind` (`cracked-marble`/`stone`/`paper`), `seed`, `sizePx?` (64–2048, por defecto 1024), `scale?`, `color?`, `cracks?` (`holes`/`lines`) | `assetId`, `widthPx`, `heightPx`, `revision`, `saved` |
+| `generate_texture` | `projectId`, `expectedRevision?`, `kind` (`cracked-marble`/`stone`/`paper`), `seed`, `sizePx?` (64–2048, por defecto 1024), `scale?`, `color?`, `cracks?` (`holes`/`lines`), `crackColor?`, `soften?` (0..8, desenfoque periódico del patrón) | `assetId`, `widthPx`, `heightPx`, `revision`, `saved` |
 | `rename_project` | `projectId`, `expectedRevision`, `name` (1–120 caracteres) | `revision`, `name`, `saved` |
 | `remove_element` | `projectId`, `expectedRevision`, `elementId` | `revision`, `saved` |
 | `reorder_element` | `projectId`, `expectedRevision`, `elementId`, `toIndex` (0 = fondo; si pasa del último, queda al frente) | `revision`, `order` (IDs del fondo al frente), `saved` |
