@@ -20,7 +20,7 @@ const ALL_SECTIONS: readonly TextSection[] = ["text", "font", "style", "color", 
 
 const GROUP_KEY: Record<FontGroupId, DictKey> = { serif: "fontGroupSerif", sans: "fontGroupSans", display: "fontGroupDisplay", system: "fontGroupSystem" };
 const WEIGHTS = [
-  [300, "weight300"], [400, "weight400"], [500, "weight500"], [600, "weight600"], [700, "weight700"], [800, "weight800"],
+  [300, "weight300"], [400, "weight400"], [500, "weight500"], [600, "weight600"], [700, "weight700"], [800, "weight800"], [900, "weight900"],
 ] as const satisfies ReadonlyArray<readonly [number, DictKey]>;
 const SWATCHES = ["#FFFFFF", "#F4EFE6", "#C2B6A1", "#8C6F47", "#2B2824", "#1A1712", "#B4453A", "#3E5C4B"];
 const HEX = /^[0-9a-fA-F]{6}$/;

@@ -85,6 +85,13 @@ describe("gestos continuos en el panel de texto (I-3)", () => {
 });
 
 describe("caras disponibles en el panel de texto (I-4)", () => {
+  it("con Roboto Slab el selector de peso ofrece 900", async () => {
+    const user = userEvent.setup();
+    const { store } = await mount();
+    await addText(user, store);
+    await user.click(within(screen.getByRole("group", { name: "Lista de fuentes" })).getByRole("button", { name: /Roboto Slab/ }));
+    expect(weightOptions()).toContain("900");
+  });
   it("el selector de peso solo ofrece los pesos de la familia", async () => {
     const user = userEvent.setup();
     const { store } = await mount();
