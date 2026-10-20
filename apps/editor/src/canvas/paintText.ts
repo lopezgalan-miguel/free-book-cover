@@ -39,7 +39,12 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
     paintGlyphs(layer.ctx, item, ops, sources, null);
     // La sombra interior va antes que la máscara: sigue el contorno de la letra y no marca como líneas
     // oscuras los bordes que la máscara abre (p. ej. las grietas de un mármol).
-    if (item.effects.innerShadow) applyInnerShadow(layer, scaleShadow(item.effects.innerShadow, layer.k));
+    // Con textura o máscara, la forma de la sombra sale de la silueta opaca de la letra: los huecos de una
+    // textura con alfa (mármol «con huecos») no cuentan como borde de la letra.
+    if (item.effects.innerShadow) {
+      const silhouette = item.texture || item.mask ? paintSilhouette(ctx, item, ops, sources, margin) : null;
+      applyInnerShadow(layer, scaleShadow(item.effects.innerShadow, layer.k), silhouette);
+    }
     if (item.mask) applyMask(layer.ctx, item, sources);
     const shadow = item.effects.shadow && scaleShadow(item.effects.shadow, layer.k);
     compositeLayer(ctx, layer, { opacity: item.opacity, shadow });
@@ -51,6 +56,16 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
   if (item.opacity < 1) ctx.globalAlpha *= item.opacity;
   paintGlyphs(ctx, item, ops, sources, item.effects.shadow && scaleShadow(item.effects.shadow, k));
   ctx.restore();
+}
+
+// Letras (con su contorno) en un lienzo aparte, en color opaco y sin textura: la forma de la letra sin los
+// huecos que la textura pueda tener. null si no queda nada visible.
+function paintSilhouette(ctx: CanvasRenderingContext2D, item: TextItem, ops: Op[], sources: ImageSources, margin: number): Layer | null {
+  const layer = openLayer(ctx, { x: 0, y: 0, width: item.box.width, height: item.box.height }, margin);
+  if (!layer) return null;
+  const solid = ops.map((o) => ({ ...o, style: { ...o.style, color: "#000" } }));
+  paintGlyphs(layer.ctx, { ...item, texture: null }, solid, sources, null);
+  return layer;
 }
 
 // Sombra (si se pide), contorno y relleno con subrayado, en este orden, sobre `ctx`.
@@ -156,14 +171,15 @@ function applyMask(ctx: Ctx2D, item: TextItem, sources: ImageSources): void {
 // conserva sobre la letra (source-atop). El negativo se dibuja muy desplazado, fuera de la capa, y la
 // sombra compensa ese desplazamiento: solo cae la sombra.
 const FAR = 100_000;
-function applyInnerShadow(layer: Layer, s: ShadowPx): void {
+// `silhouette` (misma capa, solo la forma opaca de la letra) sustituye al alfa de la capa como forma.
+function applyInnerShadow(layer: Layer, s: ShadowPx, silhouette: Layer | null = null): void {
   const { width: w, height: h } = layer.canvas;
   const neg = makeCanvas(w, h);
   const nc = context2d(neg);
   nc.fillStyle = "#000";
   nc.fillRect(0, 0, w, h);
   nc.globalCompositeOperation = "destination-out";
-  nc.drawImage(layer.canvas as CanvasImageSource, 0, 0);
+  nc.drawImage((silhouette ?? layer).canvas as CanvasImageSource, 0, 0);
   const c = layer.ctx;
   c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
