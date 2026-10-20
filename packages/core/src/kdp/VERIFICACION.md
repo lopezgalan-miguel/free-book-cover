@@ -29,4 +29,4 @@ Procedimiento: en el calculador elegir *Hardcover*, tamaño, páginas y papel; d
 | 7 × 10 in | — | — | — | pendiente |
 | 8,25 × 11 in | — | — | — | pendiente |
 
-El PDF que genera el editor para 5,5 × 8,5 / 116 / crema mide 939,87 × 714,05 pt, igual que la plantilla (`apps/editor/e2e/hardcover.spec.ts`, con el companion real). Falta subirlo al previsualizador de KDP.
+El PDF que genera el editor para 5,5 × 8,5 / 116 / crema mide 939,87 × 714,05 pt, igual que la plantilla (`apps/editor/e2e/hardcover.spec.ts`, con el companion real). El previsualizador de KDP no se automatiza: las medidas dependen del corte, las páginas y el papel de cada usuario, y la comprobación final con sus datos la hace KDP al subir el archivo.

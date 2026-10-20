@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { exportKdpPdfEditorOutput, toolErrorSchema, type CompanionReport, type PrintSetup, type ToolOutcome } from "@free-book-cover/core";
+import { MAX_EXPORT_BYTES, exportKdpPdfEditorOutput, toolErrorSchema, type CompanionReport, type PrintSetup, type ToolOutcome } from "@free-book-cover/core";
 import { CompanionError, type CompanionClient } from "../src/export/companionClient";
 import type { PdfExportDeps } from "../src/export/exportPdf";
 import { executeTool } from "../src/mcp/executor";
@@ -73,6 +73,22 @@ describe("export_kdp_pdf", () => {
     const d = pdfDeps();
     d.renderer = { render: async () => { throw new Error("boom"); } };
     expect(err(await run(d)).kind).toBe("internal");
+  });
+  it("companion caído: error sin renderizar", async () => {
+    store.applyRemote({ type: "setPrintSetup", printSetup: setup }, doc().revision);
+    for (const status of ["offline", "needs_token"] as const) {
+      const d = pdfDeps({ health: async () => status });
+      const e = err(await run(d));
+      expect(e.kind).toBe("invalid_params");
+      expect(JSON.stringify(e)).toContain("conecta el editor");
+      expect(d.renderer.render).not.toHaveBeenCalled();
+    }
+  });
+  it("PDF por encima del límite del canal: invalid_params que remite a Exportar → PDF", async () => {
+    store.applyRemote({ type: "setPrintSetup", printSetup: setup }, doc().revision);
+    const e = err(await run(pdfDeps({ downloadPdf: async () => new Blob([new Uint8Array(MAX_EXPORT_BYTES + 1)]) })));
+    expect(e.kind).toBe("invalid_params");
+    expect(JSON.stringify(e)).toContain("Exportar → PDF");
   });
   it("sin pdfDeps: internal", async () => {
     expect(err(await executeTool({ store, authorizedProjectId: () => doc().id, measure: () => null }, "export_kdp_pdf", { projectId: doc().id })).kind).toBe("internal");

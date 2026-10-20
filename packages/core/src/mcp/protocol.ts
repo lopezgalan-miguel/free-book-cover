@@ -88,7 +88,12 @@ export const runInputSchema = z
   })
   .strict();
 export type RunInput = z.infer<typeof runInputSchema>;
-const runsInput = z.array(runInputSchema).min(1).max(200);
+// Mismos límites que text: el texto unido tiene entre 1 y 5000 caracteres.
+const runsInput = z
+  .array(runInputSchema)
+  .min(1)
+  .max(200)
+  .refine((rs) => { const n = rs.reduce((a, r) => a + r.text.length, 0); return n >= 1 && n <= 5000; }, { message: "el texto de los fragmentos debe tener entre 1 y 5000 caracteres en total" });
 
 export const addTextElementInput = z
   .object({

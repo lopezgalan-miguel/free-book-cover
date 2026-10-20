@@ -16,7 +16,7 @@ const Ctx = createContext<McpBridge | null>(null);
 export function McpBridgeProvider({ bridge, createSocket, children }: { bridge?: McpBridge; createSocket?: McpBridgeDeps["createSocket"]; children: ReactNode }) {
   const store = useStore();
   const fonts = useFonts();
-  // Solo deps: el objeto de servicios puede ser nuevo en cada render y recrearía el puente (y su conexión).
+  // Solo los campos deps y pdf: el objeto de servicios puede ser nuevo en cada render y recrearía el puente (y su conexión).
   const overrideDeps = useExportServices().deps;
   const overridePdf = useExportServices().pdf;
   const own = useMemo(

@@ -26,7 +26,7 @@ export interface ServerOptions {
   /** Sustituible en pruebas. */
   preflight?: typeof runPreflight;
   /** Ajustes del canal WebSocket del MCP (pruebas). */
-  bridge?: Partial<Pick<BridgeOptions, "callTimeoutMs" | "helloTimeoutMs" | "maxMessageBytes" | "maxPending">>;
+  bridge?: Partial<Pick<BridgeOptions, "callTimeoutMs" | "pdfCallTimeoutMs" | "helloTimeoutMs" | "maxMessageBytes" | "maxPending">>;
 }
 
 export interface CompanionServer {

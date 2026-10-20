@@ -13,6 +13,8 @@ export interface BridgeOptions {
   hostOk(host: string | undefined): boolean;
   /** Espera máxima de la respuesta del editor. */
   callTimeoutMs?: number;
+  /** Espera máxima de export_kdp_pdf: el editor renderiza a 300 ppp y descarga antes de responder. */
+  pdfCallTimeoutMs?: number;
   /** Tiempo para presentar el token tras abrir el canal. */
   helloTimeoutMs?: number;
   /** Tamaño máximo de un mensaje (cubre una imagen importada en base64). */
@@ -59,6 +61,7 @@ interface Pending {
  */
 export function attachBridge(server: Server, opts: BridgeOptions): Bridge {
   const callTimeout = opts.callTimeoutMs ?? 20_000;
+  const pdfCallTimeout = opts.pdfCallTimeoutMs ?? 180_000;
   const helloTimeout = opts.helloTimeoutMs ?? 5_000;
   const maxPending = opts.maxPending ?? 16;
   const wss = new WebSocketServer({ noServer: true, maxPayload: opts.maxMessageBytes ?? 40 * 1024 * 1024 });
@@ -97,7 +100,7 @@ export function attachBridge(server: Server, opts: BridgeOptions): Bridge {
     const timer = setTimeout(() => {
       pending.delete(id);
       reply(ws, msg.id, { ok: false, error: ERR.timeout });
-    }, callTimeout);
+    }, msg.tool === "export_kdp_pdf" ? pdfCallTimeout : callTimeout);
     pending.set(id, { mcp: ws, mcpId: msg.id, timer });
     toEditor({ type: "call", id, tool: msg.tool, args });
   };

@@ -72,10 +72,19 @@ function missingFace(doc: Project, el: TextElement): string | null {
   return null;
 }
 
+const NO_COMPANION_MSG = "conecta el editor al companion de preimpresión (panel MCP o diálogo de exportación)";
 const DEFAULT_WEIGHT = 500;
 function nearestWeight(doc: Project, family: string, italic: boolean): number {
   const ws = availableWeights(family, italic, documentFontFamilies(doc));
   return ws.length ? ws.reduce((b, w) => (Math.abs(w - DEFAULT_WEIGHT) < Math.abs(b - DEFAULT_WEIGHT) ? w : b)) : DEFAULT_WEIGHT;
+}
+
+type Run = TextElement["runs"][number];
+// Fragmento desde sus valores por defecto. Sin peso propio ni del estilo: el del fragmento de partida si la cara no cambia; si no, el publicado más próximo.
+function buildRun(doc: Project, defaults: Run, own: Omit<RunInput, "text">, text: string, styleWeight?: number, from?: Run): Run {
+  const base = { ...defaults, ...Object.fromEntries(Object.entries(own).filter(([, v]) => v !== undefined)), text } as Run;
+  const sameFace = from && from.fontFamily === base.fontFamily && from.italic === base.italic;
+  return { ...base, weight: own.weight ?? styleWeight ?? (sameFace ? from.weight : nearestWeight(doc, base.fontFamily, base.italic)) };
 }
 
 const fontKnown = (doc: Project, family: string) => FONT_CATALOG.some((g) => g.names.includes(family)) || documentFontFamilies(doc).has(family);
@@ -163,11 +172,7 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       });
       if (args.runs) {
         const [first] = draft.runs;
-        draft.runs = normalizeRuns((args.runs as RunInput[]).map(({ text, ...own }) => {
-          const base = { ...first!, ...Object.fromEntries(Object.entries(own).filter(([, v]) => v !== undefined)), text };
-          // Sin peso propio ni del elemento: el más próximo al de por defecto en la familia y cursiva del fragmento.
-          return { ...base, weight: own.weight ?? args.weight ?? nearestWeight(d, base.fontFamily, base.italic) };
-        }), first);
+        draft.runs = normalizeRuns((args.runs as RunInput[]).map(({ text, ...own }) => buildRun(d, first!, own, text, args.weight)), first);
       }
       const face = missingFace(d, draft);
       if (face) return invalid(face);
@@ -199,7 +204,7 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       if (newRuns && el.type === "text") {
         const [first] = el.runs;
         const defaults = { ...first, ...Object.fromEntries(Object.entries(rest).filter(([k, v]) => v !== undefined && TEXT_RUN_KEYS.includes(k))) };
-        patch.runs = normalizeRuns(newRuns.map(({ text, ...own }: RunInput) => ({ ...defaults, ...Object.fromEntries(Object.entries(own).filter(([, v]) => v !== undefined)), text }) as TextElement["runs"][number]), first);
+        patch.runs = normalizeRuns(newRuns.map(({ text, ...own }: RunInput) => buildRun(doc(), defaults as Run, own, text, rest.weight as number | undefined, first)), first);
       }
       // null quita textura, máscara, sombra interior o filtros: updateElement elimina las claves con valor undefined.
       for (const key of ["texture", "mask", "innerShadow", "filters"]) if (style[key] === null) patch[key] = undefined;
@@ -431,19 +436,22 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
     case "export_kdp_pdf": {
       if (!deps.pdfDeps) return fail({ kind: "internal" });
       const d = doc();
-      const out = await runPdfExport(d, d.name, deps.pdfDeps());
+      const pdf = deps.pdfDeps();
+      // Sin companion no merece la pena renderizar a 300 ppp para fallar al final.
+      if ((await pdf.companion.health(pdf.config)) !== "connected") return invalid(NO_COMPANION_MSG);
+      const out = await runPdfExport(d, d.name, pdf);
       if (!out.ok) {
         const e = out.error;
         if (e.kind === "render_failed") return fail({ kind: "internal" });
         if (e.kind === "not_kdp") return invalid("el proyecto no es una cubierta KDP (usa set_print_setup)");
         if (e.kind === "low_dpi") return invalid(...e.entries.map((x) => `${x.id}: ${Math.floor(x.dpi)} ppp, por debajo del mínimo de 300 ppp de la tapa dura (sube una imagen más grande o redúcela)`));
-        if (e.kind === "companion") return invalid(e.reason === "failed" ? "el companion de preimpresión falló" : "conecta el editor al companion en el diálogo de exportación");
+        if (e.kind === "companion") return invalid(e.reason === "failed" ? "el companion de preimpresión falló" : NO_COMPANION_MSG);
         if (e.kind === "limit") return invalid(`la cubierta (${Math.round(e.megapixels)} MP) supera el límite de ${e.limitMegapixels} MP`);
         if (e.kind === "missing_assets") return invalid(`faltan recursos: ${e.assetIds.join(", ")}`);
         return invalid(`fuentes no disponibles: ${e.problems.map((p) => `${p.family}: ${p.reason}`).join(", ")}`);
       }
       const r = out.result;
-      if (r.pdf && r.pdf.size > MAX_EXPORT_BYTES) return invalid(`el PDF (${r.pdf.size} bytes) supera el máximo del canal MCP (${MAX_EXPORT_BYTES})`);
+      if (r.pdf && r.pdf.size > MAX_EXPORT_BYTES) return invalid(`el PDF (${r.pdf.size} bytes) supera el máximo del canal MCP (${MAX_EXPORT_BYTES}); usa «Exportar → PDF» en el editor`);
       const lang = readStoredLang();
       return {
         ok: true,

@@ -1,6 +1,6 @@
 # Muestra para el previsualizador de KDP
 
-`portada-kdp-muestra.pdf` es una cubierta de prueba generada con la cadena real (editor + companion + Ghostscript), no un montaje. Sirve para comprobar manualmente en el **previsualizador/validador de KDP** (Print Previewer, en tu cuenta de KDP). La subida a KDP requiere tu cuenta: no está automatizada y **la aceptación final está pendiente**.
+`portada-kdp-muestra.pdf` es una cubierta de prueba generada con la cadena real (editor + companion + Ghostscript), no un montaje. Sirve para comprobar manualmente, si quieres, en el **previsualizador/validador de KDP** (Print Previewer, en tu cuenta de KDP). La subida requiere tu cuenta y no está automatizada; el editor no trae un previsualizador propio porque las medidas dependen del corte, las páginas y el papel de cada usuario, así que la comprobación final con tus datos la hace KDP.
 
 ## Qué es
 

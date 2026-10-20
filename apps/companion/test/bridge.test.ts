@@ -38,7 +38,7 @@ const tick = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 const call = (id: string, tool: string, args: unknown) => ({ type: "call", id, tool, args });
 
 beforeEach(async () => {
-  s = await startServer({ token: TOKEN, allowedOrigins: [ORIGIN], port: 0, bridge: { callTimeoutMs: 400, helloTimeoutMs: 300, maxPending: 2 } });
+  s = await startServer({ token: TOKEN, allowedOrigins: [ORIGIN], port: 0, bridge: { callTimeoutMs: 400, pdfCallTimeoutMs: 1500, helloTimeoutMs: 300, maxPending: 2 } });
 });
 afterEach(async () => {
   for (const o of open.splice(0)) o.ws.terminate();
@@ -167,6 +167,18 @@ describe("canal WebSocket: autorización y reenvío", () => {
     m.send(call("1", "get_canvas_state", {}));
     expect(await m.next(1500)).toMatchObject({ error: { kind: "editor_disconnected", reason: "timeout" } });
     expect(s.bridge.state().pending).toBe(0);
+  });
+  it("export_kdp_pdf tiene su propio timeout, más largo que el de las llamadas rápidas", async () => {
+    const e = await editor("p1");
+    const m = await mcp();
+    m.send(call("1", "export_kdp_pdf", {}));
+    const c = await nextCall(e);
+    await tick(700);
+    expect(s.bridge.state().pending).toBe(1);
+    e.send({ type: "result", id: c.id, ok: true, data: { state: "ok" } });
+    expect(await m.next()).toEqual({ type: "result", id: "1", ok: true, data: { state: "ok" } });
+    m.send(call("2", "export_kdp_pdf", {}));
+    expect(await m.next(2500)).toMatchObject({ id: "2", error: { kind: "editor_disconnected", reason: "timeout" } });
   });
   it("tope de llamadas pendientes: busy", async () => {
     await editor("p1");

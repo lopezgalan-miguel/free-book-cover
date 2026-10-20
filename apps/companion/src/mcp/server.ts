@@ -5,7 +5,7 @@ import {
 } from "@free-book-cover/core";
 import { basename } from "node:path";
 import { COMPANION_VERSION } from "../version.js";
-import { readImportFile, writeExportFile, type ImportLimits } from "./files.js";
+import { readImportFile, writeExportFile, writeExportFiles, type ImportLimits } from "./files.js";
 
 export interface McpServerOptions {
   relay: { call(tool: McpToolName, args: unknown): Promise<ToolOutcome> };
@@ -74,7 +74,10 @@ export function createMcpServer(opts: McpServerOptions): Server {
     if (name === "export_image") {
       // El editor entrega los bytes; aquí se escriben y el cliente solo recibe la ruta.
       const file = exportImageEditorOutput.safeParse(out.data);
-      if (!file.success) return errorResult({ kind: "internal" });
+      if (!file.success) {
+        console.error("respuesta del editor no válida para export_image");
+        return errorResult({ kind: "internal" });
+      }
       const { dataBase64, mimeType: _m, ...meta } = file.data;
       const written = await writeExportFile(opts.exportDir ?? null, meta.fileName, Buffer.from(dataBase64, "base64"));
       if (!written.ok) return errorResult(written.error);
@@ -83,17 +86,18 @@ export function createMcpServer(opts: McpServerOptions): Server {
     }
     if (name === "export_kdp_pdf") {
       const file = exportKdpPdfEditorOutput.safeParse(out.data);
-      if (!file.success) return errorResult({ kind: "internal" });
-      const f = file.data;
-      let path: string | null = null;
-      if (f.pdfBase64) {
-        const pdf = await writeExportFile(opts.exportDir ?? null, f.fileName, Buffer.from(f.pdfBase64, "base64"));
-        if (!pdf.ok) return errorResult(pdf.error);
-        path = pdf.path;
+      if (!file.success) {
+        console.error("respuesta del editor no válida para export_kdp_pdf");
+        return errorResult({ kind: "internal" });
       }
-      const rep = await writeExportFile(opts.exportDir ?? null, f.reportFileName, Buffer.from(f.reportText, "utf8"));
-      if (!rep.ok) return errorResult(rep.error);
-      const result = { state: f.state, path, reportPath: rep.path, checks: f.checks, widthIn: f.widthIn, heightIn: f.heightIn };
+      const f = file.data;
+      // Informe y PDF comparten sufijo de colisión.
+      const parts = [{ fileName: f.reportFileName, bytes: Buffer.from(f.reportText, "utf8") }];
+      if (f.pdfBase64) parts.unshift({ fileName: f.fileName, bytes: Buffer.from(f.pdfBase64, "base64") });
+      const written = await writeExportFiles(opts.exportDir ?? null, parts);
+      if (!written.ok) return errorResult(written.error);
+      const path = f.pdfBase64 ? written.paths[0]! : null;
+      const result = { state: f.state, path, reportPath: written.paths[written.paths.length - 1]!, checks: f.checks, widthIn: f.widthIn, heightIn: f.heightIn };
       return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
     }
     const data = def.output.safeParse(out.data);

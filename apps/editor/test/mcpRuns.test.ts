@@ -68,4 +68,26 @@ describe("runs por MCP", () => {
     ok(await run("add_text_element", { ...base(), text: "Hola" }));
     expect(ok(await run("get_canvas_state", {})).elements[0].runs).toBeUndefined();
   });
+
+  it("runs respeta los límites de text: todos vacíos o más de 5000 en total son invalid_params", async () => {
+    const { elementId } = ok(await run("add_text_element", { ...base(), text: "Hola" }));
+    const rev = doc().revision;
+    const long = [{ text: "a".repeat(3000) }, { text: "b".repeat(2001) }];
+    expect(err(await run("add_text_element", { ...base(), runs: [{ text: "" }, { text: "" }] })).kind).toBe("invalid_params");
+    expect(err(await run("add_text_element", { ...base(), runs: long })).kind).toBe("invalid_params");
+    expect(err(await run("update_element_style", { ...base(), elementId, style: { runs: [{ text: "" }] } })).kind).toBe("invalid_params");
+    expect(err(await run("update_element_style", { ...base(), elementId, style: { runs: long } })).kind).toBe("invalid_params");
+    expect(doc().revision).toBe(rev);
+    ok(await run("add_text_element", { ...base(), runs: [{ text: "a".repeat(3000) }, { text: "b".repeat(2000) }] }));
+  });
+
+  it("update_element_style: un fragmento de otra familia sin peso toma el publicado más próximo, como al crear", async () => {
+    const { elementId } = ok(await run("add_text_element", { ...base(), text: "Hola" }));
+    ok(await run("update_element_style", { ...base(), elementId, style: { runs: [{ text: "B", fontFamily: "Bebas Neue" }] } }));
+    expect(textEl(elementId).runs.map((r) => [r.fontFamily, r.weight])).toEqual([["Bebas Neue", 400]]);
+    const rev = doc().revision;
+    const e = err(await run("update_element_style", { ...base(), elementId, style: { runs: [{ text: "x", fontFamily: "EB Garamond", weight: 500, italic: true }] } }));
+    expect(e.kind).toBe("invalid_params");
+    expect(doc().revision).toBe(rev);
+  });
 });

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
@@ -176,5 +176,24 @@ describe("servidor MCP: export_kdp_pdf", () => {
     const r: any = await client.callTool({ name: "export_kdp_pdf", arguments: { projectId: "p" } });
     expect(r.structuredContent).toMatchObject({ state: "not_validated", path: null, reportPath: join(exportDir, "rechazado-informe.txt") });
     expect(await readFile(join(exportDir, "rechazado-informe.txt"), "utf8")).toBe("Informe");
+  });
+  it("PDF e informe comparten sufijo cuando ya existen archivos con ese nombre", async () => {
+    const out = editorOut({ fileName: "dup.pdf", reportFileName: "dup-informe.txt" });
+    outcome = { ok: true, data: out };
+    await writeFile(join(exportDir, "dup-informe.txt"), "previo");
+    const r: any = await client.callTool({ name: "export_kdp_pdf", arguments: { projectId: "p" } });
+    expect(r.structuredContent).toMatchObject({ path: join(exportDir, "dup-2.pdf"), reportPath: join(exportDir, "dup-informe-2.txt") });
+    expect(await readFile(join(exportDir, "dup-informe.txt"), "utf8")).toBe("previo");
+    await expect(readFile(join(exportDir, "dup.pdf"))).rejects.toThrow();
+  });
+  it("una respuesta del editor no válida (export_kdp_pdf y export_image) da internal y se registra", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    outcome = { ok: true, data: { basura: true } };
+    for (const [name, args] of [["export_kdp_pdf", { projectId: "p" }], ["export_image", { projectId: "p", format: "png" }]] as const) {
+      log.mockClear();
+      expect(err(await client.callTool({ name, arguments: args })).kind).toBe("internal");
+      expect(log).toHaveBeenCalledWith(expect.stringContaining(name));
+    }
+    log.mockRestore();
   });
 });
