@@ -80,7 +80,9 @@ export function createClipboardActions(
     }
     // Sin esperas entre registrar los blobs y despachar: la limpieza de huérfanos no los ve a medias.
     const previous = cell.get().assets;
-    if (toWrite.length > 0) cell.set({ assets: [...previous, ...toWrite] });
+    // Si ya hubiera una entrada con el mismo id se sustituye: nunca se duplican bytes en la lista.
+    const ids = new Set(toWrite.map((b) => b.id));
+    if (toWrite.length > 0) cell.set({ assets: [...previous.filter((a) => !ids.has(a.id)), ...toWrite] });
     if (!cmds.dispatch({ type: "pasteElements", elements: prepared.elements, assets: prepared.assets })) {
       cell.set({ assets: previous });
       await rollback();
@@ -90,13 +92,23 @@ export function createClipboardActions(
     return true;
   }
 
+  // Los pegados se encadenan: así el segundo ve los blobs que registró el primero y no repite escrituras.
+  let queue: Promise<unknown> = Promise.resolve();
+  function enqueue(run: () => Promise<boolean>): Promise<boolean> {
+    const result = queue.then(run, run);
+    queue = result.catch(() => undefined);
+    return result;
+  }
+
   async function paste(): Promise<boolean> {
-    return clip ? pasteClip(clip) : false;
+    return enqueue(async () => (clip ? pasteClip(clip) : false));
   }
   // Copia y pega sin tocar lo que hubiera en el portapapeles.
   async function duplicateSelection(): Promise<boolean> {
-    const next = snapshot();
-    return next ? pasteClip(next) : false;
+    return enqueue(async () => {
+      const next = snapshot();
+      return next ? pasteClip(next) : false;
+    });
   }
 
   return { copySelection, paste, duplicateSelection, canPaste: () => clip !== null };

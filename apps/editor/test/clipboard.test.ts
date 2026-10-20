@@ -65,6 +65,30 @@ describe("portapapeles de capas", () => {
     expect(els(s)[1]).toMatchObject({ x: 1.125, y: 1.125 });
     expect(els(s)[2]).toMatchObject({ x: 1.125, y: 1.125 });
   });
+  it("dos pegados simultáneos en un proyecto sin el recurso lo escriben y registran una sola vez", async () => {
+    const s = mk();
+    await withTexture(s);
+    s.copySelection();
+    await s.newProject();
+    const put = vi.spyOn(storage, "putAsset");
+    expect(await Promise.all([s.paste(), s.paste()])).toEqual([true, true]);
+    expect(els(s)).toHaveLength(2);
+    const ids = s.getState().assets.map((a) => a.id);
+    expect(ids.filter((id) => id === "tx")).toHaveLength(1);
+    expect(ids.filter((id) => id === "tx.thumb")).toHaveLength(1);
+    expect(put.mock.calls.map((c) => c[1]).sort()).toEqual(["tx", "tx.thumb"]);
+  });
+  it("duplicar y pegar a la vez no dejan ids repetidos en los blobs", async () => {
+    const s = mk();
+    await withTexture(s);
+    s.copySelection();
+    await s.newProject();
+    s.dispatch({ type: "addElement", element: text("u", { texture: { assetId: "tx" } }) });
+    s.select("u");
+    await Promise.all([s.duplicateSelection(), s.paste()]);
+    const ids = s.getState().assets.map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
   it("copia el elemento del base aunque una variante lo mueva", async () => {
     const s = mk();
     await s.init();
