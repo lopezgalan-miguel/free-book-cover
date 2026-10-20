@@ -37,7 +37,7 @@ const HARD_DEFAULT_TRIM = trimKey(HARDCOVER_TRIMS[0]!.widthIn, HARDCOVER_TRIMS[0
 export function LowDpiAlert({ doc, entries, title, testId }: { doc: Project; entries: DpiEntry[]; title: string; testId: string }) {
   const { t } = useI18n();
   return (
-    <div role="alert" data-testid={testId} className="rounded-md border border-danger-line bg-danger-bg px-2.5 py-1.5 text-[11px] leading-snug text-danger-ink">
+    <div role="note" data-testid={testId} className="rounded-md border border-danger-line bg-danger-bg px-2.5 py-1.5 text-[11px] leading-snug text-danger-ink">
       <p className="font-semibold">{title}</p>
       <ul className="mt-0.5">
         {entries.map((e) => <li key={e.id}>{t("lowDpiItem", { name: dpiEntryName(t, doc, e), dpi: Math.floor(e.dpi) })}</li>)}

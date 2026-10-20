@@ -45,6 +45,13 @@ export function printPixelSize(widthIn: number, heightIn: number): { widthPx: nu
   return { widthPx: Math.ceil(widthIn * TARGET_DPI - 1e-6), heightPx: Math.ceil(heightIn * TARGET_DPI - 1e-6) };
 }
 
+// Escala (px por pulgada) para pintar el lienzo en un tamaño de píxeles redondeado: la que cubre los dos ejes.
+// Con la del ancho, si el alto se redondeó más hacia arriba, la última fila quedaba a medio pintar (transparente
+// y rechazada por el companion; pasaba con la tapa dura). Lo que sobra por el otro eje es menos de un píxel.
+export function coverPxPerInch(widthIn: number, heightIn: number, widthPx: number, heightPx: number): number {
+  return Math.max(widthPx / widthIn, heightPx / heightIn);
+}
+
 const EPS = 1e-4;
 
 // Comprobaciones que el editor sabe hacer sin rasterizar.

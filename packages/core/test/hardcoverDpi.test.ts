@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyCommand, hardcoverLowDpi, lowDpiForSetup, type PrintSetup, type Project } from "../src/index.js";
+import { applyCommand, coverPxPerInch, hardcoverLowDpi, lowDpiForSetup, printPixelSize, type PrintSetup, type Project } from "../src/index.js";
 import { baseProject, textEl } from "./fixtures.js";
 
 const hard: PrintSetup = { trimWidthIn: 5.5, trimHeightIn: 8.5, pageCount: 116, paperAndInk: "bw-cream", readingDirection: "ltr", binding: "hardcover" };
@@ -56,5 +56,17 @@ describe("tapa dura: mínimo de 300 ppp", () => {
     const s = applyCommand(withBackground(1600, 2560), { type: "setPrintSetup", printSetup: soft }, 0);
     if (!s.ok) throw new Error("x");
     expect(hardcoverLowDpi(s.doc)).toEqual([]);
+  });
+});
+
+describe("coverPxPerInch", () => {
+  it("cubre los dos ejes del lienzo de tapa dura (sin fila final transparente)", () => {
+    const w = 939.8721 / 72;
+    const h = 714.0472 / 72;
+    const size = printPixelSize(w, h);
+    const s = coverPxPerInch(w, h, size.widthPx, size.heightPx);
+    expect(w * s).toBeGreaterThanOrEqual(size.widthPx);
+    expect(h * s).toBeGreaterThanOrEqual(size.heightPx);
+    expect(s).toBeGreaterThanOrEqual(300);
   });
 });

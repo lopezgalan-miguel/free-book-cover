@@ -1,4 +1,4 @@
-import { assetDims, fontFamilyFor, renderDocument, type Project } from "@free-book-cover/core";
+import { assetDims, coverPxPerInch, fontFamilyFor, renderDocument, type Project } from "@free-book-cover/core";
 import { paintDocument } from "../canvas/paint";
 import type { ImageSources } from "../canvas/scene";
 import { usedImageAssets } from "./usedAssets";
@@ -52,7 +52,7 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     const measureCtx = new OffscreenCanvas(1, 1).getContext("2d")!;
     if ("letterSpacing" in measureCtx) (measureCtx as unknown as { letterSpacing: string }).letterSpacing = "0px";
     const r = renderDocument(doc, {
-      pxPerInch: widthPx / doc.canvas.widthIn,
+      pxPerInch: coverPxPerInch(doc.canvas.widthIn, doc.canvas.heightIn, widthPx, heightPx),
       measureText: (text, css) => {
         measureCtx.font = css;
         return measureCtx.measureText(text).width;
