@@ -60,6 +60,7 @@ describe("diálogo de proyecto (I-5)", () => {
     const store = await mount();
     const dlg = await openDialog(user);
     await user.click(within(dlg).getByRole("button", { name: "Nuevo proyecto" }));
+    await waitFor(() => expect(store.getState().history.present.name).toBe(""));
     await user.type(within(dlg).getByLabelText("Nombre del proyecto"), "Otro título");
     await user.click(within(dlg).getByRole("button", { name: "Cerrar" }));
     expect(store.getState().history.present.name).toBe("Otro título");

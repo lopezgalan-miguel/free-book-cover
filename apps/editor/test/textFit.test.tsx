@@ -71,6 +71,16 @@ describe("useTextFit", () => {
     expect(get(store, "b")).toMatchObject({ width: 3, height: 1, x: 1 });
   });
 
+  it("con la fuente fallida se ajusta con la de reserva", async () => {
+    const catalog = Promise.resolve(false);
+    const { store, registry, ui } = await setup(textEl("t", "Lora"), { catalog });
+    registry.ensureDoc(store.getState().history.present);
+    await act(async () => { await catalog; });
+    expect(registry.stateOf("Lora")).toBe("failed");
+    render(ui);
+    expect(get(store)).toMatchObject({ width: 3, height: 1, x: 1 });
+  });
+
   it("no toca capas ocultas", async () => {
     const { store, ui } = await setup(textEl("t", "Georgia", false));
     render(ui);
