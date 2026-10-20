@@ -40,7 +40,7 @@ export function ProjectPanel({ onOpened }: { onOpened?: () => void } = {}) {
           onBlur={commitName}
           onKeyDown={(e) => {
             if (e.key === "Enter") commitName();
-            if (e.key === "Escape") setDraft(null);
+            if (e.key === "Escape") commitName(); // guarda; el evento sigue subiendo y useModal cierra el diálogo
           }}
         />
         <div className="mt-2.5 flex items-center gap-2">
