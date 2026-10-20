@@ -64,7 +64,7 @@ const pad4 = (n: number) => (n + 3) & ~3;
 
 // Construye una colección: las tablas de cada cara se colocan tras todos los directorios, con
 // desplazamientos desde el inicio del archivo.
-export function buildTtc(fonts: FontSpec[], overrideOffsets?: number[]): Uint8Array {
+export function buildTtc(fonts: FontSpec[]): Uint8Array {
   const headerLen = 12 + fonts.length * 4;
   const dirLens = fonts.map((f) => 12 + Object.keys(f.tables).length * 16);
   const dirStarts: number[] = [];
@@ -98,27 +98,9 @@ export function buildTtc(fonts: FontSpec[], overrideOffsets?: number[]): Uint8Ar
   out.set(ascii("ttcf"), 0);
   dv.setUint16(4, 1);
   dv.setUint32(8, fonts.length);
-  fonts.forEach((_, i) => dv.setUint32(12 + i * 4, overrideOffsets?.[i] ?? dirStarts[i]!));
+  fonts.forEach((_, i) => dv.setUint32(12 + i * 4, dirStarts[i]!));
   dirs.forEach((d, i) => out.set(d, dirStarts[i]!));
   for (const c of chunks) out.set(c.data, c.at);
-  return out;
-}
-
-// sfnt independiente (para probar not_collection).
-function buildSfnt(tables: Tables): Uint8Array {
-  const n = Object.keys(tables).length;
-  let pos = 12 + n * 16;
-  const out = new Uint8Array(pos + Object.values(tables).reduce((a, t) => a + pad4(t.length), 0));
-  const odv = new DataView(out.buffer);
-  odv.setUint32(0, 0x00010000);
-  odv.setUint16(4, n);
-  Object.entries(tables).forEach(([t, d], i) => {
-    out.set(ascii(t), 12 + i * 16);
-    odv.setUint32(12 + i * 16 + 8, pos);
-    odv.setUint32(12 + i * 16 + 12, d.length);
-    out.set(d, pos);
-    pos += pad4(d.length);
-  });
   return out;
 }
 
