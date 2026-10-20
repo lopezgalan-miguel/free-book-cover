@@ -161,6 +161,18 @@ describe("paintTextItem: efectos", () => {
       const colorAfter = calls.slice(shadowSets[0]! + 1, lastDraw).filter(([k]) => k === "set:shadowColor").map(([, v]) => v);
       expect(colorAfter.every((v) => v !== "rgba(0,0,0,0.6)")).toBe(true);
     });
+    it("a escala de dispositivo 2 el volcado del halo usa píxeles de dispositivo", () => {
+      const { ctx, calls } = layered(2);
+      paintTextItem(ctx, item({ ...glow, dx: 3 }), new Map());
+      const draw = calls.findIndex(([k]) => k === "drawImage");
+      expect(draw).toBeGreaterThanOrEqual(0);
+      const before = calls.slice(0, draw);
+      const last = (key: string) => before.filter(([k]) => k === key).map(([, v]) => v).pop();
+      expect(before.some(([k, ...a]) => k === "setTransform" && a.join() === "1,0,0,1,0,0")).toBe(true);
+      expect(last("set:shadowBlur")).toBe(12.8);
+      expect(last("set:shadowOffsetY")).toBe(10);
+      expect(last("set:shadowOffsetX")).toBe(2 * 3 + 100000);
+    });
     it("con máscara, la silueta de la expansión no se recorta", () => {
       const { ctx, calls } = layered();
       const it0 = item(glow);
