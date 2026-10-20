@@ -14,7 +14,7 @@ import {
 export const MCP_TOOL_NAMES = [
   "get_canvas_state", "add_text_element", "update_element_style", "import_asset", "apply_background",
   "import_font", "add_image_element", "add_shape_element", "add_variant", "update_variant", "set_print_setup", "export_image", "set_canvas",
-  "set_background_filters", "generate_texture", "rename_project", "remove_element", "reorder_element",
+  "set_background_filters", "generate_texture", "rename_project", "remove_element", "reorder_element", "export_kdp_pdf",
 ] as const;
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
 
@@ -270,6 +270,15 @@ export const exportImageEditorOutput = z
   .object({ fileName: z.string().min(1).max(255), format: z.enum(["png", "jpeg", "webp"]), mimeType: z.string(), widthPx: z.number().int(), heightPx: z.number().int(), bytes: z.number().int(), dataBase64: z.string().min(1) })
   .strict();
 
+export const exportKdpPdfInput = z.object({ projectId }).strict();
+// Lo que el editor devuelve al companion: el PDF (null si el companion de preimpresión lo rechazó) y el informe en texto.
+export const exportKdpPdfEditorOutput = z
+  .object({
+    state: z.enum(["ready", "not_validated"]), fileName: z.string().min(1).max(255), pdfBase64: z.string().min(1).nullable(), reportFileName: z.string().min(1).max(255), reportText: z.string(),
+    checks: z.array(z.object({ id: z.string(), status: z.string() }).strict()), widthIn: z.number(), heightIn: z.number(),
+  })
+  .strict();
+
 export const applyBackgroundInput = z
   .object({
     projectId,
@@ -382,6 +391,13 @@ export const exportImageOutput = z
   .object({ path: z.string(), fileName: z.string(), format: z.enum(["png", "jpeg", "webp"]), widthPx: z.number().int(), heightPx: z.number().int(), bytes: z.number().int() })
   .strict();
 
+export const exportKdpPdfOutput = z
+  .object({
+    state: z.enum(["ready", "not_validated"]), path: z.string().nullable().describe("null si la preimpresión rechazó la entrada y no hay PDF."), reportPath: z.string(),
+    checks: z.array(z.object({ id: z.string(), status: z.string() }).strict()), widthIn: z.number(), heightIn: z.number(),
+  })
+  .strict();
+
 export const applyBackgroundOutput = z.object({ revision: z.number().int(), background: z.union([z.object({ assetId: z.string() }), z.string()]), fit: z.enum(["cover", "contain", "fill"]), saved }).strict();
 
 export const MCP_TOOLS = {
@@ -403,6 +419,7 @@ export const MCP_TOOLS = {
   remove_element: { description: "Borra un elemento y sus ajustes en las variantes; se puede deshacer en el editor.", input: removeElementInput, output: removeElementOutput, readOnly: false, destructive: true },
   reorder_element: { description: "Mueve un elemento en la pila de capas (0 = fondo; un índice mayor que el último lo deja al frente) y devuelve el orden del fondo al frente.", input: reorderElementInput, output: reorderElementOutput, readOnly: false },
   export_image: { description: "Exporta el diseño base (300 ppp) o una variante como PNG, JPEG o WebP y lo guarda en el directorio de exportación del companion (FBC_EXPORT_DIR).", input: exportImageInput, output: exportImageOutput, readOnly: true },
+  export_kdp_pdf: { description: "Genera el PDF de imprenta de una cubierta KDP (CMYK, 300 ppp) con el companion de preimpresión y lo guarda con su informe de preimpresión en FBC_EXPORT_DIR. Exige el editor conectado al companion (diálogo de exportación). El estado es ready solo si todas las comprobaciones pasan; si no, es not_validated.", input: exportKdpPdfInput, output: exportKdpPdfOutput, readOnly: true },
 } as const;
 
 /** Esquema JSON de una herramienta (MCP lo exige de tipo object). */

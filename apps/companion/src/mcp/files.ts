@@ -24,7 +24,7 @@ export type ExportFile = { ok: true; path: string } | { ok: false; error: ToolEr
  * el nombre de archivo, nunca una ruta; un archivo existente no se pisa (se añade -2, -3...).
  */
 export async function writeExportFile(dir: string | null, fileName: string, bytes: Uint8Array): Promise<ExportFile> {
-  if (!dir) return { ok: false, error: { kind: "invalid_params", issues: ["export_image necesita FBC_EXPORT_DIR en el proceso MCP"] } };
+  if (!dir) return { ok: false, error: { kind: "invalid_params", issues: ["la exportación necesita FBC_EXPORT_DIR en el proceso MCP"] } };
   const safe = basename(fileName).replace(/[^\p{L}\p{N}._-]+/gu, "-") || "portada";
   const ext = extname(safe);
   const stem = safe.slice(0, safe.length - ext.length) || "portada";

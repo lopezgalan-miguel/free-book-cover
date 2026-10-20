@@ -1,7 +1,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
-  MCP_TOOLS, MCP_TOOL_NAMES, exportImageEditorOutput, toolJsonSchema, type McpToolName, type ToolError, type ToolOutcome,
+  MCP_TOOLS, MCP_TOOL_NAMES, exportImageEditorOutput, exportKdpPdfEditorOutput, toolJsonSchema, type McpToolName, type ToolError, type ToolOutcome,
 } from "@free-book-cover/core";
 import { basename } from "node:path";
 import { COMPANION_VERSION } from "../version.js";
@@ -67,6 +67,8 @@ export function createMcpServer(opts: McpServerOptions): Server {
         ...(input.expectedRevision !== undefined ? { expectedRevision: input.expectedRevision } : {}),
       };
     }
+    // Sin directorio de exportación se rechaza antes de pedir nada al editor: no se renderiza un PDF que no se podría guardar.
+    if (name === "export_kdp_pdf" && !opts.exportDir) return errorResult({ kind: "invalid_params", issues: ["export_kdp_pdf necesita FBC_EXPORT_DIR en el proceso MCP"] });
     const out = await opts.relay.call(name, payload);
     if (!out.ok) return errorResult(out.error);
     if (name === "export_image") {
@@ -77,6 +79,21 @@ export function createMcpServer(opts: McpServerOptions): Server {
       const written = await writeExportFile(opts.exportDir ?? null, meta.fileName, Buffer.from(dataBase64, "base64"));
       if (!written.ok) return errorResult(written.error);
       const result = { path: written.path, ...meta, fileName: basename(written.path) };
+      return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
+    }
+    if (name === "export_kdp_pdf") {
+      const file = exportKdpPdfEditorOutput.safeParse(out.data);
+      if (!file.success) return errorResult({ kind: "internal" });
+      const f = file.data;
+      let path: string | null = null;
+      if (f.pdfBase64) {
+        const pdf = await writeExportFile(opts.exportDir ?? null, f.fileName, Buffer.from(f.pdfBase64, "base64"));
+        if (!pdf.ok) return errorResult(pdf.error);
+        path = pdf.path;
+      }
+      const rep = await writeExportFile(opts.exportDir ?? null, f.reportFileName, Buffer.from(f.reportText, "utf8"));
+      if (!rep.ok) return errorResult(rep.error);
+      const result = { state: f.state, path, reportPath: rep.path, checks: f.checks, widthIn: f.widthIn, heightIn: f.heightIn };
       return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
     }
     const data = def.output.safeParse(out.data);

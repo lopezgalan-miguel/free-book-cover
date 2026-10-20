@@ -145,3 +145,36 @@ describe("servidor MCP: fuentes y exportación", () => {
     expect(JSON.stringify(r.structuredContent)).not.toContain("dataBase64");
   });
 });
+
+describe("servidor MCP: export_kdp_pdf", () => {
+  const editorOut = (over: object = {}) => ({
+    state: "ready", fileName: "mi-libro-kdp-3743x2775.pdf", pdfBase64: Buffer.from("%PDF-1.4").toString("base64"), reportFileName: "mi-libro-kdp-3743x2775-informe-preimpresion.txt",
+    reportText: "Informe", checks: [{ id: "size", status: "pass" }], widthIn: 12.5, heightIn: 9.25, ...over,
+  });
+  it("sin exportDir: error sin llamar al editor", async () => {
+    const server = createMcpServer({ relay: { call: async (tool, args) => { calls.push({ tool, args }); return outcome; } }, imports: { allowedDirs: [dir], maxBytes: 1000 } });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const c = new Client({ name: "prueba", version: "1" });
+    await Promise.all([server.connect(a), c.connect(b)]);
+    const r: any = await c.callTool({ name: "export_kdp_pdf", arguments: { projectId: "p" } });
+    expect(err(r).kind).toBe("invalid_params");
+    expect(calls).toHaveLength(0);
+  });
+  it("escribe el PDF y el informe y devuelve sus rutas", async () => {
+    outcome = { ok: true, data: editorOut() };
+    const r: any = await client.callTool({ name: "export_kdp_pdf", arguments: { projectId: "p" } });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent).toEqual({
+      state: "ready", path: join(exportDir, "mi-libro-kdp-3743x2775.pdf"), reportPath: join(exportDir, "mi-libro-kdp-3743x2775-informe-preimpresion.txt"),
+      checks: [{ id: "size", status: "pass" }], widthIn: 12.5, heightIn: 9.25,
+    });
+    expect((await readFile(r.structuredContent.path)).toString()).toBe("%PDF-1.4");
+    expect(await readFile(r.structuredContent.reportPath, "utf8")).toBe("Informe");
+  });
+  it("sin PDF (entrada rechazada): path null y el informe escrito", async () => {
+    outcome = { ok: true, data: editorOut({ state: "not_validated", fileName: "rechazado.pdf", pdfBase64: null, reportFileName: "rechazado-informe.txt" }) };
+    const r: any = await client.callTool({ name: "export_kdp_pdf", arguments: { projectId: "p" } });
+    expect(r.structuredContent).toMatchObject({ state: "not_validated", path: null, reportPath: join(exportDir, "rechazado-informe.txt") });
+    expect(await readFile(join(exportDir, "rechazado-informe.txt"), "utf8")).toBe("Informe");
+  });
+});

@@ -5,6 +5,9 @@ import {
   type CommandError, type ElementSummary, type PrintSetup, type Project, type RunInput, type ResolvedTarget, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
 } from "@free-book-cover/core";
 import { textHeightIn } from "../canvas/measure";
+import { runPdfExport, type PdfExportDeps } from "../export/exportPdf";
+import { reportText } from "../export/pdfReportText";
+import { readStoredLang, translate } from "../i18n";
 import { runExport, type ExportDeps } from "../export/exportImage";
 import type { FontRegistry } from "../fonts/fontRegistry";
 import { importFont } from "../fonts/importFont";
@@ -23,6 +26,8 @@ export interface ExecutorDeps {
   fonts?: FontRegistry;
   /** Dependencias de exportación del navegador (export_image). */
   exportDeps?: () => ExportDeps;
+  /** Dependencias del PDF de KDP (export_kdp_pdf): renderer, cliente del companion de preimpresión y su configuración. */
+  pdfDeps?: () => PdfExportDeps;
   /** Codificador PNG de las texturas generadas (generate_texture); por defecto, el del navegador. */
   encodePng?: PngEncoder;
 }
@@ -419,6 +424,32 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         data: {
           revision: r.revision, binding: l.binding, hinges: l.hinges, canvas: { widthIn: l.widthIn, heightIn: l.heightIn }, spineIn: l.spineIn, back: l.back, spine: l.spine, front: l.front,
           safeFront: l.safe.front, safeBack: l.safe.back, spineSafe: l.spineSafe, barcode: l.barcode, saved: await saved(store),
+        },
+      };
+    }
+
+    case "export_kdp_pdf": {
+      if (!deps.pdfDeps) return fail({ kind: "internal" });
+      const d = doc();
+      const out = await runPdfExport(d, d.name, deps.pdfDeps());
+      if (!out.ok) {
+        const e = out.error;
+        if (e.kind === "render_failed") return fail({ kind: "internal" });
+        if (e.kind === "not_kdp") return invalid("el proyecto no es una cubierta KDP (usa set_print_setup)");
+        if (e.kind === "low_dpi") return invalid(...e.entries.map((x) => `${x.id}: ${Math.floor(x.dpi)} ppp, por debajo del mínimo de 300 ppp de la tapa dura (sube una imagen más grande o redúcela)`));
+        if (e.kind === "companion") return invalid(e.reason === "failed" ? "el companion de preimpresión falló" : "conecta el editor al companion en el diálogo de exportación");
+        if (e.kind === "limit") return invalid(`la cubierta (${Math.round(e.megapixels)} MP) supera el límite de ${e.limitMegapixels} MP`);
+        if (e.kind === "missing_assets") return invalid(`faltan recursos: ${e.assetIds.join(", ")}`);
+        return invalid(`fuentes no disponibles: ${e.problems.map((p) => `${p.family}: ${p.reason}`).join(", ")}`);
+      }
+      const r = out.result;
+      if (r.pdf && r.pdf.size > MAX_EXPORT_BYTES) return invalid(`el PDF (${r.pdf.size} bytes) supera el máximo del canal MCP (${MAX_EXPORT_BYTES})`);
+      const lang = readStoredLang();
+      return {
+        ok: true,
+        data: {
+          state: r.summary.state, fileName: r.fileName, pdfBase64: r.pdf ? await base64FromBlob(r.pdf) : null, reportFileName: r.reportFileName,
+          reportText: reportText((k, v) => translate(lang, k, v), r), checks: r.summary.checks.map((c) => ({ id: c.id, status: c.status })), widthIn: r.widthIn, heightIn: r.heightIn,
         },
       };
     }
