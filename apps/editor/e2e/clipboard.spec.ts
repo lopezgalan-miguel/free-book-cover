@@ -61,13 +61,7 @@ test("copiar con textura, proyecto nuevo y pegar: la capa y su textura se pintan
   });
   const layers = page.getByRole("complementary", { name: "Capas" }).locator("li", { hasText: "Arial" });
   await expect(layers).toHaveCount(0);
-  // «Pegar» está en el panel de la capa seleccionada: se selecciona una forma del proyecto nuevo.
-  await page.evaluate(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s = (window as any).__editorStore;
-    s.dispatch({ type: "addElement", element: { id: "s1", type: "shape", shape: "rect", x: 1, y: 1, width: 1, height: 1, rotation: 0, zIndex: 0, visible: true, fill: "#336699" } });
-    s.select("s1");
-  });
+  // Sin capa seleccionada en el proyecto nuevo, «Pegar» sigue a la vista en Posición y tamaño.
   await page.getByRole("button", { name: "Pegar", exact: true }).click();
   await expect(layers).toHaveCount(1);
   await expect.poll(async () => (await doc(page)).assets.length).toBe(1);

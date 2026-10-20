@@ -49,6 +49,15 @@ describe("preparePaste", () => {
   });
 });
 
+describe("preparePaste con fuentes subidas", () => {
+  const font = (id: string, family: string): Asset => ({ id, kind: "font", mimeType: "font/ttf", metadata: { family } });
+  it("no copia una fuente de la misma familia que el destino ya tiene con otro id", () => {
+    const target: Project = { ...baseProject(), assets: [font("f-destino", "Zed")] };
+    const clip = { sourceProjectId: "p2", elements: [shapeEl("s")], assets: [font("f-origen", "Zed"), font("f-otra", "Otra")] };
+    expect(preparePaste(target, clip, ids()).assets.map((a) => a.id)).toEqual(["f-otra"]);
+  });
+});
+
 describe("pasteElements", () => {
   it("añade capas arriba y el recurso una sola vez", () => {
     let p = ok(baseProject(), { type: "addElement", element: shapeEl("z") });

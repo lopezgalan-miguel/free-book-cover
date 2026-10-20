@@ -41,5 +41,8 @@ export function preparePaste(target: Project, clip: ClipboardContent, newId: () 
     return { ...e, id: newId(), x, y } as Element;
   });
   const have = new Set(target.assets.map((a) => a.id));
-  return { elements, assets: clip.assets.filter((a) => !have.has(a.id)) };
+  // El registro de fuentes va por nombre de familia: una familia que el destino ya tiene subida no se duplica.
+  const families = new Set(target.assets.flatMap((a) => (a.kind === "font" && typeof a.metadata.family === "string" ? [a.metadata.family] : [])));
+  const dup = (a: Asset) => a.kind === "font" && typeof a.metadata.family === "string" && families.has(a.metadata.family);
+  return { elements, assets: clip.assets.filter((a) => !have.has(a.id) && !dup(a)) };
 }

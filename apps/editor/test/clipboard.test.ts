@@ -115,3 +115,127 @@ describe("portapapeles de capas", () => {
     expect(els(s)[3]).toMatchObject({ x: 1.125, y: 1.125, texture: { assetId: "tx" } });
   });
 });
+
+// Rondas de la revisión final: cambio de proyecto a mitad de pegado, blobs ya presentes, purga, fuentes y recursos compartidos.
+const MB = 1024 * 1024;
+// Blob pequeño que declara un tamaño grande: prueba los límites sin reservar memoria.
+const fake = (mb: number) => Object.defineProperty(new Blob(["x"]), "size", { value: mb * MB });
+const ids = (s: EditorStore) => s.getState().assets.map((a) => a.id).sort();
+
+describe("pegado seguro", () => {
+  it("si el proyecto cambia mientras se escribe un blob, no se pega y no queda nada en ninguno", async () => {
+    let armed = false;
+    let s!: EditorStore;
+    const slow: ProjectStorage = {
+      ...storage,
+      putAsset: async (p, id, b) => {
+        if (armed) {
+          armed = false;
+          await s.newProject();
+        }
+        return storage.putAsset(p, id, b);
+      },
+    };
+    s = mk(slow);
+    await withTexture(s);
+    s.copySelection();
+    await s.newProject();
+    const b = s.getState().history.present.id;
+    armed = true;
+    expect(await s.paste()).toBe(false);
+    const c = s.getState().history.present.id;
+    expect(c).not.toBe(b);
+    expect(els(s)).toHaveLength(0);
+    expect(s.getState().history.present.assets).toHaveLength(0);
+    expect(s.getState().assets).toHaveLength(0);
+    expect(await storage.listAssetIds(b)).toEqual([]);
+    expect(await storage.listAssetIds(c)).toEqual([]);
+  });
+  it("deshacer y pegar otra vez no reescribe blobs que ya están y un fallo no borra los existentes", async () => {
+    let fail = false;
+    const flaky: ProjectStorage = { ...storage, putAsset: async (p, id, b) => (fail ? { ok: false as const, kind: "quota" as const, message: "" } : storage.putAsset(p, id, b)) };
+    const s = mk(flaky);
+    await withTexture(s);
+    s.copySelection();
+    await s.newProject();
+    const b = s.getState().history.present.id;
+    await s.paste();
+    s.undo();
+    fail = true;
+    const put = vi.spyOn(flaky, "putAsset");
+    expect(await s.paste()).toBe(true);
+    expect(put).not.toHaveBeenCalled();
+    expect(await storage.listAssetIds(b)).toEqual(expect.arrayContaining(["tx", "tx.thumb"]));
+    expect(ids(s)).toEqual(["tx", "tx.thumb"]);
+  });
+  it("antes de rechazar por tamaño purga los blobs huérfanos y reintenta", async () => {
+    const mem: ProjectStorage = { ...storage, putAsset: async () => ({ ok: true as const }), deleteAsset: async () => undefined };
+    const s = mk(mem);
+    await s.init();
+    await s.addAsset(tex, fake(90));
+    s.dispatch({ type: "addElement", element: text("t", { texture: { assetId: "tx" } }) });
+    s.select("t");
+    s.copySelection();
+    await s.newProject();
+    // 420 MB sin ninguna referencia en el historial: 420 + 90 superaría los 500 MB.
+    await s.addDerivedBlob("viejo", fake(420));
+    expect(ids(s)).toEqual(["viejo"]);
+    expect(await s.paste()).toBe(true);
+    expect(ids(s)).toEqual(["tx"]);
+    expect(s.getState().error).toBeNull();
+    expect(s.getState().nearLimit).toBe(false);
+  });
+  it("avisa de proyecto casi lleno tras pegar", async () => {
+    const mem: ProjectStorage = { ...storage, putAsset: async () => ({ ok: true as const }), deleteAsset: async () => undefined };
+    const s = mk(mem);
+    await s.init();
+    await s.addAsset(tex, fake(90));
+    s.dispatch({ type: "addElement", element: text("t", { texture: { assetId: "tx" } }) });
+    s.select("t");
+    s.copySelection();
+    await s.newProject();
+    await s.addAsset({ id: "otro", kind: "image", mimeType: "image/png", metadata: {} }, fake(95));
+    s.dispatch({ type: "addElement", element: text("u", { texture: { assetId: "otro" } }) });
+    for (const id of ["a", "b", "c"]) {
+      await s.addAsset({ id, kind: "image", mimeType: "image/png", metadata: {} }, fake(100));
+      s.dispatch({ type: "addElement", element: text(`e${id}`, { texture: { assetId: id } }) });
+    }
+    expect(s.getState().nearLimit).toBe(false);
+    expect(await s.paste()).toBe(true);
+    expect(s.getState().nearLimit).toBe(true);
+  });
+});
+
+describe("pegado de fuentes y recursos compartidos", () => {
+  const font: Asset = { id: "f1", kind: "font", mimeType: "font/ttf", metadata: { family: "Zed" } };
+  it("lleva la fuente subida al otro proyecto: queda en el documento y en el almacenamiento", async () => {
+    const s = mk();
+    await s.init();
+    await s.addAsset(font, new Blob(["ttf"]));
+    s.dispatch({ type: "addElement", element: text("t", { runs: [{ ...text("x").runs[0]!, fontFamily: "Zed" }] }) });
+    s.select("t");
+    s.copySelection();
+    await s.newProject();
+    const b = s.getState().history.present.id;
+    expect(await s.paste()).toBe(true);
+    expect(s.getState().history.present.assets.map((a) => a.id)).toEqual(["f1"]);
+    expect(await storage.listAssetIds(b)).toContain("f1");
+  });
+  it("una textura usada también como máscara se escribe una sola vez", async () => {
+    const s = mk();
+    await s.init();
+    await s.addAsset(tex, new Blob(["tex"]));
+    await s.addDerivedBlob("tx.thumb", new Blob(["th"]));
+    const mask = { assetId: "tx", mode: "alpha" as const, threshold: 0.5, softness: 0 };
+    s.dispatch({ type: "addElement", element: text("t", { texture: { assetId: "tx" }, mask }) });
+    s.select("t");
+    s.copySelection();
+    await s.newProject();
+    const b = s.getState().history.present.id;
+    const put = vi.spyOn(storage, "putAsset");
+    expect(await s.paste()).toBe(true);
+    expect(put.mock.calls.map((c) => c[1]).sort()).toEqual(["tx", "tx.thumb"]);
+    expect(s.getState().history.present.assets.map((a) => a.id)).toEqual(["tx"]);
+    expect(await storage.listAssetIds(b)).toEqual(expect.arrayContaining(["tx", "tx.thumb"]));
+  });
+});

@@ -17,6 +17,12 @@ export function GeometryPanel() {
       <>
         <p className="text-xs leading-snug text-muted">{t("selectHint")}</p>
         <p className="mt-2 text-xs text-muted">{t("noSelection")}</p>
+        {/* Sin capa seleccionada (p. ej. en un proyecto nuevo, o en el móvil sin teclado) también se puede pegar. */}
+        {store.canPaste() && (
+          <div className="mt-2.5 flex">
+            <button type="button" className={`${chipBtn} flex-1`} onClick={() => void store.paste()}>{t("pasteLayer")}</button>
+          </div>
+        )}
       </>
     );
   }

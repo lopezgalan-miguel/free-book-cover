@@ -1,4 +1,4 @@
-import { LIMITS, checkAssetLimits, checkProjectBytes, createHistory, execute, referencedAssetIds, unusedAssetIds, type Asset, type AssetCandidate, type Command } from "@free-book-cover/core";
+import { LIMITS, checkAssetLimits, checkProjectBytes, createHistory, execute, referencedAssetIds, unusedAssetIds, type Asset, type AssetCandidate, type Command, type LimitResult } from "@free-book-cover/core";
 import { baseAssetId } from "../storage/assetIds";
 import type { EditorDeps, EditorState, FreeResult } from "./editorStore";
 import type { StateCell } from "./state";
@@ -14,15 +14,19 @@ export function createAssetActions(
   const projectBytes = () =>
     cell.get().assets.reduce((n, a) => n + a.blob.size, 0) + JSON.stringify(cell.get().history.present).length;
 
+  // Comprueba un límite y, si el proyecto no cabe, libera lo que ningún paso del historial referencia y
+  // lo comprueba otra vez antes de rechazar.
+  async function checkWithPurge(check: () => LimitResult): Promise<LimitResult> {
+    const limit = check();
+    if (!limit.ok && limit.error.kind === "project_too_large" && (await purgeOrphans()).removed > 0) return check();
+    return limit;
+  }
+
   // meta: dimensiones decodificadas de la imagen, si se conocen, para el límite de megapíxeles.
   async function addAsset(asset: Asset, blob: Blob, meta: { widthPx?: number; heightPx?: number; expectedRevision?: number } = {}): Promise<boolean> {
     const { expectedRevision, ...dims } = meta;
     const candidate: AssetCandidate = { kind: asset.kind, sizeBytes: blob.size, ...dims };
-    let limit = checkAssetLimits(candidate, projectBytes());
-    // Antes de rechazar por tamaño se libera lo que ningún paso del historial referencia.
-    if (!limit.ok && limit.error.kind === "project_too_large" && (await purgeOrphans()).removed > 0) {
-      limit = checkAssetLimits(candidate, projectBytes());
-    }
+    const limit = await checkWithPurge(() => checkAssetLimits(candidate, projectBytes()));
     if (!limit.ok) {
       cell.set({ error: { kind: "limit", error: limit.error } });
       return false;
@@ -108,5 +112,5 @@ export function createAssetActions(
     return { removed: ids.length + (ids.length ? 0 : purged.removed), bytes: Math.max(0, before - projectBytes()) };
   }
 
-  return { projectBytes, addAsset, addDerivedBlob, purgeOrphans, unusedAssets, freeUnused };
+  return { projectBytes, checkWithPurge, addAsset, addDerivedBlob, purgeOrphans, unusedAssets, freeUnused };
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { TextElement } from "@free-book-cover/core";
 import { App } from "../src/App";
@@ -42,6 +42,22 @@ describe("U-04 copiar, pegar y duplicar", () => {
     await waitFor(() => expect(count(store)).toBe(2));
     await user.click(screen.getByRole("button", { name: "Duplicar" }));
     await waitFor(() => expect(count(store)).toBe(3));
+  });
+  it("sin selección, Posición y tamaño ofrece Pegar si hay algo copiado", async () => {
+    const user = userEvent.setup();
+    const store = await mount();
+    await user.click(screen.getByRole("button", { name: "Copiar" }));
+    await act(async () => {
+      await store.newProject();
+    });
+    expect(count(store)).toBe(0);
+    await user.click(screen.getByRole("button", { name: "Pegar" }));
+    await waitFor(() => expect(count(store)).toBe(1));
+  });
+  it("sin selección y sin portapapeles no hay botón Pegar", async () => {
+    const store = await mount();
+    act(() => store.select(null));
+    expect(screen.queryByRole("button", { name: "Pegar" })).toBeNull();
   });
   it.each(["ctrlKey", "metaKey"] as const)("%s+C y +V con el foco en el documento copian y pegan", async (mod) => {
     const store = await mount();

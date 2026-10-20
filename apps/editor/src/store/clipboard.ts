@@ -1,4 +1,4 @@
-import { checkProjectBytes, elementAssetIds, preparePaste, type ClipboardContent, type Command } from "@free-book-cover/core";
+import { checkProjectBytes, elementAssetIds, preparePaste, type ClipboardContent, type Command, type LimitResult } from "@free-book-cover/core";
 import { thumbId } from "../storage/assetIds";
 import type { StoredAsset } from "../storage/projectStorage";
 import type { EditorDeps, EditorState } from "./editorStore";
@@ -15,7 +15,7 @@ export function createClipboardActions(
   cell: StateCell<EditorState>,
   deps: EditorDeps,
   cmds: { dispatch: (cmd: Command) => boolean },
-  assets: { projectBytes: () => number },
+  assets: { projectBytes: () => number; checkWithPurge: (check: () => LimitResult) => Promise<LimitResult> },
 ) {
   let clip: Clip | null = null;
 
@@ -45,16 +45,23 @@ export function createClipboardActions(
     const projectId = cell.get().history.present.id;
     const prepared = preparePaste(cell.get().history.present, source.content, deps.newId);
     const missing = new Set(prepared.assets.flatMap((a) => [a.id, thumbId(a.id)]));
-    // Los recursos que el proyecto ya tiene no se vuelven a escribir.
-    const toWrite = source.blobs.filter((b) => missing.has(b.id));
-    const bytes = toWrite.reduce((n, b) => n + b.blob.size, 0);
-    if (toWrite.length > 0) {
-      const limit = checkProjectBytes(bytes, assets.projectBytes());
-      if (!limit.ok) {
-        cell.set({ error: { kind: "limit", error: limit.error } });
-        return false;
-      }
+    // Solo se escribe lo que el proyecto no tiene ni en el documento ni como blob en memoria o disco: lo
+    // que ya está no se reescribe y el rollback nunca lo borra. Se recalcula tras purgar huérfanos, que
+    // pueden llevarse un blob en memoria con ese id.
+    let toWrite: StoredAsset[] = [];
+    const pick = () => {
+      const have = new Set(cell.get().assets.map((a) => a.id));
+      toWrite = source.blobs.filter((b) => missing.has(b.id) && !have.has(b.id));
+    };
+    const limit = await assets.checkWithPurge(() => {
+      pick();
+      return checkProjectBytes(toWrite.reduce((n, b) => n + b.blob.size, 0), assets.projectBytes());
+    });
+    if (!limit.ok) {
+      cell.set({ error: { kind: "limit", error: limit.error } });
+      return false;
     }
+    pick();
     const written: string[] = [];
     const rollback = () => Promise.all(written.map((id) => deps.storage.deleteAsset(projectId, id).catch(() => undefined)));
     for (const b of toWrite) {
@@ -66,15 +73,20 @@ export function createClipboardActions(
       }
       written.push(b.id);
     }
+    // Si se abrió otro proyecto durante las escrituras, los blobs quedaron en el anterior: no se pega.
+    if (cell.get().history.present.id !== projectId) {
+      await rollback();
+      return false;
+    }
     // Sin esperas entre registrar los blobs y despachar: la limpieza de huérfanos no los ve a medias.
     const previous = cell.get().assets;
-    if (toWrite.length > 0) cell.set({ assets: [...previous.filter((a) => !missing.has(a.id)), ...toWrite] });
+    if (toWrite.length > 0) cell.set({ assets: [...previous, ...toWrite] });
     if (!cmds.dispatch({ type: "pasteElements", elements: prepared.elements, assets: prepared.assets })) {
       cell.set({ assets: previous });
       await rollback();
       return false;
     }
-    cell.set({ selectedId: prepared.elements[prepared.elements.length - 1]!.id });
+    cell.set({ nearLimit: limit.warning === "project_near_limit", selectedId: prepared.elements[prepared.elements.length - 1]!.id });
     return true;
   }
 
