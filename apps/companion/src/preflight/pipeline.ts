@@ -70,9 +70,10 @@ export async function runPreflight(req: PreflightRequest, steps: PreflightSteps 
       inspection = await steps.inspect(pdfPath);
     }
     const [maxInkPercent, proof] = await Promise.all([steps.measureInk(pdfPath), steps.proof(pdfPath)]);
-    // Gama: la imagen enviada (RGB) frente a la prueba del PDF CMYK.
-    const gamut = await steps.gamut(image, proof);
-    return { report: buildReport({ inspection, maxInkPercent, expected, encoding, gamutPercent: gamut.percent }), pdfPath, proof, gamut: gamut.png, dispose };
+    // Gama: la imagen enviada (RGB) frente a la prueba del PDF CMYK. Es un aviso: si no se puede medir, el
+    // PDF sigue siendo válido y la comprobación simplemente no aparece.
+    const gamut = await steps.gamut(image, proof).catch(() => null);
+    return { report: buildReport({ inspection, maxInkPercent, expected, encoding, gamutPercent: gamut?.percent ?? null }), pdfPath, proof, gamut: gamut?.png ?? null, dispose };
   } catch (e) {
     if (e instanceof PreflightInputError) return { report: inputFailureReport(expected, e.message), pdfPath: null, proof: null, gamut: null, dispose };
     await dispose();

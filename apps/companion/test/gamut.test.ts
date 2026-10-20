@@ -57,6 +57,25 @@ describe("comprobación de gama en el informe", () => {
 });
 
 describe("la cadena devuelve el mapa de gama", () => {
+  it("si la medida de gama falla, el PDF se genera igual y la comprobación no aparece", async () => {
+    const steps: PreflightSteps = {
+      flatten: vi.fn(async (b: Buffer) => b),
+      toPdf: vi.fn(async () => ({ ppi: 300 })),
+      inspect: vi.fn(async () => good()),
+      measureInk: vi.fn(async () => 250),
+      proof: vi.fn(async () => Buffer.from("proof")),
+      gamut: vi.fn(async () => { throw new Error("Input buffer contains unsupported image format"); }),
+    };
+    const r = await runPreflight({ image: Buffer.from("img"), widthIn: 12, heightIn: 9 }, steps);
+    try {
+      expect(r.pdfPath).not.toBeNull();
+      expect(r.report.ok).toBe(true);
+      expect(r.gamut).toBeNull();
+      expect(r.report.checks.some((c) => c.id === "gamut")).toBe(false);
+    } finally {
+      await r.dispose();
+    }
+  });
   it("con la prueba visual se mide la gama sobre la imagen aplanada", async () => {
     const steps: PreflightSteps = {
       flatten: vi.fn(async (b: Buffer) => b),
