@@ -58,6 +58,19 @@ describe("useTextFit", () => {
     expect(get(store)).toMatchObject({ width: 3, height: 1, x: 1 });
   });
 
+  it("refina un texto cuya fuente carga después de haber ajustado otro", async () => {
+    let done!: (v: boolean) => void;
+    const catalog = new Promise<boolean>((r) => { done = r; });
+    const { store, registry, ui } = await setup(textEl("a"), { catalog });
+    store.dispatch({ type: "addElement", element: { ...textEl("b", "Lora"), zIndex: 1 } });
+    registry.ensureDoc(store.getState().history.present);
+    render(ui);
+    expect(get(store, "a")).toMatchObject({ width: 3, height: 1 });
+    expect(get(store, "b")).toMatchObject({ width: 1, height: 3 });
+    await act(async () => { done(true); await catalog; });
+    expect(get(store, "b")).toMatchObject({ width: 3, height: 1, x: 1 });
+  });
+
   it("no toca capas ocultas", async () => {
     const { store, ui } = await setup(textEl("t", "Georgia", false));
     render(ui);

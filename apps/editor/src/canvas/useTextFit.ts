@@ -6,7 +6,7 @@ import { browserMeasure } from "./measure";
 
 // Mantiene ajustada la caja de cada texto visible del diseño base (ancho hasta la palabra más larga y alto
 // del contenido). Espera a las fuentes en carga, junta todos los parches en un solo amend (sin paso de
-// deshacer) y no reajusta si el documento sigue en la revisión que dejó el propio ajuste.
+// deshacer) y no reajusta si el proyecto, la revisión y la versión de fuentes siguen siendo los del propio ajuste.
 export function useTextFit(opts: { measure?: TextMeasure | null } = {}): void {
   const measure = opts.measure === undefined ? browserMeasure() : opts.measure;
   const store = useStore();
@@ -14,9 +14,9 @@ export function useTextFit(opts: { measure?: TextMeasure | null } = {}): void {
   const fontVersion = useFontVersion();
   const { ready, history } = useEditorState();
   const doc = history.present;
-  const fitted = useRef<number | null>(null);
+  const fitted = useRef<string | null>(null);
   useEffect(() => {
-    if (!ready || !measure || fitted.current === doc.revision) return;
+    if (!ready || !measure || fitted.current === `${doc.id}:${doc.revision}:${fontVersion}`) return;
     const report = fonts.checkFontsReady(doc);
     const waiting = new Set<string>();
     if (!report.ok) for (const p of report.problems) if (p.reason === "loading" || p.reason === "not_loaded") for (const id of p.elementIds) waiting.add(id);
@@ -27,6 +27,6 @@ export function useTextFit(opts: { measure?: TextMeasure | null } = {}): void {
       if (fit) cmds.push({ type: "updateElement", id: el.id, props: fit });
     }
     if (cmds.length === 0) return;
-    if (store.amend(cmds)) fitted.current = store.getState().history.present.revision;
+    if (store.amend(cmds)) fitted.current = `${doc.id}:${store.getState().history.present.revision}:${fontVersion}`;
   }, [ready, doc, fontVersion, measure, fonts, store]);
 }
