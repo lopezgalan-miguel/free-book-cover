@@ -1,4 +1,4 @@
-import { FONT_EXTENSIONS, FONT_MIME, catalogGroup, checkAssetLimits, detectFontFormat, documentFontFamilies, familyFromFileName, isFontCollection, splitFontCollection, type Asset, type FontFormat } from "@free-book-cover/core";
+import { FONT_EXTENSIONS, FONT_MIME, catalogGroup, checkAssetLimits, checkProjectBytes, detectFontFormat, documentFontFamilies, familyFromFileName, isFontCollection, splitFontCollection, type Asset, type FontFormat } from "@free-book-cover/core";
 import type { FontPort } from "../store/ports";
 import type { FontRegistry } from "./fontRegistry";
 
@@ -73,12 +73,20 @@ export async function importFont(store: FontPort, registry: FontRegistry, file: 
       asset: { id: store.newId(), kind: "font", mimeType, metadata: { family, name: f.label ? `${name} · ${f.label}` : name, format: f.format, sizeBytes: f.label ? f.bytes.length : file.size } },
     });
   }
+  // Comprobación previa: todas las caras juntas deben caber en el proyecto; si no, no se añade ninguna.
+  const total = registered.reduce((n, r) => n + r.blob.size, 0);
+  const fit = checkProjectBytes(total, store.projectBytes());
+  if (!fit.ok) {
+    forgetAll();
+    store.reportError({ kind: "limit", error: fit.error });
+    return { ok: false, reason: "limit" };
+  }
   const added: Array<{ family: string; assetId: string }> = [];
-  for (const r of registered) {
+  for (const [i, r] of registered.entries()) {
     if (!(await store.addAsset(r.asset, r.blob))) {
-      // El puerto no puede retirar recursos sin dejar pasos en el historial: las caras ya añadidas quedan como
-      // recursos sin uso (el límite de tamaño se comprueba al principio y «liberar espacio» las retira).
-      forgetAll();
+      // El puerto no puede retirar recursos sin dejar pasos en el historial: las caras ya guardadas (0..i-1)
+      // son recursos del documento y siguen registradas y usables; solo se olvidan las que no llegaron a guardarse.
+      registered.slice(i).forEach((x) => registry.forget(x.family));
       const e = store.getState().error;
       return { ok: false, reason: e?.kind === "limit" ? "limit" : "command" };
     }

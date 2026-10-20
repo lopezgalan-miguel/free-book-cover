@@ -182,6 +182,27 @@ describe("importFont", () => {
     expect(store.getState().assets).toHaveLength(0);
     expect(reg.stateOf("Prueba")).toBeUndefined();
   });
+  it("una .ttc que no cabe en el proyecto no añade ninguna cara", async () => {
+    const { store, reg } = await mk(fakeEnv());
+    await fill(store);
+    const big = { ...regular, glyf: new Uint8Array(3 * 1024 * 1024) };
+    const big2 = { ...boldItalic, glyf: new Uint8Array(3 * 1024 * 1024) };
+    const r = await importFont(store, reg, file("Grande.ttc", buildTtc([{ tables: big }, { tables: big2 }])));
+    expect(r).toEqual({ ok: false, reason: "limit" });
+    expect(store.getState().error).toMatchObject({ kind: "limit", error: { kind: "project_too_large" } });
+    expect(store.getState().history.present.assets.filter((a) => a.kind === "font")).toHaveLength(0);
+    expect(reg.stateOf("Prueba")).toBeUndefined();
+  });
+  it("si falla el guardado de la segunda cara, la primera sigue registrada y la segunda no", async () => {
+    const { store, reg } = await mk(fakeEnv());
+    let calls = 0;
+    const port = { ...store, addAsset: (a: Parameters<typeof store.addAsset>[0], b: Blob) => (++calls === 2 ? Promise.resolve(false) : store.addAsset(a, b)) };
+    const r = await importFont(port, reg, file("Prueba.ttc", buildTtc([{ tables: regular }, { tables: boldItalic }])));
+    expect(r.ok).toBe(false);
+    expect(store.getState().history.present.assets.filter((a) => a.kind === "font").map((a) => a.metadata.family)).toEqual(["Prueba"]);
+    expect(reg.stateOf("Prueba")).toBe("loaded");
+    expect(reg.stateOf("Prueba Bold Italic")).toBeUndefined();
+  });
   it("una .ttc corrupta se informa como formato no admitido", async () => {
     const { store, reg } = await mk(fakeEnv());
     expect(await importFont(store, reg, file("Mala.ttc", new Uint8Array([0x74, 0x74, 0x63, 0x66, 0, 1])))).toEqual({ ok: false, reason: "unsupported" });
