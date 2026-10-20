@@ -113,6 +113,14 @@ describe("lienzo", () => {
 });
 
 describe("capas y alternativa numérica", () => {
+  it("Imágenes sin capas dice «Sin imágenes» aunque haya fondo", async () => {
+    const store = await mount();
+    await importImage(store, png(1800, 2700), "background", noThumb);
+    expect(store.getState().history.present.canvas.background).toBeTruthy();
+    expect(await screen.findByText("Sin imágenes")).toBeInTheDocument();
+    expect(screen.queryByText("Sin imagen de fondo")).not.toBeInTheDocument();
+  });
+
   it("reordena capas con teclado y las elimina", async () => {
     const user = userEvent.setup();
     const store = await mount();
