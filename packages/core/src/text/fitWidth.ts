@@ -16,17 +16,20 @@ function widestLineIn(el: TextElement, runs: TextRun[], measure: TextMeasure): n
   return Math.max(0, ...lines.map((l) => l.width)) / FIT_PPI;
 }
 
+// Los décimos se redondean hacia abajo: así la línea más ancha nunca desborda la caja y no se parte.
 // Escala el cuerpo de todos los fragmentos por el mismo factor (6–300 pt, décimas de punto) para que la línea
 // más ancha llene la caja. Devuelve null en texto curvo, sin texto o si ya está ajustado.
 export function fitFontToWidth(el: TextElement, measure: TextMeasure): TextRun[] | null {
   if (el.curvature !== 0 || el.runs.every((r) => r.text === "")) return null;
   const sizes = el.runs.map((r) => r.fontSizePt);
   const scale = (runs: TextRun[], factor: number): TextRun[] => {
-    // El factor se acota para que ningún fragmento salga del rango y se conserven las proporciones.
-    const lo = MIN_PT / Math.min(...runs.map((r) => r.fontSizePt));
-    const hi = MAX_PT / Math.max(...runs.map((r) => r.fontSizePt));
+    // El factor se acota para que ningún fragmento con texto salga del rango y se conserven las proporciones.
+    // Si la razón entre cuerpos supera 300/6 es inevitable que alguno se recorte al límite.
+    const used = runs.filter((r) => r.text !== "");
+    const lo = MIN_PT / Math.min(...used.map((r) => r.fontSizePt));
+    const hi = MAX_PT / Math.max(...used.map((r) => r.fontSizePt));
     const f = Math.max(Math.min(lo, hi), Math.min(hi, factor));
-    return runs.map((r) => ({ ...r, fontSizePt: Math.min(MAX_PT, Math.max(MIN_PT, Math.round(r.fontSizePt * f * 10) / 10)) }));
+    return runs.map((r) => ({ ...r, fontSizePt: Math.min(MAX_PT, Math.max(MIN_PT, Math.floor(r.fontSizePt * f * 10 + 1e-9) / 10)) }));
   };
   const w1 = widestLineIn(el, el.runs, measure);
   if (w1 <= 0 || sizes.some((s) => !(s > 0))) return null;

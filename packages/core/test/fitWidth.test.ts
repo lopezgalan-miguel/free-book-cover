@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitFontToWidth, type TextElement, type TextMeasure, type TextRun } from "../src/index.js";
+import { fitFontToWidth, layoutText, type TextElement, type TextMeasure, type TextRun } from "../src/index.js";
 import { textEl } from "./fixtures.js";
 
 // A 300 ppp, 72 pt = 300 px y cada carácter mide 0,5 in.
@@ -28,5 +28,16 @@ describe("fitFontToWidth", () => {
     expect(fitFontToWidth(el({ curvature: 30 }), measure)).toBeNull();
     expect(fitFontToWidth(el({ runs: [run("")] }), measure)).toBeNull();
     expect(fitFontToWidth(el({ width: 2 }), measure)).toBeNull();
+  });
+  it("redondea hacia abajo: con una medida no múltiplo de 0,1 la línea cabe y no se parte", () => {
+    const odd: TextMeasure = (text, css) => text.length * Number(/([\d.]+)px/.exec(css)![1]) * 0.5037;
+    const e = el({ runs: [run("abcd efgh")] });
+    const runs = fitFontToWidth(e, odd)!;
+    const out = layoutText({ ...e, runs }, 300, odd);
+    expect(out.lines).toHaveLength(1);
+    expect(out.lines[0]!.width / 300).toBeLessThanOrEqual(4);
+  });
+  it("un fragmento vacío diminuto no limita el factor", () => {
+    expect(sizes(fitFontToWidth(el({ runs: [run("abcd", 72), run("", 6)] }), measure))).toEqual([144, 12]);
   });
 });
