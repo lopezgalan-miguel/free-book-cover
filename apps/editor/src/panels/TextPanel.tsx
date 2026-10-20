@@ -306,6 +306,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
             </div>
             <Slider label={t("shadowAngle")} min={0} max={360} step={1} value={el.shadow.angle ?? 90} format={(v) => `${v}°`} onCommit={(angle) => commit({ shadow: { ...el.shadow, angle } })} />
             <Slider label={t("shadowDistance")} min={0} max={0.5} step={0.005} value={el.shadow.distance ?? 0.05} format={(v) => `${v.toFixed(3)} em`} onCommit={(distance) => commit({ shadow: { ...el.shadow, distance } })} />
+            <Slider label={t("shadowSpread")} min={0} max={0.3} step={0.005} value={el.shadow.spread ?? 0} format={(v) => `${v.toFixed(3)} em`} onCommit={(spread) => commit({ shadow: { ...el.shadow, spread } })} />
           </>
         )}
         <Switch label={t("innerShadow")} checked={!!el.innerShadow?.on} onChange={(on) => commit({ innerShadow: on ? { ...(el.innerShadow ?? DEFAULT_INNER), on: true } : undefined })} />

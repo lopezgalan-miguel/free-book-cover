@@ -99,6 +99,8 @@ export const textElementSchema = z
         opacity: finite.min(0).max(1).optional(),
         angle: finite.optional(),
         distance: em.optional(),
+        // Expansión de la sombra (em): con distancia 0 hace un resplandor. Sin ella, sombra normal.
+        spread: finite.min(0).max(0.3).optional(),
       })
       .strict(),
     innerShadow: innerShadowSchema.optional(),

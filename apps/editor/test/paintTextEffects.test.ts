@@ -62,4 +62,56 @@ describe("paintTextItem: efectos", () => {
       expect(ops.indexOf("source-atop")).toBeLessThan(ops.indexOf("destination-in"));
     });
   });
+
+  describe("expansión de la sombra", () => {
+    afterEach(() => vi.unstubAllGlobals());
+    const layered = (k = 1) => {
+      const r = withScale(k);
+      const rec = r.ctx as unknown as Record<string, unknown>;
+      rec.canvas = { width: 1000, height: 1000 };
+      rec.createPattern = () => ({ setTransform: () => undefined });
+      rec.getImageData = () => ({ data: new Uint8ClampedArray(4) });
+      vi.stubGlobal("OffscreenCanvas", class { getContext() { return r.ctx; } });
+      vi.stubGlobal("DOMMatrix", class { translate() { return this; } scale() { return this; } });
+      return r;
+    };
+    const glow = { ...shadow, spread: 8 };
+    it("traza la silueta con 2 x spread antes del relleno de las letras, que no llevan sombra", () => {
+      const { ctx, calls } = layered();
+      paintTextItem(ctx, item(glow), new Map());
+      const stroke = calls.findIndex(([k]) => k === "strokeText");
+      expect(stroke).toBeGreaterThanOrEqual(0);
+      const lw = calls.slice(0, stroke).filter(([k]) => k === "set:lineWidth").map(([, v]) => v);
+      expect(lw[lw.length - 1]).toBe(16);
+      expect(calls.some(([k, v]) => k === "set:lineJoin" && v === "round")).toBe(true);
+      const fills = calls.map((c, i) => [c, i] as const).filter(([c]) => c[0] === "fillText").map(([, i]) => i);
+      const lastFill = fills[fills.length - 1]!;
+      expect(fills.some((i) => i > stroke)).toBe(true);
+      // La sombra se fija una sola vez (volcado de la expansión) y el relleno final no la lleva.
+      const shadowSets = calls.map((c, i) => [c, i] as const).filter(([c]) => c[0] === "set:shadowColor" && c[1] === "rgba(0,0,0,0.6)").map(([, i]) => i);
+      expect(shadowSets.length).toBe(1);
+      expect(shadowSets[0]!).toBeLessThan(lastFill);
+      const drawAt = calls.map((c, i) => [c, i] as const).filter(([c]) => c[0] === "drawImage").map(([, i]) => i);
+      const lastDraw = drawAt[drawAt.length - 1]!;
+      const colorAfter = calls.slice(shadowSets[0]! + 1, lastDraw).filter(([k]) => k === "set:shadowColor").map(([, v]) => v);
+      expect(colorAfter.every((v) => v !== "rgba(0,0,0,0.6)")).toBe(true);
+    });
+    it("con máscara, la silueta de la expansión no se recorta", () => {
+      const { ctx, calls } = layered();
+      const it0 = item(glow);
+      it0.mask = { assetId: "m", mode: "dark", threshold: 0.5, softness: 0, fit: "cover", repeat: false, src: { x: 0, y: 0, width: 1, height: 1 }, dest: { x: 0, y: 0, width: 300, height: 100 } } as never;
+      paintTextItem(ctx, it0, new Map([["m", { image: {}, scale: 1 }]]) as never);
+      const stroke = calls.findIndex(([k]) => k === "strokeText");
+      const mask = calls.findIndex(([k, v]) => k === "set:globalCompositeOperation" && v === "destination-in");
+      expect(stroke).toBeGreaterThanOrEqual(0);
+      expect(mask).toBeGreaterThan(stroke);
+      expect(calls.slice(0, stroke).some(([k, v]) => k === "set:globalCompositeOperation" && v === "destination-in")).toBe(false);
+    });
+    it("sin soporte de capas no hay trazo de expansión", () => {
+      const { ctx, calls } = recordingContext();
+      paintTextItem(ctx, item(glow), new Map());
+      expect(calls.some(([k]) => k === "strokeText")).toBe(false);
+      expect(calls.some(([k]) => k === "drawImage")).toBe(false);
+    });
+  });
 });

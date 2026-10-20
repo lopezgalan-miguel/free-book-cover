@@ -165,6 +165,13 @@ describe("efectos y renderDocument", () => {
     expect(fx.outline).toEqual({ width: 7.2, color: "#112233" });
     expect(textEffects(el(), 72)).toEqual({ shadow: null, outline: null, innerShadow: null });
   });
+  it("la expansión de la sombra se escala con el cuerpo y solo aparece si es positiva", () => {
+    const e = el({ shadow: { on: true, intensity: 40, spread: 0.1 } });
+    expect(textEffects(e, 72).shadow?.spread).toBeCloseTo(7.2, 9);
+    const plain = textEffects(el({ shadow: { on: true, intensity: 40 } }), 72);
+    expect(textEffects(el({ shadow: { on: true, intensity: 40, spread: 0 } }), 72)).toEqual(plain);
+    expect(plain.shadow).not.toHaveProperty("spread");
+  });
   it("renderDocument incluye maquetación solo con medidor, y la textura cubre la caja", () => {
     const doc: Project = {
       ...baseProject(),

@@ -76,4 +76,4 @@ export function compositeLayer(ctx: Ctx2D, layer: Layer, opts: { opacity?: numbe
   ctx.restore();
 }
 
-export const scaleShadow = (s: ShadowPx, k: number): ShadowPx => ({ dx: s.dx * k, dy: s.dy * k, blur: s.blur * k, color: s.color });
+export const scaleShadow = (s: ShadowPx, k: number): ShadowPx => ({ dx: s.dx * k, dy: s.dy * k, blur: s.blur * k, color: s.color, ...(s.spread ? { spread: s.spread * k } : {}) });

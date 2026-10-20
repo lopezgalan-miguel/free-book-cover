@@ -88,6 +88,8 @@ describe("panel de texto: acabado de las letras", () => {
     fireEvent.change(screen.getByLabelText("Opacidad de la sombra"), { target: { value: "90" } });
     fireEvent.change(screen.getByLabelText("Color de la sombra"), { target: { value: "#330000" } });
     expect(textOf(store).shadow).toEqual({ on: true, intensity: 40, angle: 45, distance: 0.1, opacity: 0.9, color: "#330000" });
+    fireEvent.change(screen.getByLabelText("Expansión de la sombra"), { target: { value: "0.12" } });
+    expect(textOf(store).shadow?.spread).toBe(0.12);
   });
 
   it("una máscara propia se sube aparte y no sigue a la textura", async () => {
