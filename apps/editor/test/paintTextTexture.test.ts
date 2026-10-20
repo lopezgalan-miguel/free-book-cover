@@ -12,7 +12,7 @@ const item = (repeat: boolean): TextItem => ({
     align: "left", lineHeight: 1, letterSpacing: 0, shadow: { on: false, intensity: 0 }, outline: { on: false, width: 0, color: "#000000" }, curvature: 0,
   },
   layout: { heightPx: 40, minWidthPx: 80, glyphs: null, lines: [{ top: 0, height: 40, baseline: 32, width: 80, pieces: [{ text: "Hola", x: 0, width: 80, style }] }] },
-  effects: { shadow: null, outline: null, innerShadow: null },
+  effects: { shadow: null, outline: null, innerShadow: null, bevel: null },
   texture: { assetId: "tx", fit: "cover", repeat, dpi: 300, lowDpi: false, src: { x: 0, y: 0, width: 600, height: 300 }, dest: { x: 0, y: 0, width: 200, height: 100 } },
   mask: null,
 });

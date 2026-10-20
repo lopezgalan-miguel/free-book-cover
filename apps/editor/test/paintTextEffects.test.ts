@@ -11,7 +11,7 @@ const item = (shadow: TextItem["effects"]["shadow"]): TextItem => ({
     align: "left", lineHeight: 1, letterSpacing: 0, shadow: { on: shadow !== null, intensity: 40 }, outline: { on: false, width: 0, color: "#000000" }, curvature: 0,
   },
   layout: { heightPx: 40, minWidthPx: 80, glyphs: null, lines: [{ top: 0, height: 40, baseline: 32, width: 80, pieces: [{ text: "Hola", x: 0, width: 80, style }] }] },
-  effects: { shadow, outline: null, innerShadow: null },
+  effects: { shadow, outline: null, innerShadow: null, bevel: null },
   texture: null,
   mask: null,
 });
@@ -60,6 +60,61 @@ describe("paintTextItem: efectos", () => {
       expect(ops).toContain("source-atop");
       expect(ops).toContain("destination-in");
       expect(ops.indexOf("source-atop")).toBeLessThan(ops.indexOf("destination-in"));
+    });
+  });
+
+  describe("bisel", () => {
+    afterEach(() => vi.unstubAllGlobals());
+    const light = { dx: 0, dy: 5, blur: 2, color: "rgba(255,255,255,0.6)" };
+    const dark = { dx: 0, dy: -5, blur: 2, color: "rgba(0,0,0,0.5)" };
+    const layered = () => {
+      const r = withScale(1);
+      const rec = r.ctx as unknown as Record<string, unknown>;
+      rec.canvas = { width: 1000, height: 1000 };
+      rec.createPattern = () => ({ setTransform: () => undefined });
+      rec.getImageData = () => ({ data: new Uint8ClampedArray(4) });
+      vi.stubGlobal("OffscreenCanvas", class { getContext() { return r.ctx; } });
+      vi.stubGlobal("DOMMatrix", class { translate() { return this; } scale() { return this; } });
+      return r;
+    };
+    const maskOf = () => ({ assetId: "m", mode: "dark", threshold: 0.5, softness: 0, fit: "cover", repeat: false, src: { x: 0, y: 0, width: 1, height: 1 }, dest: { x: 0, y: 0, width: 300, height: 100 } }) as never;
+    const colors = (calls: Array<[string, ...unknown[]]>) => calls.filter(([k]) => k === "set:shadowColor").map(([, v]) => v);
+    it("con bisel hay capa y dos pasadas de sombra interior: primero la luz y luego la sombra", () => {
+      const { ctx, calls } = layered();
+      const it0 = item(null);
+      it0.effects.bevel = { light, dark };
+      paintTextItem(ctx, it0, new Map());
+      expect(calls.some(([k]) => k === "drawImage")).toBe(true);
+      expect(calls.filter(([k, v]) => k === "set:globalCompositeOperation" && v === "source-atop").length).toBe(2);
+      const c = colors(calls);
+      expect(c.indexOf(light.color)).toBeGreaterThanOrEqual(0);
+      expect(c.indexOf(light.color)).toBeLessThan(c.indexOf(dark.color));
+    });
+    it("con máscara o textura con huecos las dos pasadas usan la silueta opaca", () => {
+      const { ctx, calls } = layered();
+      const it0 = item(null);
+      it0.effects.bevel = { light, dark };
+      it0.mask = maskOf();
+      paintTextItem(ctx, it0, new Map([["m", { image: {}, scale: 1 }]]) as never);
+      // La silueta se pinta en negro opaco sin textura: una pasada de relleno "#000".
+      expect(calls.some(([k, v]) => k === "set:fillStyle" && v === "#000")).toBe(true);
+      expect(calls.filter(([k, v]) => k === "set:globalCompositeOperation" && v === "destination-out").length).toBe(2);
+    });
+    it("el orden es sombra interior, bisel y después máscara", () => {
+      const { ctx, calls } = layered();
+      const it0 = item(null);
+      it0.effects.innerShadow = { dx: 0, dy: 4, blur: 6, color: "rgba(1,2,3,1)" } as never;
+      it0.effects.bevel = { light, dark };
+      it0.mask = maskOf();
+      paintTextItem(ctx, it0, new Map([["m", { image: {}, scale: 1 }]]) as never);
+      const c = colors(calls);
+      const [i, l, d] = ["rgba(1,2,3,1)", light.color, dark.color].map((v) => c.indexOf(v));
+      expect(i).toBeGreaterThanOrEqual(0);
+      expect(i).toBeLessThan(l!);
+      expect(l).toBeLessThan(d!);
+      const lastAtop = calls.map(([k, v]) => k === "set:globalCompositeOperation" && v === "source-atop").lastIndexOf(true);
+      const mask = calls.findIndex(([k, v]) => k === "set:globalCompositeOperation" && v === "destination-in");
+      expect(lastAtop).toBeLessThan(mask);
     });
   });
 

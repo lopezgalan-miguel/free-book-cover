@@ -207,7 +207,7 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         patch.runs = normalizeRuns(newRuns.map(({ text, ...own }: RunInput) => buildRun(doc(), defaults as Run, own, text, rest.weight as number | undefined, first)), first);
       }
       // null quita textura, máscara, sombra interior o filtros: updateElement elimina las claves con valor undefined.
-      for (const key of ["texture", "mask", "innerShadow", "filters"]) if (style[key] === null) patch[key] = undefined;
+      for (const key of ["texture", "mask", "innerShadow", "bevel", "filters"]) if (style[key] === null) patch[key] = undefined;
       // La anchura es de una fuente variable concreta: null la quita, y cambiar de familia sin indicarla también.
       if (el.type === "text" && (style.stretch === null || (style.fontFamily !== undefined && style.stretch === undefined))) {
         patch.runs = ((patch.runs as TextElement["runs"] | undefined) ?? el.runs).map(({ stretch: _s, ...r }) => r);

@@ -32,7 +32,7 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
 
   // Con expansión, la sombra sale de una silueta ensanchada en su propia capa: exige capas.
   const spread = item.effects.shadow?.spread ?? 0;
-  const layered = (item.mask !== null || item.effects.innerShadow !== null || item.opacity < 1 || spread > 0) && layerSupported(ctx);
+  const layered = (item.mask !== null || item.effects.innerShadow !== null || item.effects.bevel !== null || item.opacity < 1 || spread > 0) && layerSupported(ctx);
   if (layered) {
     // Margen de un cuerpo (más el contorno) alrededor de la caja: rasgos y letras sobre arco que sobresalen.
     const margin = Math.max(...ops.map((o) => o.style.fontPx)) + (item.effects.outline?.width ?? 0);
@@ -48,9 +48,15 @@ export function paintTextItem(ctx: CanvasRenderingContext2D, item: TextItem, sou
     // oscuras los bordes que la máscara abre (p. ej. las grietas de un mármol).
     // Con textura o máscara, la forma de la sombra sale de la silueta opaca de la letra: los huecos de una
     // textura con alfa (mármol «con huecos») no cuentan como borde de la letra.
-    if (item.effects.innerShadow) {
+    // El relieve (luz y luego sombra) son dos sombras interiores más, con la misma silueta.
+    const { innerShadow, bevel } = item.effects;
+    if (innerShadow || bevel) {
       const silhouette = item.texture || item.mask ? paintSilhouette(ctx, item, ops, sources, margin) : null;
-      applyInnerShadow(layer, scaleShadow(item.effects.innerShadow, layer.k), silhouette);
+      if (innerShadow) applyInnerShadow(layer, scaleShadow(innerShadow, layer.k), silhouette);
+      if (bevel) {
+        applyInnerShadow(layer, scaleShadow(bevel.light, layer.k), silhouette);
+        applyInnerShadow(layer, scaleShadow(bevel.dark, layer.k), silhouette);
+      }
     }
     if (item.mask) applyMask(layer.ctx, item, sources);
     const shadow = item.effects.shadow && spread === 0 ? scaleShadow(item.effects.shadow, layer.k) : null;
