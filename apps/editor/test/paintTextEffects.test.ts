@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { paintTextItem, type TextItem } from "../src/canvas/paintText";
 import { recordingContext } from "./helpers/recordingContext";
 
@@ -38,5 +38,28 @@ describe("paintTextItem: efectos", () => {
     expect(last(one.calls, "shadowOffsetY")).toBe(5);
     expect(last(two.calls, "shadowOffsetY")).toBe(10);
     expect(last(two.calls, "shadowBlur")).toBeCloseTo(12.8, 9);
+  });
+
+  describe("orden en la capa", () => {
+    afterEach(() => vi.unstubAllGlobals());
+    it("con máscara y sombra interior, la sombra (source-atop) se aplica antes que la máscara (destination-in)", () => {
+      // Vitest corre en node: se sustituyen el lienzo auxiliar y la matriz para que la capa grabe sus llamadas.
+      const { ctx, calls } = withScale(1);
+      const rec = ctx as unknown as Record<string, unknown>;
+      rec.canvas = { width: 1000, height: 1000 };
+      rec.createPattern = () => ({ setTransform: () => undefined });
+      rec.getImageData = () => ({ data: new Uint8ClampedArray(4) });
+      vi.stubGlobal("OffscreenCanvas", class { getContext() { return ctx; } });
+      vi.stubGlobal("DOMMatrix", class { translate() { return this; } scale() { return this; } });
+      const it0 = item(null);
+      it0.effects.innerShadow = { dx: 0, dy: 4, blur: 6, color: "rgba(0,0,0,1)" } as never;
+      it0.mask = { assetId: "m", mode: "dark", threshold: 0.5, softness: 0, fit: "cover", repeat: false, src: { x: 0, y: 0, width: 1, height: 1 }, dest: { x: 0, y: 0, width: 300, height: 100 } } as never;
+      const sources = new Map([["m", { image: {}, scale: 1 }]]) as never;
+      paintTextItem(ctx, it0, sources);
+      const ops = calls.filter(([k]) => k === "set:globalCompositeOperation").map(([, v]) => v);
+      expect(ops).toContain("source-atop");
+      expect(ops).toContain("destination-in");
+      expect(ops.indexOf("source-atop")).toBeLessThan(ops.indexOf("destination-in"));
+    });
   });
 });

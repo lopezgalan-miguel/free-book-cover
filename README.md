@@ -39,6 +39,7 @@ En móvil (menos de 768 px de ancho) el editor muestra barra superior, lienzo, p
 
 - El editor autoguarda en IndexedDB tras una pausa de unos segundos y avisa al cerrar o recargar si quedan cambios sin guardar; *Guardar* sigue disponible.
 - El botón con el nombre del proyecto (cabecera de escritorio y barra móvil) abre el diálogo de proyecto: renombrar, crear uno nuevo, abrir o borrar otros guardados, descargar e **importar copias de seguridad** (todas las partes juntas) y **liberar espacio** (quita los recursos sin uso tras confirmar y vacía el historial de deshacer). Los blobs que ningún paso del historial referencia se purgan solos al guardar y al abrir.
+- Capas: «Copiar», «Pegar» y «Duplicar» en «Posición y tamaño», (sin capa seleccionada solo «Pegar», si hay algo copiado) o con Ctrl/Cmd + C, V y D (no actúan dentro de campos de texto ni con un diálogo abierto). Se copia la capa con sus recursos y se puede pegar en otro proyecto de la misma pestaña.
 - Los cambios continuos (escribir, arrastrar el selector de color) cuentan como un solo paso de deshacer.
 
 ## Tests

@@ -15,6 +15,8 @@ export type ElementPatch =
 export type Command =
   // El elemento entra siempre en lo más alto de la pila: su zIndex de entrada se ignora.
   | { type: "addElement"; element: Element }
+  // Pega varias capas con sus recursos (los que falten, por id) en un solo paso; entran arriba, en orden.
+  | { type: "pasteElements"; elements: Element[]; assets: Asset[] }
   | { type: "updateElement"; id: string; props: ElementPatch }
   | { type: "removeElement"; id: string }
   // toIndex: posición en la pila de apilado (0 = fondo), acotada a [0, n-1].
@@ -82,6 +84,15 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
     case "addElement": {
       const top = doc.elements.reduce((m, e) => Math.max(m, e.zIndex + 1), 0);
       return { ...doc, elements: [...doc.elements, { ...cmd.element, zIndex: top }] };
+    }
+    case "pasteElements": {
+      if (cmd.elements.length === 0) return invalid("no hay capas que pegar");
+      const have = new Set(doc.assets.map((a) => a.id));
+      const assets = [...doc.assets];
+      for (const a of cmd.assets) if (!have.has(a.id)) { have.add(a.id); assets.push(a); }
+      const top = doc.elements.reduce((m, e) => Math.max(m, e.zIndex + 1), 0);
+      const added = cmd.elements.map((e, i) => ({ ...e, zIndex: top + i }));
+      return { ...doc, assets, elements: [...doc.elements, ...added] };
     }
     case "updateElement": {
       const current = doc.elements.find((e) => e.id === cmd.id);

@@ -29,3 +29,4 @@ export * from "./elements/editable.js";
 export * from "./elements/defaults.js";
 export * from "./textures/generate.js";
 export * from "./text/fontAxes.js";
+export * from "./elements/clipboard.js";

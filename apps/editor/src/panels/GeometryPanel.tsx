@@ -17,6 +17,12 @@ export function GeometryPanel() {
       <>
         <p className="text-xs leading-snug text-muted">{t("selectHint")}</p>
         <p className="mt-2 text-xs text-muted">{t("noSelection")}</p>
+        {/* Sin capa seleccionada (p. ej. en un proyecto nuevo, o en el móvil sin teclado) también se puede pegar. */}
+        {store.canPaste() && (
+          <div className="mt-2.5 flex">
+            <button type="button" className={`${chipBtn} flex-1`} onClick={() => void store.paste()}>{t("pasteLayer")}</button>
+          </div>
+        )}
       </>
     );
   }
@@ -53,6 +59,11 @@ export function GeometryPanel() {
       <div className="mt-2.5 flex gap-1.5">
         <button type="button" className={`${chipBtn} flex-1`} disabled={index < 0 || index === stack.length - 1} onClick={() => toIndex(stack.length - 1)}>{t("bringToFront")}</button>
         <button type="button" className={`${chipBtn} flex-1`} disabled={index <= 0} onClick={() => toIndex(0)}>{t("sendToBack")}</button>
+      </div>
+      <div className="mt-1.5 flex gap-1.5">
+        <button type="button" className={`${chipBtn} flex-1`} onClick={() => store.copySelection()}>{t("copyLayer")}</button>
+        <button type="button" className={`${chipBtn} flex-1`} disabled={!store.canPaste()} onClick={() => void store.paste()}>{t("pasteLayer")}</button>
+        <button type="button" className={`${chipBtn} flex-1`} onClick={() => void store.duplicateSelection()}>{t("duplicateLayer")}</button>
       </div>
       {el.type === "image" && (
         <>

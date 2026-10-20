@@ -149,6 +149,97 @@ test("la sombra interior oscurece la letra por dentro", async ({ page }) => {
   await expect.poll(async () => (await counts(page)).white).toBeLessThan(before.white * 0.8);
 });
 
+// Luminancia (0-255) de los píxeles de la fila central de la caja del texto, con el pintor de exportación,
+// y si cada uno es «tinta» (no es el fondo rojo).
+const centerRow = (page: Page) =>
+  page.evaluate(async () => {
+    const modulePath = "/src/canvas/paint.ts";
+    const { paintDocument } = await import(/* @vite-ignore */ modulePath);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sc = (window as any).__coverScene;
+    const r = sc.lastRender;
+    const out = document.createElement("canvas");
+    out.width = Math.round(r.widthPx);
+    out.height = Math.round(r.heightPx);
+    const ctx = out.getContext("2d")!;
+    paintDocument(ctx, r, sc.lastSources);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const box = r.items.find((i: any) => i.id === "t1").box;
+    const y = Math.round(box.y + box.height / 2);
+    const d = ctx.getImageData(0, y, out.width, 1).data;
+    const lum: number[] = [];
+    const ink: boolean[] = [];
+    for (let x = 0; x < out.width; x++) {
+      const [R, G, B] = [d[x * 4]!, d[x * 4 + 1]!, d[x * 4 + 2]!];
+      lum.push(0.2126 * R + 0.7152 * G + 0.0722 * B);
+      ink.push(!(R > 150 && G < 80 && B < 80));
+    }
+    return { lum, ink };
+  });
+
+test("la sombra interior no marca los bordes que abre la máscara", async ({ page }) => {
+  // Franjas de 40 px alternas (negro/blanco) como máscara oscura.
+  const stripesId = (await texture(page))?.assetId;
+  const wide = makePng(320, 64, (x) => (Math.floor(x / 40) % 2 === 0 ? [0, 0, 0] : [255, 255, 255]));
+  await page.getByLabel("Subir textura").setInputFiles({ name: "franjas40.png", mimeType: "image/png", buffer: wide });
+  await expect.poll(async () => (await texture(page))?.assetId).not.toBe(stripesId);
+  const maskTex = await texture(page);
+  await update(page, { texture: undefined, innerShadow: { on: true, color: "#000000", opacity: 1, angle: 90, distance: 0, blur: 0.08 } });
+  await page.waitForTimeout(200);
+  // Referencia sin máscara: dónde hay letra.
+  const full = await centerRow(page);
+  await update(page, { mask: { ...maskTex, fit: "tile", tileIn: 2, mode: "dark", threshold: 0.5, softness: 0 } });
+  await page.waitForTimeout(200);
+  const masked = await centerRow(page);
+  const lums = edgeLums(full, masked);
+  expect(lums.length).toBeGreaterThanOrEqual(2);
+  for (const l of lums) expect(l).toBeGreaterThan(200);
+});
+
+// Borde de grieta: fin de un tramo conservado donde la letra sin máscara continúa. A 3 px dentro, sigue claro.
+// Solo cuenta donde la letra, sin máscara, ya era clara a 3 px: así no se confunde con su propio contorno.
+function edgeLums(full: { lum: number[]; ink: boolean[] }, masked: { lum: number[]; ink: boolean[] }): number[] {
+  const lums: number[] = [];
+  for (let e = 4; e < masked.ink.length - 5; e++) {
+    if (masked.ink[e] && !masked.ink[e + 1] && full.ink[e + 1] && full.ink[e + 5] && full.lum[e - 3]! > 200) lums.push(masked.lum[e - 3]!);
+    if (masked.ink[e + 1] && !masked.ink[e] && full.ink[e] && full.ink[e - 4] && full.lum[e + 4]! > 200) lums.push(masked.lum[e + 4]!);
+  }
+  return lums;
+}
+
+test("la sombra interior no marca los huecos de una textura con alfa usada también como máscara alpha", async ({ page }) => {
+  // Textura blanca con franjas transparentes (bordes nítidos al escalarla) (como las grietas del mármol «con huecos»).
+  const dataUrl = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 3200;
+    c.height = 64;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "#fff";
+    for (let i = 0; i < 3200; i += 800) x.fillRect(i, 0, 400, 64);
+    return c.toDataURL("image/png");
+  });
+  const buffer = Buffer.from(dataUrl.split(",")[1]!, "base64");
+  const stripesId = (await texture(page))?.assetId;
+  await page.getByLabel("Subir textura").setInputFiles({ name: "huecos.png", mimeType: "image/png", buffer });
+  await expect.poll(async () => (await texture(page))?.assetId).not.toBe(stripesId);
+  const holes = await texture(page);
+  await update(page, { texture: undefined, innerShadow: { on: true, color: "#000000", opacity: 1, angle: 90, distance: 0, blur: 0.08 } });
+  await page.waitForTimeout(200);
+  const full = await centerRow(page);
+  const placed = { ...holes, fit: "tile", tileIn: 2 };
+  await update(page, { texture: placed, mask: { ...placed, mode: "alpha", threshold: 0.5, softness: 0 } });
+  await page.waitForTimeout(200);
+  const masked = await centerRow(page);
+  // 3 px dentro de cada borde de hueco donde la letra sin textura sigue: no debe ser más oscuro que sin huecos.
+  const drops: number[] = [];
+  for (let e = 4; e < masked.ink.length - 5; e++) {
+    if (masked.ink[e] && !masked.ink[e + 1] && full.ink[e + 1] && full.ink[e - 3]) drops.push(full.lum[e - 3]! - masked.lum[e - 3]!);
+    if (masked.ink[e + 1] && !masked.ink[e] && full.ink[e] && full.ink[e + 4]) drops.push(full.lum[e + 4]! - masked.lum[e + 4]!);
+  }
+  expect(drops.length).toBeGreaterThanOrEqual(2);
+  for (const d of drops) expect(d).toBeLessThan(15);
+});
+
 test.describe("en pantalla retina", () => {
   test.use({ deviceScaleFactor: 2 });
   test("la sombra de la vista cae donde en la exportación", async ({ page }) => {
