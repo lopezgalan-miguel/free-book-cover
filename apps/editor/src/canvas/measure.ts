@@ -1,4 +1,4 @@
-import { layoutText, type TextElement, type TextMeasure } from "@free-book-cover/core";
+import { fitTextBox, layoutText, type TextElement, type TextMeasure } from "@free-book-cover/core";
 
 // Medidor de texto con canvas 2D; null sin DOM (pruebas Node/jsdom).
 let cached: TextMeasure | null | undefined;
@@ -22,4 +22,11 @@ export function browserMeasure(): TextMeasure | null {
 // Alto del bloque en pulgadas para que la caja envuelva el texto (se maqueta a 300 ppp).
 export function textHeightIn(el: TextElement, measure: TextMeasure): number {
   return layoutText(el, 300, measure).heightPx / 300;
+}
+
+// Caja de un texto de variante tras cambiar su escala de letra de `prev` a `next`: ancho al menos el de la
+// palabra más larga escalada (con el borde de la alineación quieto) y alto del contenido.
+export function fitScaledText(el: TextElement, next: number, prev: number, measure: TextMeasure): { x?: number; width?: number; height: number } {
+  const scaled: TextElement = { ...el, runs: el.runs.map((r) => ({ ...r, fontSizePt: (r.fontSizePt * next) / prev })) };
+  return fitTextBox(scaled, measure) ?? { height: textHeightIn(scaled, measure) };
 }

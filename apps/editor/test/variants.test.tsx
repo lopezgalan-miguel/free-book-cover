@@ -3,7 +3,8 @@ import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { overridesOf, type ShapeElement } from "@free-book-cover/core";
+import { overridesOf, type ShapeElement, type TextElement, type TextMeasure } from "@free-book-cover/core";
+import { fitScaledText } from "../src/canvas/measure";
 import { App } from "../src/App";
 import type { ExportDeps } from "../src/export/exportImage";
 import { FontRegistry, type FontEnv } from "../src/fonts/fontRegistry";
@@ -318,5 +319,24 @@ describe("estado de vista de variantes", () => {
     expect(store.displayDoc()).toBe(store.getState().history.present);
     // cambiar de variante no incrementa la revisión ni ensucia el documento
     expect(store.getState().history.present.revision).toBeGreaterThan(0);
+  });
+});
+
+describe("escala de letra en variantes: ajuste de la caja", () => {
+  // A 300 ppp, 72 pt = 300 px y cada carácter mide 0,5 in.
+  const measure: TextMeasure = (text, css) => text.length * Number(/([\d.]+)px/.exec(css)![1]) * 0.5;
+  const fitted: TextElement = {
+    id: "t", type: "text", x: 1, y: 1, width: 3, height: 1, rotation: 0, zIndex: 0, visible: true, align: "center", lineHeight: 1, letterSpacing: 0,
+    runs: [{ text: "abcdef", fontFamily: "Georgia", fontSizePt: 72, weight: 400, italic: false, underline: false, uppercase: false, color: "#ffffff" }],
+    shadow: { on: false, intensity: 40 }, outline: { on: false, width: 3, color: "#000000" }, curvature: 0,
+  };
+
+  it("con fontScale 1.5 la caja crece hasta la palabra escalada, con el ancla de la alineación, y el alto sigue al texto", () => {
+    expect(fitScaledText(fitted, 1.5, 1, measure)).toEqual({ x: 0.25, width: 4.5, height: 1.5 });
+  });
+
+  it("al volver a una escala menor parte de la letra ya escalada", () => {
+    const big = { ...fitted, x: 0.25, width: 4.5, height: 1.5, runs: fitted.runs.map((r) => ({ ...r, fontSizePt: 108 })) };
+    expect(fitScaledText(big, 1, 1.5, measure)).toEqual({ x: 0.25, width: 4.5, height: 1 });
   });
 });
