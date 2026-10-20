@@ -20,6 +20,7 @@ export function issueMessage(t: (k: DictKey, v?: Record<string, string | number>
     case "trim_unsupported": return t("kdpErrTrimUnsupported");
     case "paper_unsupported": return t("kdpErrPaper");
     case "paper_unavailable_for_trim": return t("kdpErrPaperTrim");
+    case "paper_unavailable_for_binding": return t("kdpErrPaperBinding");
     case "pages_invalid": return t("kdpErrPagesInvalid");
     case "pages_below_min": return t("kdpErrPagesMin", { n: i.min });
     case "pages_above_max": return t("kdpErrPagesMax", { n: i.max });

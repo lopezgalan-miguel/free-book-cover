@@ -64,6 +64,38 @@ export function maxPagesFor(w: number, h: number, paper: string): number | null 
   const t = findTrim(w, h);
   return t && findPaper(paper) ? (t.maxPages[paper as PaperId] ?? null) : null;
 }
+export type Binding = "paperback" | "hardcover";
+const MM = 1 / 25.4;
+// Tapa dura (case laminate). Medidas leídas de los vectores de las plantillas oficiales CASE_LAMINATE de
+// 5,5 × 8,5 (116 págs. crema y 128 blanco) el 2026-10-20; cortes y páginas, de la configuración de la
+// calculadora de cubiertas de KDP (ver sources.md y VERIFICACION.md).
+export const HARDCOVER = {
+  // Solapa que se dobla por dentro del cartón, en los cuatro lados.
+  wrapIn: 15 * MM,
+  // El cartón es mayor que el libro: el corte + 5 mm de ancho y + 6 mm de alto.
+  boardExtraWIn: 5 * MM,
+  boardExtraHIn: 6 * MM,
+  // Lomo = páginas × grosor del papel + 4,8 mm.
+  spineExtraIn: 4.8 * MM,
+  // Bisagra a cada lado del lomo: ahí la cubierta se pliega al abrir el libro.
+  hingeIn: 10 * MM,
+  minPages: 76,
+  maxPages: 550,
+  papers: ["bw-white", "bw-cream", "color-premium"] as readonly PaperId[],
+  barcodeGapHingeIn: 0.25,
+  barcodeGapBottomIn: 0.375,
+} as const;
+export const HARDCOVER_TRIMS: readonly { widthIn: number; heightIn: number }[] = [
+  { widthIn: 5.5, heightIn: 8.5 },
+  { widthIn: 6, heightIn: 9 },
+  { widthIn: 6.14, heightIn: 9.21 },
+  { widthIn: 7, heightIn: 10 },
+  { widthIn: 8.25, heightIn: 11 },
+];
+export const bindingOf = (s: { binding?: Binding | undefined }): Binding => s.binding ?? "paperback";
+export const trimsFor = (b: Binding): readonly { widthIn: number; heightIn: number }[] => (b === "hardcover" ? HARDCOVER_TRIMS : SUPPORTED_TRIMS);
+export const isHardcoverTrim = (w: number, h: number): boolean => HARDCOVER_TRIMS.some((t) => same(t.widthIn, w) && same(t.heightIn, h));
+
 // Tamaño grande de KDP (otro coste de impresión): más de 6,12 in de ancho o más de 9 in de alto.
 export const isLargeTrim = (w: number, h: number): boolean => w > 6.12 || h > 9;
 
@@ -74,6 +106,7 @@ export type SetupIssue =
   | { kind: "trim_unsupported" }
   | { kind: "paper_unsupported" }
   | { kind: "paper_unavailable_for_trim" }
+  | { kind: "paper_unavailable_for_binding" }
   | { kind: "pages_invalid" }
   | { kind: "pages_below_min"; min: number }
   | { kind: "pages_above_max"; max: number };
@@ -82,7 +115,20 @@ export type SetupResult = { ok: true } | { ok: false; issues: SetupIssue[] };
 
 const round6 = (v: number) => Math.round(v * 1e6) / 1e6;
 
+function validateHardcover(s: PrintSetup): SetupResult {
+  const issues: SetupIssue[] = [];
+  if (!isHardcoverTrim(s.trimWidthIn, s.trimHeightIn)) issues.push({ kind: "trim_unsupported" });
+  const paper = findPaper(s.paperAndInk);
+  if (!paper) issues.push({ kind: "paper_unsupported" });
+  else if (!HARDCOVER.papers.includes(paper.id)) issues.push({ kind: "paper_unavailable_for_binding" });
+  if (!Number.isInteger(s.pageCount) || s.pageCount < 1) issues.push({ kind: "pages_invalid" });
+  else if (s.pageCount < HARDCOVER.minPages) issues.push({ kind: "pages_below_min", min: HARDCOVER.minPages });
+  else if (s.pageCount > HARDCOVER.maxPages) issues.push({ kind: "pages_above_max", max: HARDCOVER.maxPages });
+  return issues.length ? { ok: false, issues } : { ok: true };
+}
+
 export function validatePrintSetup(s: PrintSetup): SetupResult {
+  if (bindingOf(s) === "hardcover") return validateHardcover(s);
   const issues: SetupIssue[] = [];
   const inRange =
     s.trimWidthIn >= CUSTOM_TRIM.minW && s.trimWidthIn <= CUSTOM_TRIM.maxW && s.trimHeightIn >= CUSTOM_TRIM.minH && s.trimHeightIn <= CUSTOM_TRIM.maxH;
@@ -102,10 +148,10 @@ export function validatePrintSetup(s: PrintSetup): SetupResult {
   return issues.length ? { ok: false, issues } : { ok: true };
 }
 
-export function spineWidthIn(pageCount: number, paperId: string): number {
+export function spineWidthIn(pageCount: number, paperId: string, binding: Binding = "paperback"): number {
   const paper = findPaper(paperId);
   if (!paper) throw new RangeError(`papel no admitido: ${paperId}`);
-  return round6(pageCount * paper.thicknessIn);
+  return round6(pageCount * paper.thicknessIn + (binding === "hardcover" ? HARDCOVER.spineExtraIn : 0));
 }
 
 // El texto del lomo exige 79 páginas o más y un lomo con espacio útil.
@@ -116,15 +162,19 @@ export const spineTextAllowed = (pageCount: number, spineIn: number): boolean =>
 export const spineWithinTolerance = (actualIn: number, officialIn: number): boolean => Math.abs(actualIn - officialIn) <= SPINE_TOLERANCE_IN + 1e-9;
 
 export interface KdpLayout {
+  binding: Binding;
   widthIn: number;
   heightIn: number;
   spineIn: number;
   bleedIn: number;
-  // Caras (corte): contraportada | lomo | portada. El sangrado queda entre cada cara y el borde del lienzo.
+  // Caras: contraportada | lomo | portada (en tapa blanda, el corte; en tapa dura, el cartón). Entre cada cara
+  // y el borde del lienzo queda el sangrado (en tapa dura, la solapa, y bleedIn es su ancho).
   back: Rect;
   spine: Rect;
   front: Rect;
   folds: [number, number];
+  // Solo tapa dura: líneas exteriores de las bisagras (izquierda y derecha del lomo).
+  hinges: [number, number] | null;
   safe: { back: Rect; front: Rect };
   // Zona útil para texto del lomo; null si el lomo no admite texto.
   spineSafe: Rect | null;
@@ -132,8 +182,45 @@ export interface KdpLayout {
   barcode: Rect;
 }
 
+// Tapa dura: cartón mayor que el corte, solapa en lugar de sangrado y zona segura cortada por las bisagras.
+function hardcoverLayout(s: PrintSetup): KdpLayout {
+  const H = HARDCOVER;
+  const spineIn = spineWidthIn(s.pageCount, s.paperAndInk, "hardcover");
+  const wrap = round6(H.wrapIn);
+  const bw = round6(s.trimWidthIn + H.boardExtraWIn);
+  const bh = round6(s.trimHeightIn + H.boardExtraHIn);
+  const back: Rect = { x: wrap, y: wrap, width: bw, height: bh };
+  const spine: Rect = { x: round6(wrap + bw), y: wrap, width: spineIn, height: bh };
+  const front: Rect = { x: round6(wrap + bw + spineIn), y: wrap, width: bw, height: bh };
+  const hinges: [number, number] = [round6(spine.x - H.hingeIn), round6(spine.x + spineIn + H.hingeIn)];
+  const top = wrap + SAFE_IN;
+  const safeH = bh - 2 * SAFE_IN;
+  const allowed = spineTextAllowed(s.pageCount, spineIn);
+  return {
+    binding: "hardcover",
+    widthIn: round6(2 * bw + spineIn + 2 * wrap),
+    heightIn: round6(bh + 2 * wrap),
+    spineIn, bleedIn: wrap, back, spine, front,
+    folds: [spine.x, round6(spine.x + spineIn)],
+    hinges,
+    safe: {
+      back: { x: back.x + SAFE_IN, y: top, width: round6(hinges[0] - back.x - SAFE_IN), height: safeH },
+      front: { x: hinges[1], y: top, width: round6(front.x + bw - SAFE_IN - hinges[1]), height: safeH },
+    },
+    spineSafe: allowed ? { x: spine.x + SPINE_TEXT_MARGIN_IN, y: top, width: spineIn - 2 * SPINE_TEXT_MARGIN_IN, height: safeH } : null,
+    spineTextAllowed: allowed,
+    barcode: {
+      x: round6(hinges[0] - H.barcodeGapHingeIn - BARCODE.widthIn),
+      y: round6(back.y + bh - H.barcodeGapBottomIn - BARCODE.heightIn),
+      width: BARCODE.widthIn,
+      height: BARCODE.heightIn,
+    },
+  };
+}
+
 // Geometría completa a partir de datos de impresión válidos. Todo en pulgadas, origen arriba a la izquierda.
 export function kdpLayout(s: PrintSetup): KdpLayout {
+  if (bindingOf(s) === "hardcover") return hardcoverLayout(s);
   const spineIn = spineWidthIn(s.pageCount, s.paperAndInk);
   const w = s.trimWidthIn;
   const h = s.trimHeightIn;
@@ -151,8 +238,10 @@ export function kdpLayout(s: PrintSetup): KdpLayout {
     height: BARCODE.heightIn,
   };
   return {
+    binding: "paperback",
     widthIn, heightIn, spineIn, bleedIn: BLEED_IN, back, spine, front,
     folds: [spine.x, round6(spine.x + spineIn)],
+    hinges: null,
     safe: { back: inset(back), front: inset(front) },
     spineSafe: allowed
       ? { x: spine.x + SPINE_TEXT_MARGIN_IN, y: back.y + SAFE_IN, width: spineIn - 2 * SPINE_TEXT_MARGIN_IN, height: h - 2 * SAFE_IN }

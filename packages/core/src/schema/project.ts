@@ -162,6 +162,8 @@ export const printSetupSchema = z
     pageCount: z.number().int().positive(),
     paperAndInk: z.string().min(1),
     readingDirection: z.literal("ltr"),
+    // Encuadernación; sin ella, tapa blanda (documentos anteriores a la tapa dura).
+    binding: z.enum(["paperback", "hardcover"]).optional(),
   })
   .strict();
 
