@@ -101,4 +101,20 @@ describe("useTextFit", () => {
     render(ui);
     expect(spy).toHaveBeenCalledTimes(1);
   });
+
+  it("tras el ajuste el proyecto queda con cambios sin guardar y deshacer/rehacer siguen el historial real", async () => {
+    const { store, ui } = await setup(textEl("t"));
+    const saved = store.getState().savedRevision;
+    render(ui);
+    expect(store.getState().savedRevision).toBe(saved);
+    expect(store.getState().history.present.revision).not.toBe(saved);
+    expect(store.canRedo()).toBe(false);
+    const rev = store.getState().history.present.revision;
+    act(() => { store.undo(); });
+    // Deshacer quita el addElement (el último paso real); el ajuste no era un paso.
+    expect(store.getState().history.present.elements.find((e) => e.id === "t")).toBeUndefined();
+    expect(store.getState().history.present.revision).not.toBe(rev);
+    act(() => { store.redo(); });
+    expect(get(store)).toMatchObject({ width: 3, height: 1 });
+  });
 });
