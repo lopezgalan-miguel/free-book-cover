@@ -30,4 +30,5 @@ export * from "./elements/editable.js";
 export * from "./elements/defaults.js";
 export * from "./textures/generate.js";
 export * from "./text/fontAxes.js";
+export * from "./text/fontCollection.js";
 export * from "./elements/clipboard.js";
