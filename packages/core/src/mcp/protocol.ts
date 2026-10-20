@@ -236,7 +236,7 @@ export const updateVariantInput = z
     targetId: z.string().min(1).max(200),
     view: viewOverrideSchema.optional().describe("Encuadre: x, y (0..1, 0,5 = centrado) y zoom (1..8) de la zona visible del diseño base."),
     background: backgroundOverrideSchema.optional(),
-    elements: z.record(z.string().min(1).max(200), elementOverrideSchema).optional().describe("Ajustes por elemento en pulgadas de la variante (x, y, width, height, rotation, visible, fontScale, fit, crop)."),
+    elements: z.record(z.string().min(1).max(200), elementOverrideSchema).optional().describe("Ajustes por elemento en pulgadas de la variante (x, y, width, height, rotation, visible, opacity 0..1, fontScale, fit, crop)."),
   })
   .strict()
   .refine((v) => v.view !== undefined || v.background !== undefined || v.elements !== undefined, { message: "indica view, background o elements" });

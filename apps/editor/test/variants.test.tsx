@@ -156,6 +156,32 @@ describe("panel de variantes", () => {
   });
 });
 
+describe("opacidad por variante", () => {
+  it("con una variante activa el deslizador crea un ajuste y no toca el base; Restablecer vuelve a la del base", async () => {
+    const user = userEvent.setup();
+    const { store } = await mount();
+    store.dispatch({ type: "addElement", element: rect("s1", { opacity: 0.8 }) });
+    await addVariant(user, "instagram-feed-portrait");
+    const id = store.getState().history.present.digitalTargets![0]!.id!;
+    store.select("s1");
+    fireEvent.change(await screen.findByLabelText("Opacidad"), { target: { value: "40" } });
+    expect(overridesOf(store.getState().history.present.digitalTargets![0]!).elements?.s1).toMatchObject({ opacity: 0.4 });
+    expect(store.getState().history.present.elements[0]).toMatchObject({ opacity: 0.8 });
+    expect(screen.getByLabelText("Opacidad")).toHaveValue("40");
+    await user.click(screen.getByRole("button", { name: "Restablecer elemento" }));
+    expect(overridesOf(store.getState().history.present.digitalTargets!.find((t) => t.id === id)!).elements?.s1).toBeUndefined();
+    expect(screen.getByLabelText("Opacidad")).toHaveValue("80");
+  });
+
+  it("sin variante activa, 100 % quita la propiedad del base", async () => {
+    const { store } = await mount();
+    store.dispatch({ type: "addElement", element: rect("s1", { opacity: 0.5 }) });
+    store.select("s1");
+    fireEvent.change(await screen.findByLabelText("Opacidad"), { target: { value: "100" } });
+    expect("opacity" in store.getState().history.present.elements[0]!).toBe(false);
+  });
+});
+
 describe("modal de exportación", () => {
   const okDeps = (over: Partial<ExportDeps> = {}): ExportDeps => ({
     fonts: { ensureDoc: () => {}, whenSettled: async () => {}, checkFontsReady: () => ({ ok: true }) },

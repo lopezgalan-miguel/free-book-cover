@@ -44,11 +44,10 @@ export function GeometryPanel() {
       <div className="mt-2 flex gap-2">
         <NumberField label={t("rotation")} value={el.rotation} step={1} onCommit={(rotation) => set({ rotation })} />
       </div>
-      {/* La opacidad es del diseño base (las variantes no la ajustan). */}
       <div className="mt-2.5">
         <Slider
           label={t("opacity")} min={0} max={100} step={1} value={Math.round((el.opacity ?? 1) * 100)} format={(v) => `${v} %`}
-          onCommit={(v) => store.dispatch({ type: "updateElement", id: el.id, props: { opacity: v >= 100 ? undefined : v / 100 } })}
+          onCommit={(v) => set({ opacity: v >= 100 ? undefined : v / 100 })}
         />
       </div>
       <div className="mt-2.5 flex gap-1.5">

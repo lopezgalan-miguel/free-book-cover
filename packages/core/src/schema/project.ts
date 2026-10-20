@@ -180,6 +180,7 @@ export const elementOverrideSchema = z
     height: finite.nonnegative().optional(),
     rotation: finite.optional(),
     visible: z.boolean().optional(),
+    opacity: finite.min(0).max(1).optional(),
     // Multiplicador del tamaño de letra derivado (solo textos).
     fontScale: finite.positive().optional(),
     // Solo imágenes.

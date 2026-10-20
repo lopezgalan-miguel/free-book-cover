@@ -86,6 +86,7 @@ function deriveElement(e: Element, m: CoverMap, ov: ElementOverride | undefined)
     height: ov?.height ?? derived.height,
     rotation: ov?.rotation ?? e.rotation,
     visible: ov?.visible ?? e.visible,
+    ...((ov?.opacity ?? e.opacity) !== undefined ? { opacity: ov?.opacity ?? e.opacity } : {}),
   };
   if (e.type === "text") {
     const k = s * (ov?.fontScale ?? 1);

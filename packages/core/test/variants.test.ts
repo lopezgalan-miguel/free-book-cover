@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CUSTOM_PRESET_ID, DIGITAL_PRESETS, MAX_TARGET_PX, applyCommand, buildExportReport, checkExportSize, createHistory, customTarget,
-  elementVisibility, execute, exportFileName, findPreset, fitToExportLimit, formatBytes, loadProject, overridesOf, redo, renderDocument,
+  elementOverrideSchema, elementVisibility, execute, exportFileName, findPreset, fitToExportLimit, formatBytes, loadProject, overridesOf, redo, renderDocument,
   targetFromPreset, undo, variantDocument, visibleArea, type Command, type Project,
 } from "../src/index.js";
 import { baseProject, imageEl, shapeEl, textEl } from "./fixtures.js";
@@ -364,5 +364,24 @@ describe("fondo de la variante alineado con los elementos", () => {
     expect(doc.canvas.backgroundFrame).toBeUndefined();
     const r = renderDocument(doc, { pxPerInch: 100 });
     expect(r.background.kind === "image" && r.background.frame).toEqual({ x: 0, y: 0, width: 600, height: 900 });
+  });
+});
+
+describe("opacidad por variante", () => {
+  it("el ajuste de la variante sustituye a la del base; sin ajuste hereda; el base no cambia", () => {
+    const b = base();
+    b.elements = [shapeEl("s1", { x: 1, y: 2, width: 2, height: 1, fill: "#ff0000", zIndex: 0, opacity: 0.5 }), shapeEl("s2", { x: 1, y: 2, width: 2, height: 1, fill: "#ff0000", zIndex: 1 })];
+    const t = ig();
+    const withOv = run(run(b, { type: "addDigitalTarget", target: t }), { type: "setVariantElement", targetId: t.id!, elementId: "s1", props: { opacity: 1 } });
+    const doc = variantDocument(withOv, withOv.digitalTargets![0] as never);
+    expect(doc.elements.find((e) => e.id === "s1")!.opacity).toBe(1);
+    expect(withOv.elements.find((e) => e.id === "s1")!.opacity).toBe(0.5);
+    expect("opacity" in doc.elements.find((e) => e.id === "s2")!).toBe(false);
+    const inherit = variantDocument(run(b, { type: "addDigitalTarget", target: t }), t);
+    expect(inherit.elements.find((e) => e.id === "s1")!.opacity).toBe(0.5);
+  });
+  it("opacity fuera de 0..1 no valida", () => {
+    expect(elementOverrideSchema.safeParse({ opacity: 1.2 }).success).toBe(false);
+    expect(elementOverrideSchema.safeParse({ opacity: 0.3 }).success).toBe(true);
   });
 });
