@@ -1,6 +1,6 @@
 import {
   DEFAULT_EXPORT_QUALITY, DEFAULT_PX_PER_IN, FONT_CATALOG, availableFaces, availableWeights, hasFace, MAX_EXPORT_BYTES, MCP_TOOLS, assetDims, customTarget, defaultTextElement, documentFontFamilies,
-  editableKeys, elementVisibility, findPreset, readFontAxes, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, letterWidthPatch, lowDpiForSetup, needsRelayout, overridesOf,
+  editableKeys, elementVisibility, findPreset, readFontAxes, importAssetEditorInput, importFontEditorInput, isResolvedTarget, kdpLayout, lowDpiForSetup, needsRelayout, overridesOf,
   normalizeRuns, TEXT_RUN_KEYS, styleToPatch, targetFromPreset, validatePrintSetup, variantDocument, visibleArea,
   type CommandError, type ElementSummary, type PrintSetup, type Project, type RunInput, type ResolvedTarget, type TextElement, type TextMeasure, type ToolError, type ToolOutcome, type McpToolName,
 } from "@free-book-cover/core";
@@ -219,10 +219,6 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
         const own = documentFontFamilies(doc());
         const notUploaded = next.runs.find((r) => r.stretch !== undefined && !own.has(r.fontFamily));
         if (notUploaded) return invalid(`style.stretch: solo se aplica a una fuente variable subida al proyecto («${notUploaded.fontFamily}» no lo es)`);
-      }
-      // La anchura de letra no reparte las líneas de nuevo: la caja se ensancha con ella, salvo que el cliente fije width o x.
-      if (el.type === "text" && typeof style.scaleX === "number" && style.width === undefined && style.x === undefined) {
-        Object.assign(patch, letterWidthPatch({ ...el, align: (style.align as TextElement["align"] | undefined) ?? el.align }, style.scaleX));
       }
       // La caja sigue al texto salvo que el cliente fije la altura.
       if (el.type === "text" && style.height === undefined && (needsRelayout(style) || newRuns !== undefined)) {
