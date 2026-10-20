@@ -37,7 +37,7 @@ export function createMcpServer(opts: McpServerOptions): Server {
       description: MCP_TOOLS[name].description,
       inputSchema: toolJsonSchema(name, "input") as { type: "object" },
       outputSchema: toolJsonSchema(name, "output") as { type: "object" },
-      annotations: { readOnlyHint: MCP_TOOLS[name].readOnly, destructiveHint: false, openWorldHint: false },
+      annotations: { readOnlyHint: MCP_TOOLS[name].readOnly, destructiveHint: (MCP_TOOLS[name] as { destructive?: boolean }).destructive ?? false, openWorldHint: false },
     })),
   }));
 

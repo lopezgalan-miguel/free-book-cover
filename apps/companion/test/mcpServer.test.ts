@@ -65,6 +65,11 @@ describe("servidor MCP: descubrimiento", () => {
     expect(tools.find((t) => t.name === "get_canvas_state")!.annotations?.readOnlyHint).toBe(true);
     expect(add.annotations?.readOnlyHint).toBe(false);
   });
+  it("gestión: renombrar, borrar y reordenar; solo remove_element es destructiva", async () => {
+    const { tools } = await client.listTools();
+    for (const name of ["rename_project", "remove_element", "reorder_element"]) expect(tools.map((t) => t.name)).toContain(name);
+    expect(tools.filter((t) => t.annotations?.destructiveHint).map((t) => t.name)).toEqual(["remove_element"]);
+  });
 });
 
 describe("servidor MCP: llamadas", () => {

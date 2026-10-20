@@ -41,6 +41,9 @@ Todas las entradas son `strict` (campos desconocidos se rechazan). Longitudes en
 | `set_canvas` | `projectId`, `expectedRevision`, `widthIn`, `heightIn` | `revision`, `canvas`, `saved` |
 | `set_background_filters` | `projectId`, `expectedRevision`, `filters` (`{ blur?, brightness?, saturation? }` o `null`) | `revision`, `filters`, `saved` |
 | `generate_texture` | `projectId`, `expectedRevision?`, `kind` (`cracked-marble`/`stone`/`paper`), `seed`, `sizePx?` (64–2048, por defecto 1024), `scale?`, `color?`, `cracks?` (`holes`/`lines`) | `assetId`, `widthPx`, `heightPx`, `revision`, `saved` |
+| `rename_project` | `projectId`, `expectedRevision`, `name` (1–120 caracteres) | `revision`, `name`, `saved` |
+| `remove_element` | `projectId`, `expectedRevision`, `elementId` | `revision`, `saved` |
+| `reorder_element` | `projectId`, `expectedRevision`, `elementId`, `toIndex` (0 = fondo; si pasa del último, queda al frente) | `revision`, `order` (IDs del fondo al frente), `saved` |
 | `export_image` | `projectId`, `target?` (variante; sin él, el base a 300 ppp), `format` (`png`/`jpeg`/`webp`), `quality?` | `path`, `fileName`, `format`, `widthPx`, `heightPx`, `bytes` |
 
 Los esquemas JSON de entrada y salida se publican en `tools/list` (generados con `z.toJSONSchema`). Notas:
@@ -61,6 +64,7 @@ Los esquemas JSON de entrada y salida se publican en `tools/list` (generados con
 - `get_canvas_state` incluye `printSetup` y `variants` cuando existen, y la familia de las fuentes subidas.
 - Un recurso o variante ausente es `not_found` con `resource` `asset` o `variant`.
 - `apply_background` aplica fondo y encuadre con un único comando (`setBackground` con `fit`): una revisión y un solo paso de deshacer.
+- `remove_element` es la única herramienta marcada `destructiveHint: true`: borra el elemento y también sus ajustes en las variantes, en un solo paso; deshacer en el editor lo recupera todo.
 - `saved`: el editor guarda el proyecto tras cada cambio; si el guardado falla, la edición sigue aplicada (se puede deshacer) y `saved` es `false`.
 
 ### Importación de recursos (`import_asset`)

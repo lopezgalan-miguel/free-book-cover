@@ -305,6 +305,25 @@ export async function executeTool(deps: ExecutorDeps, tool: McpToolName, rawArgs
       return { ok: true, data: { revision: r.revision, filters: doc().canvas.backgroundFilters ?? null, saved: await saved(store) } };
     }
 
+    case "rename_project": {
+      const r = store.applyRemote({ type: "setName", name: args.name }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "element"));
+      return { ok: true, data: { revision: r.revision, name: doc().name, saved: await saved(store) } };
+    }
+
+    case "remove_element": {
+      const r = store.applyRemote({ type: "removeElement", id: args.elementId }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "element"));
+      return { ok: true, data: { revision: r.revision, saved: await saved(store) } };
+    }
+
+    case "reorder_element": {
+      const r = store.applyRemote({ type: "reorderElement", id: args.elementId, toIndex: args.toIndex }, args.expectedRevision);
+      if (!r.ok) return fail(fromCommand(r.error, "element"));
+      const order = [...doc().elements].sort((a, b) => a.zIndex - b.zIndex).map((e) => e.id);
+      return { ok: true, data: { revision: r.revision, order, saved: await saved(store) } };
+    }
+
     case "generate_texture": {
       if (args.expectedRevision !== undefined && args.expectedRevision !== doc().revision) return conflict(args.expectedRevision, doc().revision);
       const { projectId: _p, expectedRevision, ...opts } = args;

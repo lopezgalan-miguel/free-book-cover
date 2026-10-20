@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DIGITAL_PRESETS } from "../presets/digital.js";
+import { MAX_NAME_LENGTH } from "../commands/commands.js";
 import { PAPERS } from "../kdp/kdp.js";
 import { TEXTURE_KINDS } from "../textures/generate.js";
 import {
@@ -13,7 +14,7 @@ import {
 export const MCP_TOOL_NAMES = [
   "get_canvas_state", "add_text_element", "update_element_style", "import_asset", "apply_background",
   "import_font", "add_image_element", "add_shape_element", "add_variant", "update_variant", "set_print_setup", "export_image", "set_canvas",
-  "set_background_filters", "generate_texture",
+  "set_background_filters", "generate_texture", "rename_project", "remove_element", "reorder_element",
 ] as const;
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
 
@@ -48,6 +49,12 @@ export type ToolError = z.infer<typeof toolErrorSchema>;
 const finite = z.number().finite();
 const projectId = z.string().min(1).max(200).describe("ID del proyecto autorizado en el editor.");
 const expectedRevision = z.number().int().nonnegative().describe("Revisión del documento que el cliente leyó; si ya no es la vigente, la llamada se rechaza sin modificar nada.");
+
+export const renameProjectInput = z.object({ projectId, expectedRevision, name: z.string().trim().min(1).max(MAX_NAME_LENGTH) }).strict();
+export const removeElementInput = z.object({ projectId, expectedRevision, elementId: z.string().min(1).max(200) }).strict();
+export const reorderElementInput = z
+  .object({ projectId, expectedRevision, elementId: z.string().min(1).max(200), toIndex: z.number().int().nonnegative().describe("Posición en la pila: 0 = fondo; si excede el último, queda al frente.") })
+  .strict();
 
 export const getCanvasStateInput = z
   .object({ projectId: projectId.optional().describe("Si se omite, se usa el proyecto autorizado.") })
@@ -367,6 +374,9 @@ export const setPrintSetupOutput = z
     saved,
   })
   .strict();
+export const renameProjectOutput = z.object({ revision: z.number().int(), name: z.string(), saved }).strict();
+export const removeElementOutput = z.object({ revision: z.number().int(), saved }).strict();
+export const reorderElementOutput = z.object({ revision: z.number().int(), order: z.array(z.string()).describe("IDs de los elementos del fondo al frente."), saved }).strict();
 export const setCanvasOutput = z.object({ revision: z.number().int(), canvas: z.object({ widthIn: z.number(), heightIn: z.number() }).strict(), saved }).strict();
 export const exportImageOutput = z
   .object({ path: z.string(), fileName: z.string(), format: z.enum(["png", "jpeg", "webp"]), widthPx: z.number().int(), heightPx: z.number().int(), bytes: z.number().int() })
@@ -389,6 +399,9 @@ export const MCP_TOOLS = {
   set_canvas: { description: "Cambia el tamaño del lienzo (pulgadas) en modo libre o digital; los elementos no se mueven. En una cubierta KDP el tamaño lo fija set_print_setup.", input: setCanvasInput, output: setCanvasOutput, readOnly: false },
   set_background_filters: { description: "Desenfoca, oscurece o desatura el fondo (filtros de imagen del lienzo) sin preparar la imagen fuera.", input: setBackgroundFiltersInput, output: setBackgroundFiltersOutput, readOnly: false },
   generate_texture: { description: "Genera una textura incluida y sin costuras (mármol agrietado, piedra o papel) como recurso de imagen, para usarla en texture o mask de un texto en mosaico.", input: generateTextureInput, output: generateTextureOutput, readOnly: false },
+  rename_project: { description: "Cambia el nombre del proyecto (1 a 120 caracteres).", input: renameProjectInput, output: renameProjectOutput, readOnly: false },
+  remove_element: { description: "Borra un elemento y sus ajustes en las variantes; se puede deshacer en el editor.", input: removeElementInput, output: removeElementOutput, readOnly: false, destructive: true },
+  reorder_element: { description: "Mueve un elemento en la pila de capas (0 = fondo; un índice mayor que el último lo deja al frente) y devuelve el orden del fondo al frente.", input: reorderElementInput, output: reorderElementOutput, readOnly: false },
   export_image: { description: "Exporta el diseño base (300 ppp) o una variante como PNG, JPEG o WebP y lo guarda en el directorio de exportación del companion (FBC_EXPORT_DIR).", input: exportImageInput, output: exportImageOutput, readOnly: true },
 } as const;
 
