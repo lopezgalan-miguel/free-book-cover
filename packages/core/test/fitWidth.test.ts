@@ -29,8 +29,8 @@ describe("fitFontToWidth", () => {
     expect(fitFontToWidth(el({ runs: [run("")] }), measure)).toBeNull();
     expect(fitFontToWidth(el({ width: 2 }), measure)).toBeNull();
   });
-  it("redondea hacia abajo: con una medida no múltiplo de 0,1 la línea cabe y no se parte", () => {
-    const odd: TextMeasure = (text, css) => text.length * Number(/([\d.]+)px/.exec(css)![1]) * 0.5037;
+  it("redondea hacia abajo: el ideal (~63,57 pt) no es múltiplo de 0,1: la línea cabe y no se parte", () => {
+    const odd: TextMeasure = (text, css) => text.length * Number(/([\d.]+)px/.exec(css)![1]) * 0.5034;
     const e = el({ runs: [run("abcd efgh")] });
     const runs = fitFontToWidth(e, odd)!;
     const out = layoutText({ ...e, runs }, 300, odd);
