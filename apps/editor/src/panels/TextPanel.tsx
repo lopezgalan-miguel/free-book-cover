@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
-  FONT_CATALOG, TEXTURE_KINDS, applyStyleToRange, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, nearestFace, rangeStyle, replaceText, runsToText,
+  FONT_CATALOG, TEXTURE_KINDS, applyStyleToRange, fitFontToWidth, availableFaces, availableWeights, documentFontFamilies, fontStack, hasFace, nearestFace, rangeStyle, replaceText, runsToText,
   type FontGroupId, type InnerShadow, TEXTURE_DEFAULTS, type TextureKind, type TextureOptions, type RunStylePatch, type TextElement, type TextMask, type TextTexture,
 } from "@free-book-cover/core";
 import { browserMeasure, textHeightIn } from "../canvas/measure";
@@ -14,7 +14,7 @@ import { useI18n } from "../i18n";
 import type { DictKey } from "../i18n/dictionaries";
 import { useEditorState, useStore } from "../store/react";
 import type { TextSection } from "../layout/mobileTabs";
-import { NumberField, Section, Slider, Switch, fieldCls, toggleBtn } from "./ui";
+import { NumberField, Section, Slider, Switch, chipBtn, fieldCls, toggleBtn } from "./ui";
 
 const ALL_SECTIONS: readonly TextSection[] = ["text", "font", "style", "color", "fx"];
 
@@ -67,6 +67,13 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
     const measure = browserMeasure();
     const next = { ...cur, ...props };
     store.dispatch({ type: "updateElement", id, props: measure ? { ...props, height: textHeightIn(next, measure) } : props }, mergeKey ? { mergeKey: `${id}:${mergeKey}` } : {});
+  };
+  // Escala todos los cuerpos para que la línea más ancha llene la caja (no en texto curvo).
+  const fitWidth = () => {
+    const cur = latest();
+    const measure = browserMeasure();
+    const runs = cur && measure ? fitFontToWidth(cur, measure) : null;
+    if (runs) commit({ runs });
   };
   // Cambia la textura y, si la máscara está enlazada, le copia el mismo encaje en el mismo paso.
   const setTexture = (texture: TextTexture) => {
@@ -246,6 +253,7 @@ function TextEditor({ id, sections }: { id: string; sections: readonly TextSecti
         <div className="-mt-1 mb-3 flex">
           <NumberField label={t("sizeExact")} value={cur.fontSizePt ?? first?.fontSizePt ?? 24} min={1} max={1000} step={0.1} digits={1} onCommit={(v) => v > 0 && style({ fontSizePt: v })} />
         </div>
+        <button type="button" className={`${chipBtn} -mt-1 mb-3`} disabled={el.curvature !== 0} onClick={fitWidth}>{t("fitWidth")}</button>
         <Slider label={t("lineH")} min={0.8} max={2.4} step={0.05} value={el.lineHeight} format={(v) => v.toFixed(2)} onCommit={(lineHeight) => commit({ lineHeight })} />
         <Slider label={t("letterS")} min={-0.05} max={0.5} step={0.01} value={el.letterSpacing} format={(v) => `${v.toFixed(2)}em`} onCommit={(letterSpacing) => commit({ letterSpacing })} />
         <Slider label={t("scaleX")} min={0.5} max={1.5} step={0.01} value={el.scaleX ?? 1} format={(v) => `${Math.round(v * 100)} %`} onCommit={(scaleX) => commit({ scaleX })} />

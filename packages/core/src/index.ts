@@ -15,6 +15,7 @@ export * from "./text/runs.js";
 export * from "./text/layout.js";
 export * from "./text/letterWidth.js";
 export * from "./text/fitBox.js";
+export * from "./text/fitWidth.js";
 export * from "./presets/digital.js";
 export * from "./variants/variants.js";
 export * from "./export/report.js";
