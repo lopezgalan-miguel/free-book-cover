@@ -10,7 +10,7 @@ const item = (shadow: TextItem["effects"]["shadow"]): TextItem => ({
     runs: [{ text: "Hola", fontFamily: "Lora", fontSizePt: 10, weight: 400, italic: false, underline: false, uppercase: false, color: "#ffffff" }],
     align: "left", lineHeight: 1, letterSpacing: 0, shadow: { on: shadow !== null, intensity: 40 }, outline: { on: false, width: 0, color: "#000000" }, curvature: 0,
   },
-  layout: { heightPx: 40, glyphs: null, lines: [{ top: 0, height: 40, baseline: 32, width: 80, pieces: [{ text: "Hola", x: 0, width: 80, style }] }] },
+  layout: { heightPx: 40, minWidthPx: 80, glyphs: null, lines: [{ top: 0, height: 40, baseline: 32, width: 80, pieces: [{ text: "Hola", x: 0, width: 80, style }] }] },
   effects: { shadow, outline: null, innerShadow: null },
   texture: null,
   mask: null,

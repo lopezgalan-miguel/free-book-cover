@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canUndo, createHistory, endMerge, execute, redo, undo, type Command, type History } from "../src/index.js";
+import { amendPresent, canUndo, createHistory, endMerge, execute, redo, undo, type Command, type History } from "../src/index.js";
 import { baseProject, textEl } from "./fixtures.js";
 
 const run = (h: History, c: Command, merge?: { key: string; at: number; windowMs?: number }) => {
@@ -78,5 +78,28 @@ describe("fusión de gestos en el historial", () => {
     expect(u.ok && u.history.present.name).toBe(baseProject().name);
     const r = u.ok ? redo(u.history) : u;
     expect(r.ok && r.history.present.name).toBe("Mi portada");
+  });
+});
+
+describe("amendPresent", () => {
+  it("amendPresent corrige el presente sin añadir paso", () => {
+    let h = withText();
+    h = run(h, setX(5), { key: "t:x", at: 0 });
+    const r = amendPresent(h, [setX(7), { type: "updateElement", id: "t", props: { y: 4 } }]);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.history.past).toBe(h.past);
+    expect(r.history.future).toEqual(h.future);
+    expect(r.history.merge).toEqual(h.merge);
+    expect(r.history.limit).toBe(h.limit);
+    expect(r.history.present.revision).toBe(h.present.revision + 2);
+    expect(r.history.present.elements[0]).toMatchObject({ x: 7, y: 4 });
+    const none = amendPresent(h, []);
+    expect(none.ok && none.history).toBe(h);
+  });
+  it("si un comando falla devuelve el error y el historial no cambia", () => {
+    const h = withText();
+    const r = amendPresent(h, [setX(7), { type: "updateElement", id: "nope", props: { x: 1 } }]);
+    expect(r.ok).toBe(false);
+    expect(h.present.elements[0]).toMatchObject({ x: 1 });
   });
 });

@@ -49,6 +49,18 @@ export function execute(h: History, cmd: Command, expectedRevision: number, merg
   return { ok: true, history: { past, present: r.doc, future: [], limit: h.limit, ...mark } };
 }
 
+// Corrige el presente con comandos (p. ej. el ajuste automático de la caja de texto) sin abrir un paso
+// de deshacer: se conservan past, future, limit y merge. Si un comando falla, nada cambia.
+export function amendPresent(h: History, cmds: readonly Command[]): HistoryResult {
+  let doc = h.present;
+  for (const cmd of cmds) {
+    const r = applyCommand(doc, cmd, doc.revision);
+    if (!r.ok) return r;
+    doc = r.doc;
+  }
+  return cmds.length === 0 ? { ok: true, history: h } : { ok: true, history: { ...h, present: doc } };
+}
+
 // Cierra el gesto en curso: el siguiente comando abre un paso nuevo.
 export function endMerge(h: History): History {
   if (!h.merge) return h;

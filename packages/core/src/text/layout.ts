@@ -39,6 +39,8 @@ export interface TextLayout {
   lines: LayoutLine[];
   // Solo con curvatura distinta de 0; en ese caso se pinta esto y no las líneas.
   glyphs: LayoutGlyph[] | null;
+  // Ancho de la palabra más ancha (con espaciado y anchura de letra); 0 si no hay palabras.
+  minWidthPx: number;
 }
 
 export interface ShadowPx {
@@ -126,41 +128,13 @@ function tokenize(el: TextElement, ppi: number, measure: TextMeasure): Token[] {
   return tokens;
 }
 
-// Parte una palabra más ancha que la caja en trozos que quepan.
-function splitWord(tok: Token, max: number, measure: TextMeasure): Token[] {
-  const out: Token[] = [];
-  let cur: Token = { kind: "word", pieces: [], width: 0 };
-  for (const p of tok.pieces) {
-    let buf = "";
-    const flush = () => {
-      if (buf) {
-        const w = measure(buf, p.style.font) + buf.length * p.style.spacingPx;
-        cur.pieces.push({ text: buf, style: p.style, width: w });
-        cur.width += w;
-        buf = "";
-      }
-    };
-    for (const ch of p.text) {
-      const w = measure(buf + ch, p.style.font) + (buf.length + 1) * p.style.spacingPx;
-      if (cur.width + w > max && (buf || cur.pieces.length)) {
-        flush();
-        out.push(cur);
-        cur = { kind: "word", pieces: [], width: 0 };
-      }
-      buf += ch;
-    }
-    flush();
-  }
-  if (cur.pieces.length) out.push(cur);
-  return out;
-}
-
 interface RawLine {
   tokens: Token[];
   endsParagraph: boolean;
 }
 
-function breakLines(tokens: Token[], maxWidth: number, measure: TextMeasure): RawLine[] {
+// Una palabra más ancha que la caja ocupa su propia línea y sobresale; nunca se parte.
+function breakLines(tokens: Token[], maxWidth: number): RawLine[] {
   const lines: RawLine[] = [];
   let cur: Token[] = [];
   let width = 0;
@@ -183,12 +157,9 @@ function breakLines(tokens: Token[], maxWidth: number, measure: TextMeasure): Ra
       }
       continue;
     }
-    const parts = tok.width > maxWidth ? splitWord(tok, maxWidth, measure) : [tok];
-    for (const part of parts) {
-      if (width + part.width > maxWidth && cur.some((t) => t.kind === "word")) push(false);
-      cur.push(part);
-      width += part.width;
-    }
+    if (width + tok.width > maxWidth && cur.some((t) => t.kind === "word")) push(false);
+    cur.push(tok);
+    width += tok.width;
   }
   if (cur.length || lines.length === 0) push(true);
   return lines;
@@ -203,7 +174,9 @@ export function layoutText(el: TextElement, ppi: number, rawMeasure: TextMeasure
   const boxW = Math.max(1, el.width * ppi);
   const fallbackPx = px(el.runs[0]?.fontSizePt ?? 12, ppi);
   const curved = el.curvature !== 0;
-  const raw = breakLines(tokenize(el, ppi, measure), curved ? Infinity : boxW, measure);
+  const tokens = tokenize(el, ppi, measure);
+  const minWidthPx = Math.max(0, ...tokens.filter((t) => t.kind === "word").map((t) => t.width));
+  const raw = breakLines(tokens, curved ? Infinity : boxW);
   const lines: LayoutLine[] = [];
   let top = 0;
   for (const rl of raw) {
@@ -234,7 +207,7 @@ export function layoutText(el: TextElement, ppi: number, rawMeasure: TextMeasure
     lines.push({ top, height, baseline: top + (height - size) / 2 + size * ASCENT, width: natural + gap * rl.tokens.filter((t) => t.kind === "space").length, pieces: placed });
     top += height;
   }
-  return { heightPx: top, lines, glyphs: curved ? curveGlyphs(lines, el.curvature, boxW, measure) : null };
+  return { heightPx: top, lines, minWidthPx, glyphs: curved ? curveGlyphs(lines, el.curvature, boxW, measure) : null };
 }
 
 // Arco de circunferencia: la línea más larga barre |curvatura|/100 · 180° y todas las líneas
