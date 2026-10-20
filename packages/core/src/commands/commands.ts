@@ -1,6 +1,7 @@
 import { applyResizePolicy, type ResizePolicy, type ResizeTargets } from "../geometry/resize.js";
 import { overridesOf } from "../variants/variants.js";
-import { validatePrintSetup, type PrintSetup } from "../kdp/kdp.js";
+import { bindingOf, validatePrintSetup, type PrintSetup } from "../kdp/kdp.js";
+import { lowDpiForSetup } from "../kdp/hardcoverDpi.js";
 import { applyPrintSetup } from "../kdp/recalc.js";
 import { projectSchema, type Asset, type BackgroundOverride, type ImageFilters, type DigitalTarget, type Element, type ElementOverride, type ImageElement, type Project, type ShapeElement, type TextElement, type ViewOverride } from "../schema/project.js";
 
@@ -205,6 +206,7 @@ function build(doc: Project, cmd: Command): Project | CommandResult {
     case "setPrintSetup": {
       const v = validatePrintSetup(cmd.printSetup);
       if (!v.ok) return invalid(...v.issues.map((i) => `printSetup: ${i.kind}`));
+      if (bindingOf(cmd.printSetup) === "hardcover" && lowDpiForSetup(doc, cmd.printSetup).length) return invalid("printSetup: low_dpi");
       return { ...doc, ...applyPrintSetup(doc, cmd.printSetup) };
     }
   }
