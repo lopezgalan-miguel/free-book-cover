@@ -98,13 +98,14 @@ test("recalcular al cambiar páginas reposiciona sin deformar, avisa y se deshac
 
 test("revisión: texto fuera de zona segura, texto de lomo inválido y fondo sin sangrado", async ({ page }) => {
   await configure(page, "50");
-  const text = (id: string, x: number, w: number) => ({
-    id, type: "text", x, y: 1, width: w, height: 1, rotation: 0, zIndex: 0, visible: true,
-    runs: [{ text: id, fontFamily: "sans-serif", fontSizePt: 24, weight: 400, italic: false, underline: false, uppercase: false, color: "#000000" }],
+  const text = (id: string, x: number, w: number, rotation = 0, fontSizePt = 24) => ({
+    id, type: "text", x, y: 1, width: w, height: 1, rotation, zIndex: 0, visible: true,
+    runs: [{ text: id, fontFamily: "sans-serif", fontSizePt, weight: 400, italic: false, underline: false, uppercase: false, color: "#000000" }],
     align: "left", lineHeight: 1.2, letterSpacing: 0, shadow: { on: false, intensity: 40 }, outline: { on: false, width: 3, color: "#000000" }, curvature: 0,
   });
   await dispatch(page, { type: "addElement", element: text("fuera", 0.2, 3) });
-  await dispatch(page, { type: "addElement", element: text("lomo", 6.15, 0.05) });
+  // Girado 90° y en cuerpo pequeño: la palabra no se parte y la caja queda dentro del lomo (50 páginas: lomo sin texto).
+  await dispatch(page, { type: "addElement", element: text("lomo", 5.68, 1, 90, 6) });
   const issues = page.getByTestId("kdp-issue");
   await expect(issues).toHaveCount(2);
   await expect(issues.nth(0)).toContainText("fuera: texto fuera de la zona segura");
