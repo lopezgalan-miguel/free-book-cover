@@ -242,4 +242,23 @@ describe("splitFontCollection", () => {
     expect(isFontCollection(ttf)).toBe(false);
     expect(splitFontCollection(ttf)).toEqual({ ok: false, reason: "not_collection" });
   });
+  it("nameID 16/17 mandan sobre 1/2; sin OS/2 el peso es 400; macStyle marca la cursiva", () => {
+    const t = buildTtc([{ tables: { head: head(true), name: nameTable([[3, 0x409, 1, "Corta"], [3, 0x409, 2, "Bold"], [3, 0x409, 16, "Larga"], [3, 0x409, 17, "Light"]]) } }]);
+    const r = splitFontCollection(t);
+    if (!r.ok) throw new Error("no ok");
+    expect(r.faces[0]).toMatchObject({ family: "Larga", subfamily: "Light", weight: 400, italic: true });
+  });
+
+  it("una colección sin caras o truncada es corrupt", () => {
+    const vacia = buildTtc([]);
+    expect(splitFontCollection(vacia)).toEqual({ ok: false, reason: "corrupt" });
+    expect(splitFontCollection(ttc.subarray(0, 20))).toEqual({ ok: false, reason: "corrupt" });
+    expect(splitFontCollection(ttc.subarray(0, 4))).toEqual({ ok: false, reason: "corrupt" });
+  });
+
+  it("16 caras (el tope) se aceptan", () => {
+    const t = buildTtc(Array.from({ length: MAX_COLLECTION_FACES }, () => ({ tables: regular })));
+    const r = splitFontCollection(t);
+    expect(r.ok && r.faces.length).toBe(MAX_COLLECTION_FACES);
+  });
 });

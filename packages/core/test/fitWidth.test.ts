@@ -40,4 +40,11 @@ describe("fitFontToWidth", () => {
   it("un fragmento vacío diminuto no limita el factor", () => {
     expect(sizes(fitFontToWidth(el({ runs: [run("abcd", 72), run("", 6)] }), measure))).toEqual([144, 12]);
   });
+  it("en el límite: a 300 pt que ya no pueden crecer, o a 6 pt que no pueden encoger, no devuelve nada", () => {
+    expect(fitFontToWidth(el({ width: 40, runs: [run("ab", 300)] }), measure)).toBeNull();
+    expect(fitFontToWidth(el({ width: 0.01, runs: [run("abcd", 6)] }), measure)).toBeNull();
+  });
+  it("si un fragmento ya está en 6 pt no se encoge el bloque: las proporciones mandan sobre llenar la caja", () => {
+    expect(fitFontToWidth(el({ width: 0.05, runs: [run("ab", 72), run("cd", 6)] }), measure)).toBeNull();
+  });
 });
